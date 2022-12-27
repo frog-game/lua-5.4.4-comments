@@ -301,31 +301,33 @@ typedef struct global_State {
 /*
 ** 'per thread' state
 */
+
+/// @brief Lua 主线程 栈 数据结构
+///作用：管理整个栈和当前函数使用的栈的情况，最主要的功能就是函数调用以及和c的通信
 struct lua_State {
   CommonHeader;
-  lu_byte status;
-  lu_byte allowhook;
-  unsigned short nci;  /* number of items in 'ci' list */
-  StkId top;  /* first free slot in the stack */
-  global_State *l_G;
-  CallInfo *ci;  /* call info for current function */
-  StkId stack_last;  /* end of stack (last element + 1) */
-  StkId stack;  /* stack base */
-  UpVal *openupval;  /* list of open upvalues in this stack */
-  StkId tbclist;  /* list of to-be-closed variables */
-  GCObject *gclist;
-  struct lua_State *twups;  /* list of threads with open upvalues */
-  struct lua_longjmp *errorJmp;  /* current error recover point */
-  CallInfo base_ci;  /* CallInfo for first level (C calling Lua) */
-  volatile lua_Hook hook;
-  ptrdiff_t errfunc;  /* current error handling function (stack index) */
-  l_uint32 nCcalls;  /* number of nested (non-yieldable | C)  calls */
-  int oldpc;  /* last pc traced */
-  int basehookcount;
-  int hookcount;
-  volatile l_signalT hookmask;
+  lu_byte status;//线程脚本的状态
+  lu_byte allowhook;//是否允许hook
+  unsigned short nci;  /* number of items in 'ci' list *///ci列表中的条目数，存储一共多少个CallInfo
+  StkId top;  /* first free slot in the stack *///指向栈的顶部，压入数据，都通过移动栈顶指针来实现
+  global_State *l_G;//全局状态机，维护全局字符串表、内存管理函数、gc等信息
+  CallInfo *ci;  /* call info for current function *///当前运行函数信息
+  StkId stack_last;  /* end of stack (last element + 1) *///执行lua stack最后一个空闲的slot
+  StkId stack;  /* stack base *///stack基地址
+  UpVal *openupval;  /* list of open upvalues in this stack */// upvalues open状态时候的的链表
+  StkId tbclist;  /* list of to-be-closed variables *///此堆栈中所有活动的将要关闭的变量的列表
+  GCObject *gclist;//GC列表
+  struct lua_State *twups;  /* list of threads with open upvalues *///twups 链表  所有带有 open upvalue 的 thread 都会放到这个链表中，这样提供了一个方便的遍历 thread 的途径，并且排除掉了没有 open upvalue 的 thread
+  struct lua_longjmp *errorJmp;  /* current error recover point *///发生错误的长跳转位置，用于记录当函数发生错误时跳转出去的位置
+  CallInfo base_ci;  /* CallInfo for first level (C calling Lua) *///指向函数调用栈的栈底
+  volatile lua_Hook hook;//用户注册的hook回调函数
+  ptrdiff_t errfunc;  /* current error handling function (stack index) *///发生错误的回调函数
+  l_uint32 nCcalls;  /* number of nested (non-yieldable | C)  calls */// 当前C函数的调用的深度
+  int oldpc;  /* last pc traced *///最后一次执行的指令的位置
+  int basehookcount;//用户设置的执行指令数（在hookmask=LUA_MASK_COUNT生效）
+  int hookcount;//运行时，跑了多少条指令
+  volatile l_signalT hookmask;//支持那些hook能力
 };
-
 
 #define G(L)	(L->l_G)
 

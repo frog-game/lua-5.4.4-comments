@@ -105,9 +105,13 @@ typedef LUAI_UACINT l_uacInt;
 
 /*
 ** assertion for checking API calls
+*///(void)l是用来屏蔽编译器 "参数没有被使用，快看看是不是写错了或者把不使用的参数干掉吧" 警告用的
+/*(e) && msg  短路逻辑 
+* &&与：若第一个为假，不判断第二个，整个表达式为假
+* ||或：如果第一个为真就算整个表达式为真，不判断第二个
 */
 #if !defined(luai_apicheck)
-#define luai_apicheck(l,e)	((void)l, lua_assert(e))
+#define luai_apicheck(l,e)	((void)l, lua_assert(e)) 
 #endif
 
 #define api_check(l,e,msg)	luai_apicheck(l,(e) && msg)

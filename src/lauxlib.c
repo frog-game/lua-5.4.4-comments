@@ -308,6 +308,12 @@ LUALIB_API int luaL_execresult (lua_State *L, int stat) {
 ** =======================================================
 */
 
+/// @brief 如果注册表中已经有名为tname的key,则返回0. 
+// 否则创建一个新table作为userdata的元表. 这个元表存储在注册表中,并以tname为key. 返回1. 
+// 函数完成后将该元表置于栈顶. 
+/// @param L 
+/// @param tname 
+/// @return 
 LUALIB_API int luaL_newmetatable (lua_State *L, const char *tname) {
   if (luaL_getmetatable(L, tname) != LUA_TNIL)  /* name already in use? */
     return 0;  /* leave previous value on top, but return 0 */
@@ -320,7 +326,10 @@ LUALIB_API int luaL_newmetatable (lua_State *L, const char *tname) {
   return 1;
 }
 
-
+/// @brief 将栈顶元素存储到注册表中, 它的key为tname
+/// @param L 
+/// @param tname 
+/// @return 
 LUALIB_API void luaL_setmetatable (lua_State *L, const char *tname) {
   luaL_getmetatable(L, tname);
   lua_setmetatable(L, -2);
@@ -924,6 +933,15 @@ LUALIB_API const char *luaL_tolstring (lua_State *L, int idx, size_t *len) {
 ** function gets the 'nup' elements at the top as upvalues.
 ** Returns with only the table at the stack.
 */
+
+/// @brief 将所有 luaL_Reg数组中的函数注册到栈顶的table中.  
+// 当upvalue个数不为0时,所创建的所有函数共享这些upvalue. -2到-(nup+1)的元素为要注册的upvalue. 
+// (注意:这些upvalue是c中的upvalue,不是lua中的upvalue,可以在注册的c函数中通过 lua_upvalueindex(n)获取其值.) 
+// 调用完成后弹出栈顶的所有upvalue.
+/// @param L 
+/// @param l 
+/// @param nup 
+/// @return 
 LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
   luaL_checkstack(L, nup, "too many upvalues");
   for (; l->name != NULL; l++) {  /* fill the table with given functions */
@@ -945,6 +963,13 @@ LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 ** ensure that stack[idx][fname] has a table and push that table
 ** into the stack
 */
+
+/// @brief 将 t[fname] push到栈顶, 其中t是index处的table , 并且 t[fname] 也为一个table. 
+// 如果 t[fname] 原本就存在,返回 true ,否则返回false,并且将 t[fname] 新建为一张空表. 
+/// @param L 
+/// @param idx 
+/// @param fname 
+/// @return 
 LUALIB_API int luaL_getsubtable (lua_State *L, int idx, const char *fname) {
   if (lua_getfield(L, idx, fname) == LUA_TTABLE)
     return 1;  /* table already there */

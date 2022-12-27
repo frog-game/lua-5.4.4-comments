@@ -123,10 +123,13 @@ LUALIB_API void (luaL_requiref) (lua_State *L, const char *modname,
 ** ===============================================================
 */
 
-
+/// @brief 创建一张空表, lua预先分配足够的内存用来存储我们创建的函数库. 
+// 稍后我们可以使用 luaL_setfuncs 函数注册我们的函数库. 
 #define luaL_newlibtable(L,l)	\
   lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
 
+/// brief 创建一个新的table , 并将luaL_Reg数组中的函数注册到其中. 
+// 它是一个宏 (luaL_newlibtable(L,l), luaL_setfuncs(L,l,0)) 
 #define luaL_newlib(L,l)  \
   (luaL_checkversion(L), luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))
 
@@ -147,7 +150,7 @@ LUALIB_API void (luaL_requiref) (lua_State *L, const char *modname,
 #define luaL_dostring(L, s) \
 	(luaL_loadstring(L, s) || lua_pcall(L, 0, LUA_MULTRET, 0))
 
-#define luaL_getmetatable(L,n)	(lua_getfield(L, LUA_REGISTRYINDEX, (n)))
+#define luaL_getmetatable(L,n)	(lua_getfield(L, LUA_REGISTRYINDEX, (n))) /// @brief 将注册表中以tname为key的元表push到栈顶.
 
 #define luaL_opt(L,f,n,d)	(lua_isnoneornil(L,(n)) ? (d) : f(L,(n)))
 
