@@ -379,19 +379,25 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 #define lua_isnone(L,n)		(lua_type(L, (n)) == LUA_TNONE)
 #define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0)
 
+///@brief  通常在push字符串字面值时使用lua_pushliteral,在push字符串指针是使用lua_pushstring "" s这种写法是为了强制只能传递字符串
 #define lua_pushliteral(L, s)	lua_pushstring(L, "" s)
 
 /// @brief 将lua的全局表放在栈顶
 #define lua_pushglobaltable(L)  \
 	((void)lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS))
 
+/// @brief 函数返回一个指向字符串的内部拷贝的指针。你不能修改它（使你想起那里有一个const）。
+/// 只要这个指针对应的值还在栈内，Lua会保证这个指针一直有效。
+/// 当一个C函数返回后，Lua会清理他的栈，所以，有一个原则：永远不要将指向Lua字符串的指针保存到访问他们的外部函数中
 #define lua_tostring(L,i)	lua_tolstring(L, (i), NULL)
 
-
+/// @brief 移动栈顶元素到指定索引的位置，并将这个索引位置上面的元素全部上移至栈顶被移动留下的空隔
 #define lua_insert(L,idx)	lua_rotate(L, (idx), 1)
 
+/// @brief 从给定有效索引处移除一个元素， 把这个索引之上的所有元素移下来填补上这个空隙
 #define lua_remove(L,idx)	(lua_rotate(L, (idx), -1), lua_pop(L, 1))
 
+/// @brief 把栈顶元素移动到给定位置（并且把这个栈顶元素弹出）， 不移动任何元素（因此在那个位置处的值被覆盖掉）
 #define lua_replace(L,idx)	(lua_copy(L, -1, (idx)), lua_pop(L, 1))
 
 /* }============================================================== */

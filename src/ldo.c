@@ -408,6 +408,14 @@ StkId luaD_tryfuncTM (lua_State *L, StkId func) {
 ** expressions, multiple results for tail calls/single parameters)
 ** separated.
 */
+
+
+/// @brief 调整返回结果
+/// @param L 
+/// @param res 
+/// @param nres 函数实际的返回值个数
+/// @param wanted 期待的返回值数量 0:不期待有返回值 1:希望返回一个 -1:希望返回全部  小与-1：判断是to-be-closed变量
+/// @return 
 l_sinline void moveresults (lua_State *L, StkId res, int nres, int wanted) {
   StkId firstresult;
   int i;

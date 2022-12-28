@@ -29,7 +29,8 @@
 
 #if !defined(MAX_SIZET)
 /* maximum value for size_t */
-#define MAX_SIZET	((size_t)(~(size_t)0))
+/// @brief 最大值 其实就是把0取反在强转然后里面的二进制就全是1了
+#define MAX_SIZET	((size_t)(~(size_t)0)) 
 #endif
 
 
@@ -39,8 +40,10 @@
 ** =======================================================
 */
 
-
+/// @brief 堆栈第一部分大小
 #define LEVELS1	10	/* size of the first part of the stack */
+
+/// @brief 堆栈第二部分大小
 #define LEVELS2	11	/* size of the second part of the stack */
 
 
@@ -49,17 +52,50 @@
 ** Search for 'objidx' in table at index -1. ('objidx' must be an
 ** absolute index.) Return 1 + string at top if it found a good name.
 */
+
+/// @brief 查找字段
+/// @param L 
+/// @param objidx 必须是个绝对值索引
+/// @param level 递归层次
+/// @return 
 static int findfield (lua_State *L, int objidx, int level) {
-  if (level == 0 || !lua_istable(L, -1))
-    return 0;  /* not found */
-  lua_pushnil(L);  /* start 'next' loop */
-  while (lua_next(L, -2)) {  /* for each pair in table */
-    if (lua_type(L, -2) == LUA_TSTRING) {  /* ignore non-string keys */
-      if (lua_rawequal(L, objidx, -1)) {  /* found object? */
+  if (level == 0 || !lua_istable(L, -1))  //如果level等于0或者栈顶不是table
+    return 0;  /* not found */// 没找到
+  lua_pushnil(L);  /* start 'next' loop *///塞入一个nil是为了下面的循环
+    /*此时栈的状态
+    -------
+    | -1 nil
+    | -2 table NUMBER_TABLE
+    -------
+    */
+  while (lua_next(L, -2)) {  /* for each pair in table *///循环这个table
+        /*此时栈的状态
+        -------
+        | -1 value
+        | -2 key
+        | -3 table NUMBER_TABLE
+        -------
+        */
+
+    if (lua_type(L, -2) == LUA_TSTRING) {  /* ignore non-string keys *///是字符串
+      if (lua_rawequal(L, objidx, -1)) {  /* found object? *///如果找到了
+        /*此时栈的状态
+        -------
+        | -1 value
+        | -2 key
+        | -3 table NUMBER_TABLE
+        -------
+        */
         lua_pop(L, 1);  /* remove value (but keep name) */
+          /*此时栈的状态
+          -------
+          | -1 key
+          | -2 table NUMBER_TABLE
+          -------
+          */
         return 1;
       }
-      else if (findfield(L, objidx, level - 1)) {  /* try recursively */
+      else if (findfield(L, objidx, level - 1)) {  /* try recursively *///进行递归
         /* stack: lib_name, lib_table, field_name (top) */
         lua_pushliteral(L, ".");  /* place '.' between the two names */
         lua_replace(L, -3);  /* (in the slot occupied by table) */
@@ -67,7 +103,22 @@ static int findfield (lua_State *L, int objidx, int level) {
         return 1;
       }
     }
+
+      /*此时栈的状态
+      -------
+      | -1 value
+      | -2 key
+      | -3 table NUMBER_TABLE
+      -------
+      */
     lua_pop(L, 1);  /* remove value */
+
+     /*此时栈的状态
+    -------
+    | -1 key
+    | -2 table NUMBER_TABLE
+    -------
+    */
   }
   return 0;  /* not found */
 }

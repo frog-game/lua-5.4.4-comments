@@ -61,13 +61,16 @@ const char lua_ident[] =
 ** '!ttisnil(o)' implies 'o != &G(L)->nilvalue', so it is not needed.
 ** However, it covers the most common cases in a faster way.
 */
+/// @brief 是否有效
 #define isvalid(L, o)	(!ttisnil(o) || o != &G(L)->nilvalue)
 
 
 /* test for pseudo index */
+/// @brief 是不是假索引 假索引除了他对应的值不在栈中之外，其他都类似于栈中的索引
 #define ispseudo(i)		((i) <= LUA_REGISTRYINDEX)
 
 /* test for upvalue */
+/// @brief 是不是上值
 #define isupvalue(i)		((i) < LUA_REGISTRYINDEX)
 
 
