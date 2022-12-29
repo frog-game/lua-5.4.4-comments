@@ -28,6 +28,7 @@ typedef struct luaL_Buffer luaL_Buffer;
 
 
 /* key, in the registry, for table of loaded modules */
+/// @brief 在注册表中用于加载模块的表
 #define LUA_LOADED_TABLE	"_LOADED"
 
 

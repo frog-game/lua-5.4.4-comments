@@ -475,24 +475,53 @@ LUA_API int (lua_gethookcount) (lua_State *L);
 LUA_API int (lua_setcstacklimit) (lua_State *L, unsigned int limit);
 
 struct lua_Debug {
-  int event;
-  const char *name;	/* (n) */
-  const char *namewhat;	/* (n) 'global', 'local', 'field', 'method' */
-  const char *what;	/* (S) 'Lua', 'C', 'main', 'tail' */
-  const char *source;	/* (S) */
-  size_t srclen;	/* (S) */
-  int currentline;	/* (l) */
-  int linedefined;	/* (S) */
-  int lastlinedefined;	/* (S) */
-  unsigned char nups;	/* (u) number of upvalues */
-  unsigned char nparams;/* (u) number of parameters */
-  char isvararg;        /* (u) */
-  char istailcall;	/* (t) */
-  unsigned short ftransfer;   /* (r) index of first value transferred */
-  unsigned short ntransfer;   /* (r) number of transferred values */
-  char short_src[LUA_IDSIZE]; /* (S) */
+  int event;//事件类型标识如下几种 [LUA_HOOKCALL,LUA_HOOKRET,LUA_HOOKLINE,LUA_HOOKCOUNT,LUA_HOOKTAILCALL]
+  const char *name;	/* (n) */// 给定函数的一个合理的名字。
+                            //  因为Lua中的函数是"first-class values"，所以它们没有固定的名字。
+                            //  一些函数可能是全局复合变量的值，另一些可能仅仅只是被保存在一个"table"的某个域中。
+                            //  Lua会检查函数是怎样被调用的，以此来找到一个适合的名字。
+                            //  如果它找不到名字，该域就被设置为"NULL"。
+
+  const char *namewhat;	/* (n) 'global', 'local', 'field', 'method' */// 作用域的含义，用于解释"name"域。
+                                                                      // 其值可以是"global"，"local"，"method"，"field"，"upvalue"，或是""，
+                                                                      // 这取决于函数怎样被调用。（Lua用空串表示其它选项都不符合）
+
+  const char *what;	/* (S) 'Lua', 'C', 'main', 'tail' */// 如果函数是一个Lua函数，则为一个字符串"Lua"；
+                                                       //  如果是一个C函数，则为"C"；
+                                                       //  如果是一个"chunk"的主体部分，则为"main"。
+                                                       //  "what"可以指定如下参数，以指定返回值"table"中包含上面所有域中的哪些域：
+                                                       //  'n': 包含"name"和"namewhat"域；
+                                                       //  'S': 包含"source"，"short_src"，"linedefined"，"lastlinedefined"以及"what"域；
+                                                       //  'l': 包含"currentline"域；
+                                                       //  't': 包含"istailcall"域；
+                                                       //  'u': 包含"nup"，"nparams"以及"isvararg"域；
+                                                       //  'f': 包含"func"域；
+                                                       //  'L': 包含"activelines"域；]]
+
+  const char *source;	/* (S) */// 创建这个函数的"chunk"的名字。 
+                              //  如果"source"以'@'打头，表示这个函数定义在一个文件中，而'@'之后的部分就是文件名。
+                              //  若"source"以'='打头，表示之后的部分由用户行为来决定如何表示源码。
+                              //  其它的情况下，这个函数定义在一个字符串中，而"source"正是那个字符串。
+
+  size_t srclen;	/* (S) *///source的长度
+  int currentline;	/* (l) *///给定函数正在执行的那一行。当提供不了行号信息的时候，"currentline"被设为-1。
+  int linedefined;	/* (S) *///函数定义开始处的行号。
+  int lastlinedefined;	/* (S) *///函数定义结束处的行号
+  unsigned char nups;	/* (u) number of upvalues *///上值的个数
+  unsigned char nparams;/* (u) number of parameters *///参数数量
+  char isvararg;        /* (u) *///如果函数是一个可变参数函数则为"true"（对于C函数永远为"true"）。
+  char istailcall;	/* (t) *///如果函数以尾调用形式调用，这个值为"true"。在这种情况下，当前栈级别的调用者不在栈中。 所谓尾调用形式，就是一个函数返回另一个函数的返回值,类似于goto语句 
+                            //形如
+                            // function fun()
+                            //   -- body
+                            //   return fun1()
+	                          // end
+
+  unsigned short ftransfer;   /* (r) index of first value transferred *///与第一个转移值的偏移量 主要用call/return方式
+  unsigned short ntransfer;   /* (r) number of transferred values *///转移的数量 主要用call/return方式
+  char short_src[LUA_IDSIZE]; /* (S) */// 一个“可打印版本”的"source"，用于出错信息。
   /* private part */
-  struct CallInfo *i_ci;  /* active function */
+  struct CallInfo *i_ci;  /* active function *///记录一个函数调用涉及到的栈引用，lua在调用函数的时候会把每个callinfo用双向链表串起来
 };
 
 /* }====================================================================== */

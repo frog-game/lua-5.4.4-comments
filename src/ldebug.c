@@ -156,7 +156,11 @@ LUA_API int lua_gethookcount (lua_State *L) {
   return L->basehookcount;
 }
 
-
+/// @brief 获取解释器的运行时栈的信息
+/// @param L 
+/// @param level  0 级表示当前运行的函数， 而 n+1 级处的函数就是调用第 n 级函数的那一个
+/// @param ar 
+/// @return 
 LUA_API int lua_getstack (lua_State *L, int level, lua_Debug *ar) {
   int status;
   CallInfo *ci;
@@ -379,7 +383,30 @@ static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
   return status;
 }
 
+/// @brief 返回一个指定的函数或函数调用的信息。
+// 当用于取得一次函数调用的信息时，参数 ar 必须是一个有效的活动的记录。这条记录可以是前一次调用lua_getstack 得到的，或是一个钩子 （lua_Hook）得到的参数。
+// 用于获取一个函数的信息时，可以把这个函数压入堆栈，然后把 what 字符串以字符 '>' 起头。（这个情况下，lua_getinfo 从栈顶上弹出函数。）例如，想知道函数f 在哪一行定义的，你可以下下列代码：
 
+//      lua_Debug ar;
+//      lua_getfield(L, LUA_GLOBALSINDEX, "f");  /* 取到全局变量 'f' */
+//      lua_getinfo(L, ">S", &ar);
+//      printf("%d\n", ar.linedefined);
+
+// what 字符串中的每个字符都筛选出结构 ar 结构中一些域用于填充，或是把一个值压入堆栈：
+// 'n': 填充 name 及 namewhat 域；
+// 'S': 填充 source， short_src，linedefined，lastlinedefined，以及 what 域；
+// 'l': 填充 currentline 域；
+// 'u': 填充 nups 域；
+// 'f': 把正在运行中指定级别处函数压入堆栈； （译注：一般用于获取函数调用中的信息， 级别是由 ar 中的私有部分来提供。 如果用于获取静态函数，那么就直接把指定函数重新压回堆栈， 但这样做通常无甚意义。）
+// 'L': 压一个 table 入栈，这个 table 中的整数索引用于描述函数中哪些行是有效行。 （有效行指有实际代码的行， 即你可以置入断点的行。 无效行包括空行和只有注释的行。）
+// 这个函数出错会返回 0 （例如，what 中有一个无效选项）。
+
+// 如果你想输出多个，what字符串可以放几个上面列举的参数，例如 lua_getinfo(L, "Sln", &ar);
+// 'l'参数可以看见当前处于第几行，对查看崩溃很有帮助。
+/// @param L 
+/// @param what 字符串中的每个字符都筛选出结构 ar 结构中一些域用于填充，或是把一个值压入堆栈
+/// @param ar 
+/// @return 
 LUA_API int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar) {
   int status;
   Closure *cl;

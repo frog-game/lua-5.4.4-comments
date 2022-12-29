@@ -170,32 +170,32 @@ typedef struct stringtable {
 ** before the function starts or after it ends.
 */
 typedef struct CallInfo {
-  StkId func;  /* function index in the stack */
-  StkId	top;  /* top for this function */
-  struct CallInfo *previous, *next;  /* dynamic call link */
+  StkId func;  /* function index in the stack *///该栈位置保存调用关联的函数
+  StkId	top;  /* top for this function *///该函数的栈顶引用，[func, top]就是这个函数栈范围
+  struct CallInfo *previous, *next;  /* dynamic call link *///双向链表前驱后驱指针
   union {
-    struct {  /* only for Lua functions */
-      const Instruction *savedpc;
-      volatile l_signalT trap;
-      int nextraargs;  /* # of extra arguments in vararg functions */
+    struct {  /* only for Lua functions *///针对lua函数
+      const Instruction *savedpc;//代码指令执行点, 类似 PC 寄存器 
+      volatile l_signalT trap;//信号开关,调试中断用的
+      int nextraargs;  /* # of extra arguments in vararg functions *///额外参数
     } l;
-    struct {  /* only for C functions */
-      lua_KFunction k;  /* continuation in case of yields */
-      ptrdiff_t old_errfunc;
-      lua_KContext ctx;  /* context info. in case of yields */
+    struct {  /* only for C functions *///针对c函数
+      lua_KFunction k;  /* continuation in case of yields *///延续函数
+      ptrdiff_t old_errfunc;//异常处理
+      lua_KContext ctx;  /* context info. in case of yields *///延续函数环境
     } c;
   } u;
   union {
-    int funcidx;  /* called-function index */
-    int nyield;  /* number of values yielded */
-    int nres;  /* number of values returned */
+    int funcidx;  /* called-function index *///被调用函数索引
+    int nyield;  /* number of values yielded *///yield数量
+    int nres;  /* number of values returned *///返回值数量
     struct {  /* info about transferred values (for call/return hooks) */
-      unsigned short ftransfer;  /* offset of first value transferred */
-      unsigned short ntransfer;  /* number of values transferred */
+      unsigned short ftransfer;  /* offset of first value transferred *///与第一个转移值的偏移量 
+      unsigned short ntransfer;  /* number of values transferred *///转移的数量
     } transferinfo;
   } u2;
-  short nresults;  /* expected number of results from this function */
-  unsigned short callstatus;
+  short nresults;  /* expected number of results from this function *///目标函数返回值个数
+  unsigned short callstatus;//调用状态
 } CallInfo;
 
 

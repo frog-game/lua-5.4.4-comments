@@ -65,7 +65,7 @@ static int findfield (lua_State *L, int objidx, int level) {
     /*此时栈的状态
     -------
     | -1 nil
-    | -2 table NUMBER_TABLE
+    | -2 lib_table
     -------
     */
   while (lua_next(L, -2)) {  /* for each pair in table *///循环这个table
@@ -73,7 +73,7 @@ static int findfield (lua_State *L, int objidx, int level) {
         -------
         | -1 value
         | -2 key
-        | -3 table NUMBER_TABLE
+        | -3 lib_table
         -------
         */
 
@@ -83,40 +83,63 @@ static int findfield (lua_State *L, int objidx, int level) {
         -------
         | -1 value
         | -2 key
-        | -3 table NUMBER_TABLE
+        | -3 lib_table
         -------
         */
         lua_pop(L, 1);  /* remove value (but keep name) */
           /*此时栈的状态
           -------
           | -1 key
-          | -2 table NUMBER_TABLE
+          | -2 lib_table
           -------
           */
         return 1;
       }
       else if (findfield(L, objidx, level - 1)) {  /* try recursively *///进行递归
         /* stack: lib_name, lib_table, field_name (top) */
+
+        /*此时栈的状态
+        //  -------
+        // | -1 field_name
+        // | -2 lib_table
+        // | -3 lib_name
+        // -------
+        */
         lua_pushliteral(L, ".");  /* place '.' between the two names */
+        /*此时栈的状态
+        -------
+        | -1 "." 
+        | -2 field_name
+        | -3 lib_table
+        | -4 lib_name
+        -------
+        */
         lua_replace(L, -3);  /* (in the slot occupied by table) */
+        /*此时栈的状态
+        -------
+        | -1 field_name
+        | -2 "." 
+        | -3 lib_name
+        -------
+        */
         lua_concat(L, 3);  /* lib_name.field_name */
         return 1;
       }
     }
 
-      /*此时栈的状态
-      -------
-      | -1 value
-      | -2 key
-      | -3 table NUMBER_TABLE
-      -------
-      */
+        /*此时栈的状态
+        -------
+        | -1 value
+        | -2 key
+        | -3 lib_table
+        -------
+        */
     lua_pop(L, 1);  /* remove value */
 
      /*此时栈的状态
     -------
     | -1 key
-    | -2 table NUMBER_TABLE
+    | -2 lib_table
     -------
     */
   }
@@ -127,49 +150,59 @@ static int findfield (lua_State *L, int objidx, int level) {
 /*
 ** Search for a name for a function in all loaded modules
 */
+
+/// @brief 在加载的modules中搜索函数的名称
+/// @param L 
+/// @param ar 
+/// @return 
 static int pushglobalfuncname (lua_State *L, lua_Debug *ar) {
-  int top = lua_gettop(L);
-  lua_getinfo(L, "f", ar);  /* push function */
-  lua_getfield(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);
-  if (findfield(L, top + 1, 2)) {
-    const char *name = lua_tostring(L, -1);
-    if (strncmp(name, LUA_GNAME ".", 3) == 0) {  /* name start with '_G.'? */
-      lua_pushstring(L, name + 3);  /* push name without prefix */
-      lua_remove(L, -2);  /* remove original name */
+  int top = lua_gettop(L);//得到栈顶索引
+  lua_getinfo(L, "f", ar);  /* push function *///把正在运行中指定级别处函数压入堆栈
+  lua_getfield(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);//如果是全局注册表，则idx=LUA_REGISTRYINDEX；如果是在栈上的一个Table表，则数字索引 从全局注册表上找LUA_LOADED_TABLE，放置到L->top
+  if (findfield(L, top + 1, 2)) {//查找字段名字
+    const char *name = lua_tostring(L, -1);//把字段名字取出来
+    if (strncmp(name, LUA_GNAME ".", 3) == 0) {  /* name start with '_G.'? *///形如_G.??? 这种类型的名字
+      lua_pushstring(L, name + 3);  /* push name without prefix *///把_G.??? 后缀压栈（也就是???）
+      lua_remove(L, -2);  /* remove original name */// 移除掉原始名字 也就是_G.???
     }
-    lua_copy(L, -1, top + 1);  /* copy name to proper place */
-    lua_settop(L, top + 1);  /* remove table "loaded" and name copy */
+    lua_copy(L, -1, top + 1);  /* copy name to proper place *////将名称复制到正确的位置
+    lua_settop(L, top + 1);  /* remove table "loaded" and name copy *//// 放到这个位置的时候其实之前的loaded和name copy就给移除掉了
     return 1;
   }
   else {
-    lua_settop(L, top);  /* remove function and global table */
+    lua_settop(L, top);  /* remove function and global table *///移除掉之前压入的function和table
     return 0;
   }
 }
 
-
+/// @brief 塞入一个函数相关的信息
+/// @param L 
+/// @param ar 
 static void pushfuncname (lua_State *L, lua_Debug *ar) {
-  if (pushglobalfuncname(L, ar)) {  /* try first a global name */
-    lua_pushfstring(L, "function '%s'", lua_tostring(L, -1));
-    lua_remove(L, -2);  /* remove name */
+  if (pushglobalfuncname(L, ar)) {  /* try first a global name */// 尝试塞入到全局表中
+    lua_pushfstring(L, "function '%s'", lua_tostring(L, -1)); /// 如果有塞入拼接的字符串信息到栈顶
+    lua_remove(L, -2);  /* remove name *///删除名字
   }
-  else if (*ar->namewhat != '\0')  /* is there a name from code? */
-    lua_pushfstring(L, "%s '%s'", ar->namewhat, ar->name);  /* use it */
-  else if (*ar->what == 'm')  /* main? */
-      lua_pushliteral(L, "main chunk");
-  else if (*ar->what != 'C')  /* for Lua functions, use <file:line> */
-    lua_pushfstring(L, "function <%s:%d>", ar->short_src, ar->linedefined);
-  else  /* nothing left... */
-    lua_pushliteral(L, "?");
+  else if (*ar->namewhat != '\0')  /* is there a name from code? *///namewhat是不是有值
+    lua_pushfstring(L, "%s '%s'", ar->namewhat, ar->name);  /* use it *///如果有塞入拼接的字符串信息到栈顶
+  else if (*ar->what == 'm')  /* main? *///是main
+      lua_pushliteral(L, "main chunk"); //塞入main chunk到栈顶
+  else if (*ar->what != 'C')  /* for Lua functions, use <file:line> *///是c函数
+    lua_pushfstring(L, "function <%s:%d>", ar->short_src, ar->linedefined);//塞入拼接的字符串信息到栈顶
+  else  /* nothing left... *///其他
+    lua_pushliteral(L, "?");//塞入到栈顶
 }
 
 
+/// @brief 找到函数第一次调用位置
+/// @param L 
+/// @return 
 static int lastlevel (lua_State *L) {
   lua_Debug ar;
   int li = 1, le = 1;
-  /* find an upper bound */
+  /* find an upper bound *///查找上限
   while (lua_getstack(L, le, &ar)) { li = le; le *= 2; }
-  /* do a binary search */
+  /* do a binary search *///二分查找
   while (li < le) {
     int m = (li + le)/2;
     if (lua_getstack(L, m, &ar)) li = m + 1;
@@ -178,12 +211,17 @@ static int lastlevel (lua_State *L) {
   return le - 1;
 }
 
-
+/// @brief 打印堆栈信息用的
+/// @param L 
+/// @param L1 
+/// @param msg 
+/// @param level 
+/// @return 
 LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1,
                                 const char *msg, int level) {
   luaL_Buffer b;
   lua_Debug ar;
-  int last = lastlevel(L1);
+  int last = lastlevel(L1);//找到第一层调用位置
   int limit2show = (last - level > LEVELS1 + LEVELS2) ? LEVELS1 : -1;
   luaL_buffinit(L, &b);
   if (msg) {
@@ -223,6 +261,11 @@ LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1,
 ** =======================================================
 */
 
+/// @brief 抛出一个参数错误
+/// @param L 
+/// @param arg 
+/// @param extramsg 
+/// @return 
 LUALIB_API int luaL_argerror (lua_State *L, int arg, const char *extramsg) {
   lua_Debug ar;
   if (!lua_getstack(L, 0, &ar))  /* no stack frame? */
@@ -240,7 +283,11 @@ LUALIB_API int luaL_argerror (lua_State *L, int arg, const char *extramsg) {
                         arg, ar.name, extramsg);
 }
 
-
+/// @brief 抛出一个类型错误
+/// @param L 
+/// @param arg 
+/// @param tname 
+/// @return 
 LUALIB_API int luaL_typeerror (lua_State *L, int arg, const char *tname) {
   const char *msg;
   const char *typearg;  /* name for the type of the actual argument */
@@ -254,7 +301,10 @@ LUALIB_API int luaL_typeerror (lua_State *L, int arg, const char *tname) {
   return luaL_argerror(L, arg, msg);
 }
 
-
+/// @brief 对luaL_typeerror的一层包装
+/// @param L 
+/// @param arg 
+/// @param tag 
 static void tag_error (lua_State *L, int arg, int tag) {
   luaL_typeerror(L, arg, lua_typename(L, tag));
 }
@@ -264,6 +314,11 @@ static void tag_error (lua_State *L, int arg, int tag) {
 ** The use of 'lua_pushfstring' ensures this function does not
 ** need reserved stack space when called.
 */
+
+/// @brief 构建错误消息的前缀
+/// @param L 
+/// @param level 
+/// @return 
 LUALIB_API void luaL_where (lua_State *L, int level) {
   lua_Debug ar;
   if (lua_getstack(L, level, &ar)) {  /* check function at level */
@@ -282,6 +337,12 @@ LUALIB_API void luaL_where (lua_State *L, int level) {
 ** not need reserved stack space when called. (At worst, it generates
 ** an error with "stack overflow" instead of the given message.)
 */
+
+/// @brief 抛出一个错误。错误消息的格式由 fmt 给出。后面需提供若干参数
+/// @param L 
+/// @param fmt 
+/// @param  
+/// @return 
 LUALIB_API int luaL_error (lua_State *L, const char *fmt, ...) {
   va_list argp;
   va_start(argp, fmt);
@@ -292,7 +353,11 @@ LUALIB_API int luaL_error (lua_State *L, const char *fmt, ...) {
   return lua_error(L);
 }
 
-
+/// @brief 这个函数用于生成标准库中和文件相关的函数的返回值。（指 (io.open，os.rename，file:seek，等。)
+/// @param L 
+/// @param stat 
+/// @param fname 
+/// @return 
 LUALIB_API int luaL_fileresult (lua_State *L, int stat, const char *fname) {
   int en = errno;  /* calls to Lua API may change this value */
   if (stat) {
@@ -332,7 +397,10 @@ LUALIB_API int luaL_fileresult (lua_State *L, int stat, const char *fname) {
 
 #endif				/* } */
 
-
+/// @brief 这个函数用于生成标准库中和进程相关函数的返回值。（指 os.execute 和 io.close）
+/// @param L 
+/// @param stat 
+/// @return 
 LUALIB_API int luaL_execresult (lua_State *L, int stat) {
   if (stat != 0 && errno != 0)  /* error with an 'errno'? */
     return luaL_fileresult(L, 0, NULL);
@@ -386,7 +454,11 @@ LUALIB_API void luaL_setmetatable (lua_State *L, const char *tname) {
   lua_setmetatable(L, -2);
 }
 
-
+/// @brief 此函数和 luaL_checkudata 类似。但它在测试失败时会返回 NULL 而不是抛出错误
+/// @param L 
+/// @param ud 
+/// @param tname 
+/// @return 
 LUALIB_API void *luaL_testudata (lua_State *L, int ud, const char *tname) {
   void *p = lua_touserdata(L, ud);
   if (p != NULL) {  /* value is a userdata? */
@@ -401,7 +473,11 @@ LUALIB_API void *luaL_testudata (lua_State *L, int ud, const char *tname) {
   return NULL;  /* value is not a userdata with a metatable */
 }
 
-
+/// @brief 检查函数的第 arg 个参数是否是一个类型为tname 的用户数据 它会返回该用户数据的地址
+/// @param L 
+/// @param ud 
+/// @param tname 
+/// @return 
 LUALIB_API void *luaL_checkudata (lua_State *L, int ud, const char *tname) {
   void *p = luaL_testudata(L, ud, tname);
   luaL_argexpected(L, p != NULL, ud, tname);
@@ -417,6 +493,15 @@ LUALIB_API void *luaL_checkudata (lua_State *L, int ud, const char *tname) {
 ** =======================================================
 */
 
+/// @brief 检查函数的第 arg 个参数是否是一个字符串，并在数组 lst （比如是零结尾的字符串数组）中查找这个字符串。
+// 返回匹配到的字符串在数组中的索引号。如果参数不是字符串，或是字符串在数组中匹配不到，都将抛出错误。
+// 如果 def 不为 NULL，函数就把 def 当作默认值。默认值在参数 arg 不存在，或该参数是 nil 时生效。
+// 这个函数通常用于将字符串映射为 C 枚举量。（在 Lua 库中做这个转换可以让其使用字符串，而不是数字来做一些选项。）
+/// @param L 
+/// @param arg 
+/// @param def 
+/// @param lst 
+/// @return 
 LUALIB_API int luaL_checkoption (lua_State *L, int arg, const char *def,
                                  const char *const lst[]) {
   const char *name = (def) ? luaL_optstring(L, arg, def) :
@@ -437,6 +522,12 @@ LUALIB_API int luaL_checkoption (lua_State *L, int arg, const char *def,
 ** this extra space, Lua will generate the same 'stack overflow' error,
 ** but without 'msg'.)
 */
+
+/// @brief 检查栈是否溢出
+/// @param L 
+/// @param space 
+/// @param msg 
+/// @return 
 LUALIB_API void luaL_checkstack (lua_State *L, int space, const char *msg) {
   if (l_unlikely(!lua_checkstack(L, space))) {
     if (msg)
@@ -446,26 +537,44 @@ LUALIB_API void luaL_checkstack (lua_State *L, int space, const char *msg) {
   }
 }
 
-
+/// @brief 检查函数的第 arg 个参数的类型是否是 t
+/// @param L 
+/// @param arg 
+/// @param t 
+/// @return 
 LUALIB_API void luaL_checktype (lua_State *L, int arg, int t) {
   if (l_unlikely(lua_type(L, arg) != t))
     tag_error(L, arg, t);
 }
 
-
+/// @brief 检查函数在 arg 位置是否有任何类型（包括 nil）的参数。
+/// @param L 
+/// @param arg 
+/// @return 
 LUALIB_API void luaL_checkany (lua_State *L, int arg) {
   if (l_unlikely(lua_type(L, arg) == LUA_TNONE))
     luaL_argerror(L, arg, "value expected");
 }
 
-
+/// @brief 检查函数的第 arg 个参数是否是一个字符串，并返回该字符串；如果 l 不为 NULL ，将字符串的长度填入 *l。
+// 这个函数使用 lua_tolstring 来获取结果。所以该函数有可能引发的转换都同样有效
+/// @param L 
+/// @param arg 
+/// @param len 
+/// @return 
 LUALIB_API const char *luaL_checklstring (lua_State *L, int arg, size_t *len) {
   const char *s = lua_tolstring(L, arg, len);
   if (l_unlikely(!s)) tag_error(L, arg, LUA_TSTRING);
   return s;
 }
 
-
+/// @brief 如果函数的第 arg 个参数是一个字符串，返回该字符串。若该参数不存在或是 nil，返回 d。除此之外的情况，抛出错误。
+// 若 l 不为 NULL，将结果的长度填入 *l
+/// @param L 
+/// @param arg 
+/// @param def 
+/// @param len 
+/// @return 
 LUALIB_API const char *luaL_optlstring (lua_State *L, int arg,
                                         const char *def, size_t *len) {
   if (lua_isnoneornil(L, arg)) {
@@ -476,7 +585,10 @@ LUALIB_API const char *luaL_optlstring (lua_State *L, int arg,
   else return luaL_checklstring(L, arg, len);
 }
 
-
+/// @brief 检查函数的第 arg 个参数是否是一个数字，并返回这个数字
+/// @param L 
+/// @param arg 
+/// @return 
 LUALIB_API lua_Number luaL_checknumber (lua_State *L, int arg) {
   int isnum;
   lua_Number d = lua_tonumberx(L, arg, &isnum);
@@ -485,12 +597,18 @@ LUALIB_API lua_Number luaL_checknumber (lua_State *L, int arg) {
   return d;
 }
 
-
+/// @brief 如果函数的第 arg 个参数是一个数字，返回该数字。若该参数不存在或是 nil，返回 d。除此之外的情况，抛出错误
+/// @param L 
+/// @param arg 
+/// @param def 
+/// @return 
 LUALIB_API lua_Number luaL_optnumber (lua_State *L, int arg, lua_Number def) {
   return luaL_opt(L, luaL_checknumber, arg, def);
 }
 
-
+/// @brief integer 错误提示
+/// @param L 
+/// @param arg 
 static void interror (lua_State *L, int arg) {
   if (lua_isnumber(L, arg))
     luaL_argerror(L, arg, "number has no integer representation");
@@ -499,6 +617,10 @@ static void interror (lua_State *L, int arg) {
 }
 
 
+/// @brief 检查函数的第 arg 个参数是否是一个整型，并返回这个整型
+/// @param L 
+/// @param arg 
+/// @return 
 LUALIB_API lua_Integer luaL_checkinteger (lua_State *L, int arg) {
   int isnum;
   lua_Integer d = lua_tointegerx(L, arg, &isnum);
@@ -508,7 +630,11 @@ LUALIB_API lua_Integer luaL_checkinteger (lua_State *L, int arg) {
   return d;
 }
 
-
+/// @brief 如果函数的第 arg 个参数是一个整数（或可以转换为一个整数），返回该整数。若该参数不存在或是 nil，返回 d。除此之外的情况，抛出错误
+/// @param L 
+/// @param arg 
+/// @param def 
+/// @return 
 LUALIB_API lua_Integer luaL_optinteger (lua_State *L, int arg,
                                                       lua_Integer def) {
   return luaL_opt(L, luaL_checkinteger, arg, def);
@@ -524,12 +650,17 @@ LUALIB_API lua_Integer luaL_optinteger (lua_State *L, int arg,
 */
 
 /* userdata to box arbitrary data */
-typedef struct UBox {
+typedef struct UBox {//userdata 缓存的地方
   void *box;
   size_t bsize;
 } UBox;
 
 
+/// @brief 调整box大小
+/// @param L 
+/// @param idx 
+/// @param newsize 
+/// @return 
 static void *resizebox (lua_State *L, int idx, size_t newsize) {
   void *ud;
   lua_Alloc allocf = lua_getallocf(L, &ud);
@@ -544,20 +675,23 @@ static void *resizebox (lua_State *L, int idx, size_t newsize) {
   return temp;
 }
 
-
+/// @brief 对box进行gc调整
+/// @param L 
+/// @return 
 static int boxgc (lua_State *L) {
   resizebox(L, 1, 0);
   return 0;
 }
 
-
+/// @brief box元方法
 static const luaL_Reg boxmt[] = {  /* box metamethods */
   {"__gc", boxgc},
   {"__close", boxgc},
   {NULL, NULL}
 };
 
-
+/// @brief new一个box
+/// @param L 
 static void newbox (lua_State *L) {
   UBox *box = (UBox *)lua_newuserdatauv(L, sizeof(UBox), 0);
   box->box = NULL;

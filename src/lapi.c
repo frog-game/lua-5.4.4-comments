@@ -227,7 +227,7 @@ LUA_API int lua_absindex (lua_State *L, int idx) {
          : cast_int(L->top - L->ci->func) + idx;
 }
 
-/// @brief 返回栈中元素个数
+/// @brief 返回栈中元素个数（返回栈顶索引）
 /// @param L 
 /// @return 
 LUA_API int lua_gettop (lua_State *L) {
@@ -1430,8 +1430,8 @@ LUA_API void lua_callk (lua_State *L, int nargs, int nresults,
 ** Execute a protected call.
 */
 struct CallS {  /* data to 'f_call' */
-  StkId func;
-  int nresults;
+  StkId func;//* 要调用的函数位置 */
+  int nresults;//函数返回值个数
 };
 
 
