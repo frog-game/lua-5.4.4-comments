@@ -536,29 +536,32 @@ typedef struct AbsLineInfo {
 /*
 ** Function Prototypes
 */
+
+/// @brief 函数原型
+///Proto主要存放二进制指令集Opcode
 typedef struct Proto {
   CommonHeader;
-  lu_byte numparams;  /* number of fixed (named) parameters */
-  lu_byte is_vararg;
-  lu_byte maxstacksize;  /* number of registers needed by this function */
-  int sizeupvalues;  /* size of 'upvalues' */
-  int sizek;  /* size of 'k' */
-  int sizecode;
-  int sizelineinfo;
-  int sizep;  /* size of 'p' */
-  int sizelocvars;
-  int sizeabslineinfo;  /* size of 'abslineinfo' */
-  int linedefined;  /* debug information  */
-  int lastlinedefined;  /* debug information  */
-  TValue *k;  /* constants used by the function */
-  Instruction *code;  /* opcodes */
-  struct Proto **p;  /* functions defined inside the function */
-  Upvaldesc *upvalues;  /* upvalue information */
-  ls_byte *lineinfo;  /* information about source lines (debug information) */
-  AbsLineInfo *abslineinfo;  /* idem */
-  LocVar *locvars;  /* information about local variables (debug information) */
-  TString  *source;  /* used for debug information */
-  GCObject *gclist;
+  lu_byte numparams;  /* number of fixed (named) parameters *///固定参数个数
+  lu_byte is_vararg;//是否支持变参:1 表示使用了变参作为最后一个参数
+  lu_byte maxstacksize;  /* number of registers needed by this function *///本函数用了多少个寄存器
+  int sizeupvalues;  /* size of 'upvalues' *///上值个数
+  int sizek;  /* size of 'k' *///常量个数
+  int sizecode;//本函数的指令个数
+  int sizelineinfo;//相对行号lineinfo长度
+  int sizep;  /* size of 'p' *///子函数大小
+  int sizelocvars;//局部变量调试信息大小
+  int sizeabslineinfo;  /* size of 'abslineinfo' *///绝对行号abslineinfo长度
+  int linedefined;  /* debug information  *///函数定义开始处的行号
+  int lastlinedefined;  /* debug information  *///函数定义结束处的行号
+  TValue *k;  /* constants used by the function *///常量表
+  Instruction *code;  /* opcodes *///存储的指令集数组, 起始位置
+  struct Proto **p;  /* functions defined inside the function *///子函数表
+  Upvaldesc *upvalues;  /* upvalue information *///是个数组指针
+  ls_byte *lineinfo;  /* information about source lines (debug information) *///相对行号信息
+  AbsLineInfo *abslineinfo;  /* idem *///绝对行号信息
+  LocVar *locvars;  /* information about local variables (debug information) *///局部变量调试信息
+  TString  *source;  /* used for debug information *///二进制块的源文件名
+  GCObject *gclist;//gc对象链表
 } Proto;
 
 /* }================================================================== */

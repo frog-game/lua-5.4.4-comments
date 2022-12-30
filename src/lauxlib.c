@@ -40,10 +40,10 @@
 ** =======================================================
 */
 
-/// @brief 堆栈第一部分大小
+/// @brief 堆栈第一部分大小 用来打印堆栈信息的
 #define LEVELS1	10	/* size of the first part of the stack */
 
-/// @brief 堆栈第二部分大小
+/// @brief 堆栈第二部分大小 用来打印堆栈信息的
 #define LEVELS2	11	/* size of the second part of the stack */
 
 
@@ -706,6 +706,8 @@ static void newbox (lua_State *L) {
 ** check whether buffer is using a userdata on the stack as a temporary
 ** buffer
 */
+
+/// @brief 检查缓冲区是否正在使用堆栈上的用户数据作为临时缓冲区
 #define buffonstack(B)	((B)->b != (B)->init.b)
 
 
@@ -713,6 +715,8 @@ static void newbox (lua_State *L) {
 ** Whenever buffer is accessed, slot 'idx' must either be a box (which
 ** cannot be NULL) or it is a placeholder for the buffer.
 */
+
+/// @brief 每当访问缓冲区时，idx指定的数据必须是一个box（不能为 NULL），或者是缓冲区的占位符
 #define checkbufferlevel(B,idx)  \
   lua_assert(buffonstack(B) ? lua_touserdata(B->L, idx) != NULL  \
                             : lua_touserdata(B->L, idx) == (void*)B)
@@ -722,6 +726,11 @@ static void newbox (lua_State *L) {
 ** Compute new size for buffer 'B', enough to accommodate extra 'sz'
 ** bytes.
 */
+
+/// @brief 计算缓冲区B的新大小，足以容纳额外的sz字节
+/// @param B 
+/// @param sz 
+/// @return 
 static size_t newbuffsize (luaL_Buffer *B, size_t sz) {
   size_t newsize = B->size * 2;  /* double buffer size */
   if (l_unlikely(MAX_SIZET - sz < B->n))  /* overflow in (B->n + sz)? */
@@ -737,6 +746,12 @@ static size_t newbuffsize (luaL_Buffer *B, size_t sz) {
 ** 'B'. 'boxidx' is the relative position in the stack where is the
 ** buffer's box or its placeholder.
 */
+
+/// @brief 返回指向缓冲区中至少具有sz字节的可用区域的指针B。boxidx是堆栈中的相对位置，其中缓冲区的box或其占位符。
+/// @param B 
+/// @param sz 
+/// @param boxidx 
+/// @return 
 static char *prepbuffsize (luaL_Buffer *B, size_t sz, int boxidx) {
   checkbufferlevel(B, boxidx);
   if (B->size - B->n >= sz)  /* enough space? */
@@ -765,11 +780,21 @@ static char *prepbuffsize (luaL_Buffer *B, size_t sz, int boxidx) {
 /*
 ** returns a pointer to a free area with at least 'sz' bytes
 */
+
+/// @brief 返回一段大小为 sz 的空间地址。你可以将字符串复制其中以加到缓存 B 内
+// 将字符串复制其中后，你必须调用 luaL_addsize传入字符串的大小，才会真正把它加入缓存。
+/// @param B 
+/// @param sz 
+/// @return 
 LUALIB_API char *luaL_prepbuffsize (luaL_Buffer *B, size_t sz) {
   return prepbuffsize(B, sz, -1);
 }
 
-
+/// @brief 向缓存 B 添加一个长度为 l 的字符串 s。这个字符串可以包含零。
+/// @param B 
+/// @param s 
+/// @param l 
+/// @return 
 LUALIB_API void luaL_addlstring (luaL_Buffer *B, const char *s, size_t l) {
   if (l > 0) {  /* avoid 'memcpy' when 's' can be NULL */
     char *b = prepbuffsize(B, l, -1);
@@ -778,12 +803,17 @@ LUALIB_API void luaL_addlstring (luaL_Buffer *B, const char *s, size_t l) {
   }
 }
 
-
+/// @brief 向缓存 B 添加一个零结尾的字符串 s
+/// @param B 
+/// @param s 
+/// @return 
 LUALIB_API void luaL_addstring (luaL_Buffer *B, const char *s) {
   luaL_addlstring(B, s, strlen(s));
 }
 
-
+/// @brief 结束对缓存 B 的使用，将最终的字符串留在栈顶
+/// @param B 
+/// @return 
 LUALIB_API void luaL_pushresult (luaL_Buffer *B) {
   lua_State *L = B->L;
   checkbufferlevel(B, -1);
@@ -793,7 +823,10 @@ LUALIB_API void luaL_pushresult (luaL_Buffer *B) {
   lua_remove(L, -2);  /* remove box or placeholder from the stack */
 }
 
-
+/// @brief 等价于 luaL_addsize，luaL_pushresul
+/// @param B 
+/// @param sz 
+/// @return 
 LUALIB_API void luaL_pushresultsize (luaL_Buffer *B, size_t sz) {
   luaL_addsize(B, sz);
   luaL_pushresult(B);
@@ -809,6 +842,11 @@ LUALIB_API void luaL_pushresultsize (luaL_Buffer *B, size_t sz) {
 ** trigger an emergency GC, so we should not remove the string from the
 ** stack before we have the space guaranteed.)
 */
+
+/// @brief 向缓存 B 添加栈顶的一个值，随后将其弹出。
+// 这个函数是操作字符串缓存的函数中，唯一一个会（且必须）在栈上放置额外元素的。这个元素将被加入缓存
+/// @param B 
+/// @return 
 LUALIB_API void luaL_addvalue (luaL_Buffer *B) {
   lua_State *L = B->L;
   size_t len;
@@ -819,7 +857,10 @@ LUALIB_API void luaL_addvalue (luaL_Buffer *B) {
   lua_pop(L, 1);  /* pop string */
 }
 
-
+/// @brief 初始化缓存 B。这个函数不会分配任何空间；缓存必须以一个变量的形式声明
+/// @param L 
+/// @param B 
+/// @return 
 LUALIB_API void luaL_buffinit (lua_State *L, luaL_Buffer *B) {
   B->L = L;
   B->b = B->init.b;
@@ -828,7 +869,11 @@ LUALIB_API void luaL_buffinit (lua_State *L, luaL_Buffer *B) {
   lua_pushlightuserdata(L, (void*)B);  /* push placeholder */
 }
 
-
+/// @brief 等价于调用序列luaL_buffinit，luaL_prepbuffsize
+/// @param L 
+/// @param B 
+/// @param sz 
+/// @return 
 LUALIB_API char *luaL_buffinitsize (lua_State *L, luaL_Buffer *B, size_t sz) {
   luaL_buffinit(L, B);
   return prepbuffsize(B, sz, -1);
@@ -844,6 +889,7 @@ LUALIB_API char *luaL_buffinitsize (lua_State *L, luaL_Buffer *B, size_t sz) {
 */
 
 /* index of free-list header (after the predefined values) */
+/// @brief 空闲表
 #define freelist	(LUA_RIDX_LAST + 1)
 
 /*
@@ -851,6 +897,14 @@ LUALIB_API char *luaL_buffinitsize (lua_State *L, luaL_Buffer *B, size_t sz) {
 ** t[freelist] is the index of a first free index, or zero if list is
 ** empty; t[t[freelist]] is the index of the second element; etc.
 */
+
+/// @brief 针对栈顶的对象，创建并返回一个在索引 t 指向的表中的 引用（最后会弹出栈顶对象）。
+// 此引用是一个唯一的整数键。只要你不向表 t 手工添加整数键，luaL_ref 可以保证它返回的键的唯一性。
+// 你可以通过调用 lua_rawgeti(L, t, r) 来找回由r 引用的对象。函数 luaL_unref 用来释放一个引用关联的对象
+// 如果栈顶的对象是 nil，luaL_ref 将返回常量LUA_REFNIL。常量 LUA_NOREF 可以保证和luaL_ref 能返回的其它引用值不同。
+/// @param L 
+/// @param t 
+/// @return 
 LUALIB_API int luaL_ref (lua_State *L, int t) {
   int ref;
   if (lua_isnil(L, -1)) {
@@ -878,7 +932,12 @@ LUALIB_API int luaL_ref (lua_State *L, int t) {
   return ref;
 }
 
-
+/// @brief 释放索引 t 处表的 ref 引用对象。此条目会从表中移除以让其引用的对象可被垃圾收集。而引用 ref 也被回收再次使用。
+// 如果 ref 为 LUA_NOREF 或 LUA_REFNIL，luaL_unref 什么也不做。
+/// @param L 
+/// @param t 
+/// @param ref 
+/// @return 
 LUALIB_API void luaL_unref (lua_State *L, int t, int ref) {
   if (ref >= 0) {
     t = lua_absindex(L, t);
@@ -900,12 +959,16 @@ LUALIB_API void luaL_unref (lua_State *L, int t, int ref) {
 */
 
 typedef struct LoadF {
-  int n;  /* number of pre-read characters */
-  FILE *f;  /* file being read */
-  char buff[BUFSIZ];  /* area for reading file */
+  int n;  /* number of pre-read characters *///预读字符数
+  FILE *f;  /* file being read *///正在读取的文件
+  char buff[BUFSIZ];  /* area for reading file *///读到的文件内容块
 } LoadF;
 
-
+/// @brief 读取文件内容块
+/// @param L 
+/// @param ud 
+/// @param size 
+/// @return 
 static const char *getF (lua_State *L, void *ud, size_t *size) {
   LoadF *lf = (LoadF *)ud;
   (void)L;  /* not used */
@@ -923,7 +986,11 @@ static const char *getF (lua_State *L, void *ud, size_t *size) {
   return lf->buff;
 }
 
-
+/// @brief 提示文件错误
+/// @param L 
+/// @param what 
+/// @param fnameindex 
+/// @return 
 static int errfile (lua_State *L, const char *what, int fnameindex) {
   const char *serr = strerror(errno);
   const char *filename = lua_tostring(L, fnameindex) + 1;
@@ -932,7 +999,9 @@ static int errfile (lua_State *L, const char *what, int fnameindex) {
   return LUA_ERRFILE;
 }
 
-
+/// @brief 跳过utf-8 bom头
+/// @param lf 
+/// @return 
 static int skipBOM (LoadF *lf) {
   const char *p = "\xEF\xBB\xBF";  /* UTF-8 BOM mark */
   int c;
@@ -954,6 +1023,14 @@ static int skipBOM (LoadF *lf) {
 ** first "valid" character of the file (after the optional BOM and
 ** a first-line comment).
 */
+
+/// @brief 跳过一些内容
+// 读取文件“f”的第一个字符，并跳过其开头的可选 BOM 标记 
+// 如果它以“#”开头，则跳过其第一行
+// 如果跳过第一行，则返回 true
+/// @param lf 
+/// @param cp 
+/// @return 
 static int skipcomment (LoadF *lf, int *cp) {
   int c = *cp = skipBOM(lf);
   if (c == '#') {  /* first line is a comment (Unix exec. file)? */
@@ -966,7 +1043,15 @@ static int skipcomment (LoadF *lf, int *cp) {
   else return 0;  /* no comment */
 }
 
-
+/// @brief 把一个文件加载为 Lua 代码块。这个函数使用 lua_load 加载文件中的数据。
+// 代码块的名字被命名为 filename。如果 filename 为 NULL，它从标准输入加载。如果文件的第一行以 # 打头，则忽略这一行。
+// mode 字符串的作用同函数 lua_load。
+// 此函数的返回值和 lua_load 相同，不过它还可能产生一个叫做 LUA_ERRFILE的出错码。这种错误发生于无法打开或读入文件时，或是文件的模式错误。
+// 和 lua_load 一样，这个函数仅加载代码块不运行
+// /// @param L 
+/// @param filename 
+/// @param mode 
+/// @return 
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
   LoadF lf;
@@ -1002,13 +1087,17 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   return status;
 }
 
-
+/// @brief 加载字符串
 typedef struct LoadS {
   const char *s;
   size_t size;
 } LoadS;
 
-
+/// @brief 获取字符串
+/// @param L 
+/// @param ud 
+/// @param size 
+/// @return 
 static const char *getS (lua_State *L, void *ud, size_t *size) {
   LoadS *ls = (LoadS *)ud;
   (void)L;  /* not used */
@@ -1018,7 +1107,14 @@ static const char *getS (lua_State *L, void *ud, size_t *size) {
   return ls->s;
 }
 
-
+/// @brief 把一段缓存加载为一个 Lua 代码块。这个函数使用 lua_load 来加载 buff 指向的长度为 sz 的内存区。
+// 这个函数和 lua_load 返回值相同。name 作为代码块的名字，用于调试信息和错误消息。mode 字符串的作用同函数 lua_load
+/// @param L 
+/// @param buff 
+/// @param size 
+/// @param name 
+/// @param mode 
+/// @return 
 LUALIB_API int luaL_loadbufferx (lua_State *L, const char *buff, size_t size,
                                  const char *name, const char *mode) {
   LoadS ls;
@@ -1027,7 +1123,12 @@ LUALIB_API int luaL_loadbufferx (lua_State *L, const char *buff, size_t size,
   return lua_load(L, getS, &ls, name, mode);
 }
 
-
+/// @brief 将一个字符串加载为 Lua 代码块。这个函数使用 lua_load 加载一个零结尾的字符串s。
+// 此函数的返回值和 lua_load 相同。
+// 也和 lua_load 一样，这个函数仅加载代码块不运行。
+/// @param L 
+/// @param s 
+/// @return 
 LUALIB_API int luaL_loadstring (lua_State *L, const char *s) {
   return luaL_loadbuffer(L, s, strlen(s), s);
 }
@@ -1035,7 +1136,11 @@ LUALIB_API int luaL_loadstring (lua_State *L, const char *s) {
 /* }====================================================== */
 
 
-
+/// @brief 将索引 obj 处对象的元表中 e 域的值压栈。如果该对象没有元表，或是该元表没有相关域，此函数什么也不做,并返回 LUA_TNIL。
+/// @param L 
+/// @param obj 
+/// @param event 
+/// @return 
 LUALIB_API int luaL_getmetafield (lua_State *L, int obj, const char *event) {
   if (!lua_getmetatable(L, obj))  /* no metatable? */
     return LUA_TNIL;
@@ -1051,7 +1156,11 @@ LUALIB_API int luaL_getmetafield (lua_State *L, int obj, const char *event) {
   }
 }
 
-
+/// @brief 调用元方法
+/// @param L 
+/// @param obj 
+/// @param event 
+/// @return 
 LUALIB_API int luaL_callmeta (lua_State *L, int obj, const char *event) {
   obj = lua_absindex(L, obj);
   if (luaL_getmetafield(L, obj, event) == LUA_TNIL)  /* no metafield? */
@@ -1061,7 +1170,10 @@ LUALIB_API int luaL_callmeta (lua_State *L, int obj, const char *event) {
   return 1;
 }
 
-
+/// @brief 以数字形式返回给定索引处值的“长度”；它等价于在 Lua 中调用 '#' 的操作
+/// @param L 
+/// @param idx 
+/// @return 
 LUALIB_API lua_Integer luaL_len (lua_State *L, int idx) {
   lua_Integer l;
   int isnum;
@@ -1073,7 +1185,13 @@ LUALIB_API lua_Integer luaL_len (lua_State *L, int idx) {
   return l;
 }
 
-
+/// @brief 将给定索引处的 Lua 值转换为一个相应格式的 C 字符串。
+// 结果串不仅会压栈，还会由函数返回。如果 len 不为 NULL ，它还把字符串长度设到 *len 中。
+// 如果该值有一个带 "__tostring" 域的元表，luaL_tolstring 会以该值为参数去调用对应的元方法，并将其返回值作为结果
+/// @param L 
+/// @param idx 
+/// @param len 
+/// @return 
 LUALIB_API const char *luaL_tolstring (lua_State *L, int idx, size_t *len) {
   idx = lua_absindex(L,idx);
   if (luaL_callmeta(L, idx, "__tostring")) {  /* metafield? */
@@ -1194,7 +1312,12 @@ LUALIB_API void luaL_requiref (lua_State *L, const char *modname,
   }
 }
 
-
+/// @brief 将字符串 s 生成一个副本，并将其中的所有字符串p都替换为字符串r 。将结果串压栈并返回它。
+/// @param b 
+/// @param s 
+/// @param p 
+/// @param r 
+/// @return 
 LUALIB_API void luaL_addgsub (luaL_Buffer *b, const char *s,
                                      const char *p, const char *r) {
   const char *wild;
@@ -1207,7 +1330,12 @@ LUALIB_API void luaL_addgsub (luaL_Buffer *b, const char *s,
   luaL_addstring(b, s);  /* push last suffix */
 }
 
-
+/// @brief 将字符串 s 生成一个副本，并将其中的所有字符串 p都替换为字符串 r 。将结果串压栈并返回它。
+/// @param L 
+/// @param s 
+/// @param p 
+/// @param r 
+/// @return 
 LUALIB_API const char *luaL_gsub (lua_State *L, const char *s,
                                   const char *p, const char *r) {
   luaL_Buffer b;
@@ -1217,6 +1345,12 @@ LUALIB_API const char *luaL_gsub (lua_State *L, const char *s,
   return lua_tostring(L, -1);
 }
 
+/// @brief 尝试重新调整之前调用 malloc 或 calloc 所分配的 ptr 所指向的内存块的大小。
+/// @param ud 
+/// @param ptr 指针指向一个要重新分配内存的内存块，该内存块之前是通过调用 malloc、calloc 或 realloc 进行分配内存的。如果为空指针，则会分配一个新的内存块，且函数返回一个指向它的指针。
+/// @param osize 
+/// @param nsize 内存块的新的大小，以字节为单位。如果大小为 0，且 ptr 指向一个已存在的内存块，则 ptr 所指向的内存块会被释放，并返回一个空指针。
+/// @return 
 
 static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
   (void)ud; (void)osize;  /* not used */
@@ -1228,7 +1362,9 @@ static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
     return realloc(ptr, nsize);
 }
 
-
+/// @brief 打印错误,并返回给lua进行程序中止
+/// @param L 
+/// @return 
 static int panic (lua_State *L) {
   const char *msg = lua_tostring(L, -1);
   if (msg == NULL) msg = "error object is not a string";
@@ -1244,15 +1380,21 @@ static int panic (lua_State *L) {
 ** warnfon: ready to start a new message
 ** warnfcont: previous message is to be continued
 */
-static void warnfoff (void *ud, const char *message, int tocont);
-static void warnfon (void *ud, const char *message, int tocont);
-static void warnfcont (void *ud, const char *message, int tocont);
+static void warnfoff (void *ud, const char *message, int tocont);//警告系统已关闭
+static void warnfon (void *ud, const char *message, int tocont);//警告准备启动新消息
+static void warnfcont (void *ud, const char *message, int tocont);//警告上一条消息要继续
 
 
 /*
 ** Check whether message is a control message. If so, execute the
 ** control or ignore it if unknown.
 */
+
+/// @brief 检查消息是否为控制消息 如果是执行这个控制，否则不管他
+/// @param L 
+/// @param message 
+/// @param tocont 
+/// @return 
 static int checkcontrol (lua_State *L, const char *message, int tocont) {
   if (tocont || *(message++) != '@')  /* not a control message? */
     return 0;
@@ -1294,7 +1436,11 @@ static void warnfon (void *ud, const char *message, int tocont) {
   warnfcont(ud, message, tocont);  /* finish processing */
 }
 
-
+/// @brief 创建一个新的 Lua 状态机。它以一个基于标准 C 的 realloc 函数实现的内存分配器调用 lua_newstate 。
+// 并把可打印一些出错信息到标准错误输出的 panic 函数设置好，用于处理致命错误。
+// 返回新的状态机。如果内存分配失败，则返回 NULL 。
+/// @param  
+/// @return 
 LUALIB_API lua_State *luaL_newstate (void) {
   lua_State *L = lua_newstate(l_alloc, NULL);
   if (l_likely(L)) {
@@ -1304,7 +1450,11 @@ LUALIB_API lua_State *luaL_newstate (void) {
   return L;
 }
 
-
+/// @brief 检测版本
+/// @param L 
+/// @param ver 
+/// @param sz 
+/// @return 
 LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
   lua_Number v = lua_version(L);
   if (sz != LUAL_NUMSIZES)  /* check numeric types */
