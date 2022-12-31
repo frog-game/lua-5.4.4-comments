@@ -261,67 +261,59 @@ typedef struct global_State {
   void *ud;         /* auxiliary data to 'frealloc' *////frealloc 函数的第一个参数, 用来实现定制内存分配器 
   l_mem totalbytes;  /* number of bytes currently allocated - GCdebt *///初始为 LG 结构大小
   l_mem GCdebt;  /* bytes allocated not yet compensated by the collector *///需要回收的内存数量
-  lu_mem GCestimate;  /* an estimate of the non-garbage memory in use *///内存实际使用量的估计值
-  lu_mem lastatomic;  /* see function 'genstep' in file 'lgc.c' *///上次回收的内存数量
-  stringtable strt;  /* hash table for strings */
-  TValue l_registry;// //全局变量表. 
-                        //  * 初始时这张表的大小为 2, 只有 array part, 
-                        //  * 通过 key LUA_RIDX_MAINTHREAD 和 LUA_RIDX_GLOBALS 来索引, 并且初始化:
-                        //  * l_registry[ LUA_RIDX_MAINTHREAD ] = mainthread
-                        //  * l_registry[ LUA_RIDX_GLOBALS ] = table of globals, 初始时 global table
-                        //  * 是空的.
- 
-  TValue nilvalue;  /* a nil value */
+  lu_mem GCestimate;  /* an estimate of the non-garbage memory in use *///上一轮完整GC 所存活下来的对象总数量
+  lu_mem lastatomic;  /* see function 'genstep' in file 'lgc.c' *///上次回收的不良gc计数
+  stringtable strt;  /* hash table for strings *///全局的字符串哈希表，即保存那些短字符串，使得整个虚拟机中短字符串只有一份实例
+  TValue l_registry;// //保存全局的注册表，注册表就是一个全局的table（即整个虚拟机中只有一个注册表），它只能被C代码访问，通常，它用来保存那些需要在几个模块中共享的数据。比如通过luaL_newmetatable创建的元表就是放在全局的注册表中
+  TValue nilvalue;  /* a nil value *///一个空值
   unsigned int seed;  /* randomized seed for hashes *///随机数种子, lstate.c 中的 makeseed 函数生成 
   lu_byte currentwhite;//存放当前GC的白色种类
-  lu_byte gcstate;  /* state of garbage collector *///存放GC状态，分别有以下几种 ： 
-                      // GCS pause （暂停阶段） 、
-                      // GCSpropagate（传播阶段，用于遍历灰色节点检查对象的引用情况）、
-                      // GCSsweepstring （字符串回收阶段） , 
-                      // GCSsweep （回收阶段，用于对除了字符串之外的所有其他数据类型进行回收）和
-                      // GCSfinalize （终止阶段） 。
-
-  lu_byte gckind;  /* kind of GC running */
-  lu_byte gcstopem;  /* stops emergency collections */
-  lu_byte genminormul;  /* control for minor generational collections */
-  lu_byte genmajormul;  /* control for major generational collections */
-  lu_byte gcstp;  /* control whether GC is running */
-  lu_byte gcemergency;  /* true if this is an emergency collection */
-  lu_byte gcpause;  /* size of pause between successive GCs */
-  lu_byte gcstepmul;  /* GC "speed" */
-  lu_byte gcstepsize;  /* (log2 of) GC granularity */
+  lu_byte gcstate;  /* state of garbage collector *///存放GC状态
+  lu_byte gckind; /* kind of GC running */            // gc 运行的种类 KGC_INC:增量GC KGC_GEN:分代GC
+  lu_byte gcstopem; /* stops emergency collections */ // 为1 停止紧急回收
+  lu_byte genminormul;  /* control for minor generational collections *///分代完整GC
+  lu_byte genmajormul;  /* control for major generational collections *///分代局部GC
+  lu_byte gcstp;  /* control whether GC is running *///GC是否正在运行
+  lu_byte gcemergency;  /* true if this is an emergency collection *///为1 进行紧急GC回收
+  lu_byte gcpause;  /* size of pause between successive GCs *///触发GC需要等待的内存增长百分比
+  lu_byte gcstepmul;  /* GC "speed" *////gc增长速度
+  lu_byte gcstepsize;  /* (log2 of) GC granularity *///gc粒度
   GCObject *allgc;  /* list of all collectable objects *///存放待GC对象的链表，所有对象创建之后都会放入该链表中
   GCObject **sweepgc;  /* current position of sweep in list *///待处理的回收数据都存放在rootgc链表中，
                                                                 // 由于回收阶段不是一次性全部回收这个链表的所有数据，
                                                                 // 所以使用这个变量来保存当前回收的位置，下一次从这个位置开始继续回收操作
 
-  GCObject *finobj;  /* list of collectable objects with finalizers */
+  GCObject *finobj;  /* list of collectable objects with finalizers *///存放所有带有析构函数(__gc)的GC obj链表
   GCObject *gray;  /* list of gray objects *///存放灰色节点的链表
   GCObject *grayagain;  /* list of objects to be traversed atomically *///存放需要一次性扫描处理的灰色节点链表，也就是说，这个链表上所有数据的处理需要一步到位，不能被打断
-  GCObject *weak;  /* list of tables with weak values *///存放弱表的链表
-  GCObject *ephemeron;  /* list of ephemeron tables (weak keys) */
-  GCObject *allweak;  /* list of all-weak tables */
-  GCObject *tobefnz;  /* list of userdata to be GC */
+  GCObject *weak;  /* list of tables with weak values *///存放弱值的链表
+  GCObject *ephemeron;  /* list of ephemeron tables (weak keys) *///键值对（pair），键是弱引用，但键对值的 mark 有如下影响。如果键可达（reachable），则 mark 其值；如果键不可达，则不必 mark 其值
+                                                                // 主要用来解决弱表的循环引用问题  
+                                                                // 弱引用（weak reference）：可以访问对象，但不会阻止对象被收集。
+                                                                //  弱表（weak table）：键或（和）值是弱引用 
+
+  GCObject *allweak;  /* list of all-weak tables *///具有要清除的弱键或弱值 或者弱键弱值同时存在的表
+  GCObject *tobefnz;  /* list of userdata to be GC *///所有准备终结的对象
   GCObject *fixedgc;  /* list of objects not to be collected */// 永远不回收的对象链表, 如保留关键字的字符串, 对象必须在创建之后马上
                                                               //  从 allgc 链表移入该链表中, 用的是 lgc.c 中的 luaC_fix 函数 
 
   /* fields for generational collector */
-  GCObject *survival;  /* start of objects that survived one GC cycle */
-  GCObject *old1;  /* start of old1 objects */
-  GCObject *reallyold;  /* objects more than one cycle old ("really old") */
-  GCObject *firstold1;  /* first OLD1 object in the list (if any) */
-  GCObject *finobjsur;  /* list of survival objects with finalizers */
-  GCObject *finobjold1;  /* list of old1 objects with finalizers */
-  GCObject *finobjrold;  /* list of really old objects with finalizers */
-  struct lua_State *twups;  /* list of threads with open upvalues */
-  lua_CFunction panic;  /* to be called in unprotected errors */
-  struct lua_State *mainthread;
-  TString *memerrmsg;  /* message for memory-allocation errors */
-  TString *tmname[TM_N];  /* array with tag-method names */
-  struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types */
-  TString *strcache[STRCACHE_N][STRCACHE_M];  /* cache for strings in API */
-  lua_WarnFunction warnf;  /* warning function */
-  void *ud_warn;         /* auxiliary data to 'warnf' */
+  GCObject *survival;  /* start of objects that survived one GC cycle *///当前gc存活下来的对象
+  GCObject *old1;  /* start of old1 objects *///活过了一次完整的gc
+  GCObject *reallyold;  /* objects more than one cycle old ("really old") *///指向被标记为G_OLD的开始节点
+  GCObject *firstold1;  /* first OLD1 object in the list (if any) *///列表中的第一个 OLD1 对象
+  GCObject *finobjsur;  /* list of survival objects with finalizers *///指向的是带有"__gc"元方法的survival对象
+  GCObject *finobjold1;  /* list of old1 objects with finalizers *///指向的是带有"__gc"元方法的old1对象
+  GCObject *finobjrold;  /* list of really old objects with finalizers *////指向的是带有"__gc"元方法的被标记为G_OLD对象
+  struct lua_State *twups;  /* list of threads with open upvalues *///twups 链表  所有带有 open upvalue 的 thread 都会放到这个链表中，这样提供了一个方便的遍历 thread 的途径，并且排除掉了没有 open upvalue 的 thread
+  lua_CFunction panic;  /* to be called in unprotected errors *///代码出现错误且未被保护时，会调用panic函数并终止宿主程。这个函数可以通过lua_atpanic来修改
+  struct lua_State *mainthread;//指向主lua_State，或者说是主线程、主执行栈
+  TString *memerrmsg;  /* message for memory-allocation errors *///初始为 "not enough memory" 该字符串永远不会被回收
+  TString *tmname[TM_N];  /* array with tag-method names *///初始化为元方法字符串, 在 ltm.c luaT_init 中, 且将它们标记为不可回收对象
+  struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types *////保存全局的注册表，注册表就是一个全局的table（即整个虚拟机中只有一个注册表），它只能被C代码访问，通常，它用来保存那些需要在几个模块中共享的数据。比如通过luaL_newmetatable创建的元表就是放在全局的注册表中
+  TString *strcache[STRCACHE_N][STRCACHE_M];  /* cache for strings in API *///零结尾的字符串缓存
+  lua_WarnFunction warnf;  /* warning function *////警告函数
+  void *ud_warn;         /* auxiliary data to 'warnf' */// warnf的辅助数据
 } global_State;
 
 
