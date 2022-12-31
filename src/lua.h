@@ -77,60 +77,74 @@ typedef struct lua_State lua_State;
 
 
 /* minimum Lua stack available to a C function */
+/// @brief 最小栈空间
 #define LUA_MINSTACK	20
 
 
 /* predefined values in the registry */
-#define LUA_RIDX_MAINTHREAD	1
-#define LUA_RIDX_GLOBALS	2
+/// @brief 注册表中的预定义值
+#define LUA_RIDX_MAINTHREAD	1 //指向main thread
+#define LUA_RIDX_GLOBALS	2 //指向global table
 #define LUA_RIDX_LAST		LUA_RIDX_GLOBALS //保存了Globals(也就是_G)
 
 
 /* type of numbers in Lua */
+/// @brief 数字类型
 typedef LUA_NUMBER lua_Number;
 
 
 /* type for integer functions */
+/// @brief 整型类型
 typedef LUA_INTEGER lua_Integer;
 
 /* unsigned integer type */
+/// @brief 无符号整数类型
 typedef LUA_UNSIGNED lua_Unsigned;
 
 /* type for continuation-function contexts */
+/// @brief 延续函数上下文的类型
 typedef LUA_KCONTEXT lua_KContext;
 
 
 /*
 ** Type for C functions registered with Lua
 */
+/// @brief 在 Lua 注册的 C 函数的类型
 typedef int (*lua_CFunction) (lua_State *L);
 
 /*
 ** Type for continuation functions
 */
+
+/// @brief 延续函数类型
 typedef int (*lua_KFunction) (lua_State *L, int status, lua_KContext ctx);
 
 
 /*
 ** Type for functions that read/write blocks when loading/dumping Lua chunks
 */
+
+/// @brief 用来读取/写入 加载/转储 lua块
 typedef const char * (*lua_Reader) (lua_State *L, void *ud, size_t *sz);
 
+/// @brief 写入数据接口
 typedef int (*lua_Writer) (lua_State *L, const void *p, size_t sz, void *ud);
 
 
 /*
 ** Type for memory-allocation functions
 */
+
+/// @brief 内存分配函数
 typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
 
 
 /*
 ** Type for warning functions
 */
+
+/// @brief 警告函数
 typedef void (*lua_WarnFunction) (void *ud, const char *msg, int tocont);
-
-
 
 
 /*
@@ -144,32 +158,91 @@ typedef void (*lua_WarnFunction) (void *ud, const char *msg, int tocont);
 /*
 ** RCS ident string
 */
+/// @brief 一些版本,作者信息
 extern const char lua_ident[];
 
 
 /*
 ** state manipulation
 */
+
+/// @brief 构建一台虚拟机global_State以及一条执行线程lua_State 
+/// @param  
+/// @return 
 LUA_API lua_State *(lua_newstate) (lua_Alloc f, void *ud);
+
+/// @brief 关闭虚拟机和所有的执行线程
+/// @param L 
+/// @return 
 LUA_API void       (lua_close) (lua_State *L);
+
+/// @brief 创建一条执行线程
+/// @param  
+/// @return 
 LUA_API lua_State *(lua_newthread) (lua_State *L);
+
+/// @brief 重置一条线程
+/// @param L 
+/// @return 
 LUA_API int        (lua_resetthread) (lua_State *L);
 
+/// @brief 设置panic回调函数 
+/// @param  
+/// @return 
 LUA_API lua_CFunction (lua_atpanic) (lua_State *L, lua_CFunction panicf);
 
-
+/// @brief 这里返回了指针,预防静态链接问题以及中途值被修改的问题 
+/// @param  
+/// @return 
 LUA_API lua_Number (lua_version) (lua_State *L);
 
 
 /*
 ** basic stack manipulation
 */
+
+/// @brief 求解有效的堆栈栈顶指针
+/// @param L 
+/// @param idx 
+/// @return 
 LUA_API int   (lua_absindex) (lua_State *L, int idx);
+
+/// @brief  栈内已压入的参数个数(元素的函数指针不算)
+/// @param L 
+/// @return 
 LUA_API int   (lua_gettop) (lua_State *L);
+
+/// @brief 调整栈内参数个数, idx>=0：保留N个元素,idx<0:表示保留至倒数第N个参数
+// 这里idx的参数意义实际上和absindex()中的一样，也和Lua接口文档一致
+/// @param L 
+/// @param idx 
+/// @return 
 LUA_API void  (lua_settop) (lua_State *L, int idx);
+
+/// @brief 拷贝一份idx指定的数据到栈顶并++top 
+/// @param L 
+/// @param idx 
+/// @return 
 LUA_API void  (lua_pushvalue) (lua_State *L, int idx);
+
+/// @brief 旋转statck[idx,n]
+/// @param L 
+/// @param idx 
+/// @param n 
+/// @return 
 LUA_API void  (lua_rotate) (lua_State *L, int idx, int n);
+
+/// @brief 拷贝数据fromidx->toidx
+/// @param L 
+/// @param fromidx 
+/// @param toidx 
+/// @return 
 LUA_API void  (lua_copy) (lua_State *L, int fromidx, int toidx);
+
+/// @brief 调整堆栈大小确保空闲的slot>=n 
+/// @param L 
+/// @param n 
+/// @return 
 LUA_API int   (lua_checkstack) (lua_State *L, int n);
 
 LUA_API void  (lua_xmove) (lua_State *from, lua_State *to, int n);
@@ -179,14 +252,27 @@ LUA_API void  (lua_xmove) (lua_State *from, lua_State *to, int n);
 ** access functions (stack -> C)
 */
 
+//----------------------------------判断栈上元素是否为指定(或兼容)类型 begin -------------------------------//
 LUA_API int             (lua_isnumber) (lua_State *L, int idx);
 LUA_API int             (lua_isstring) (lua_State *L, int idx);
 LUA_API int             (lua_iscfunction) (lua_State *L, int idx);
 LUA_API int             (lua_isinteger) (lua_State *L, int idx);
 LUA_API int             (lua_isuserdata) (lua_State *L, int idx);
+//----------------------------------判断栈上元素是否为指定(或兼容)类型 end -------------------------------//
+
+/// @brief 获取类型
+/// @param L 
+/// @param idx 
+/// @return 
 LUA_API int             (lua_type) (lua_State *L, int idx);
+
+/// @brief 获取类型名字
+/// @param L 
+/// @param tp 
+/// @return 
 LUA_API const char     *(lua_typename) (lua_State *L, int tp);
 
+//----------------------------------栈上指定元素转到对应的类型  begin -------------------------------//
 LUA_API lua_Number      (lua_tonumberx) (lua_State *L, int idx, int *isnum);
 LUA_API lua_Integer     (lua_tointegerx) (lua_State *L, int idx, int *isnum);
 LUA_API int             (lua_toboolean) (lua_State *L, int idx);
@@ -196,6 +282,7 @@ LUA_API lua_CFunction   (lua_tocfunction) (lua_State *L, int idx);
 LUA_API void	       *(lua_touserdata) (lua_State *L, int idx);
 LUA_API lua_State      *(lua_tothread) (lua_State *L, int idx);
 LUA_API const void     *(lua_topointer) (lua_State *L, int idx);
+//----------------------------------栈上指定元素转到对应的类型 end -------------------------------//
 
 
 /*
@@ -219,9 +306,10 @@ LUA_API const void     *(lua_topointer) (lua_State *L, int idx);
 
 LUA_API void  (lua_arith) (lua_State *L, int op);
 
-#define LUA_OPEQ	0
-#define LUA_OPLT	1
-#define LUA_OPLE	2
+
+#define LUA_OPEQ	0 // ==
+#define LUA_OPLT	1 // < 
+#define LUA_OPLE	2 // <=
 
 LUA_API int   (lua_rawequal) (lua_State *L, int idx1, int idx2);
 LUA_API int   (lua_compare) (lua_State *L, int idx1, int idx2, int op);
@@ -450,7 +538,6 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 #define LUA_MASKCOUNT	(1 << LUA_HOOKCOUNT)
 
 typedef struct lua_Debug lua_Debug;  /* activation record */
-
 
 /* Functions to be called by the debugger in specific events */
 typedef void (*lua_Hook) (lua_State *L, lua_Debug *ar);

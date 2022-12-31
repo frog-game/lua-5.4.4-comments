@@ -96,24 +96,29 @@
 
 
 /* true if this thread does not have non-yieldable calls in the stack */
+/// @brief 利用nCcalls 高16位 来判断协程是否可以yield 
 #define yieldable(L)		(((L)->nCcalls & 0xffff0000) == 0)
 
 /* real number of C calls */
+/// @brief 利用nCcalls 低16位 来作为c函数调用数量
 #define getCcalls(L)	((L)->nCcalls & 0xffff)
 
 
 /* Increment the number of non-yieldable calls */
+/// @brief 其实就是利用加nCcalls + 0x10000 这样如果加了,那么yieldable就会认为不能yield
 #define incnny(L)	((L)->nCcalls += 0x10000)
 
 /* Decrement the number of non-yieldable calls */
+/// @brief 其实就是利用加nCcalls - 0x10000 这样如果减了,那么yieldable 判断如果等于0了那么就认为可以yield
 #define decnny(L)	((L)->nCcalls -= 0x10000)
 
 /* Non-yieldable call increment */
+/// @brief 自增一下
 #define nyci	(0x10000 | 1)
 
 
 
-
+/// @brief goto作用 使用setjmp设置非局部标号
 struct lua_longjmp;  /* defined in ldo.c */
 
 
@@ -121,6 +126,8 @@ struct lua_longjmp;  /* defined in ldo.c */
 ** Atomic type (relative to signals) to better ensure that 'lua_sethook'
 ** is thread safe
 */
+
+/// @brief 原子类型的信号,主要是用来保证lua_sethook是线程安全的
 #if !defined(l_signalT)
 #include <signal.h>
 #define l_signalT	sig_atomic_t
@@ -134,9 +141,12 @@ struct lua_longjmp;  /* defined in ldo.c */
 ** there will be a stack check soon after the push. Function frames
 ** never use this extra space, so it does not need to be kept clean.
 */
+
+/// @brief 额外的堆栈空间 ,别没事使用这块空间
+/// 会留空EXTRA_STACK=5个BUF，用于元表调用或错误处理的栈操作
 #define EXTRA_STACK   5
 
-
+/// @brief 2倍的最小栈空间
 #define BASIC_STACK_SIZE        (2*LUA_MINSTACK)
 
 #define stacksize(th)	cast_int((th)->stack_last - (th)->stack)
@@ -247,18 +257,30 @@ typedef struct CallInfo {
 ** 'global state', shared by all threads of this state
 */
 typedef struct global_State {
-  lua_Alloc frealloc;  /* function to reallocate memory */
-  void *ud;         /* auxiliary data to 'frealloc' */
-  l_mem totalbytes;  /* number of bytes currently allocated - GCdebt */
-  l_mem GCdebt;  /* bytes allocated not yet compensated by the collector */
-  lu_mem GCestimate;  /* an estimate of the non-garbage memory in use */
-  lu_mem lastatomic;  /* see function 'genstep' in file 'lgc.c' */
+  lua_Alloc frealloc;  /* function to reallocate memory *////全局使用的内存分配器, 在 lua_auxilib.c 中提供了一个示例: l_alloc
+  void *ud;         /* auxiliary data to 'frealloc' *////frealloc 函数的第一个参数, 用来实现定制内存分配器 
+  l_mem totalbytes;  /* number of bytes currently allocated - GCdebt *///初始为 LG 结构大小
+  l_mem GCdebt;  /* bytes allocated not yet compensated by the collector *///需要回收的内存数量
+  lu_mem GCestimate;  /* an estimate of the non-garbage memory in use *///内存实际使用量的估计值
+  lu_mem lastatomic;  /* see function 'genstep' in file 'lgc.c' *///上次回收的内存数量
   stringtable strt;  /* hash table for strings */
-  TValue l_registry;
+  TValue l_registry;// //全局变量表. 
+                        //  * 初始时这张表的大小为 2, 只有 array part, 
+                        //  * 通过 key LUA_RIDX_MAINTHREAD 和 LUA_RIDX_GLOBALS 来索引, 并且初始化:
+                        //  * l_registry[ LUA_RIDX_MAINTHREAD ] = mainthread
+                        //  * l_registry[ LUA_RIDX_GLOBALS ] = table of globals, 初始时 global table
+                        //  * 是空的.
+ 
   TValue nilvalue;  /* a nil value */
-  unsigned int seed;  /* randomized seed for hashes */
-  lu_byte currentwhite;
-  lu_byte gcstate;  /* state of garbage collector */
+  unsigned int seed;  /* randomized seed for hashes *///随机数种子, lstate.c 中的 makeseed 函数生成 
+  lu_byte currentwhite;//存放当前GC的白色种类
+  lu_byte gcstate;  /* state of garbage collector *///存放GC状态，分别有以下几种 ： 
+                      // GCS pause （暂停阶段） 、
+                      // GCSpropagate（传播阶段，用于遍历灰色节点检查对象的引用情况）、
+                      // GCSsweepstring （字符串回收阶段） , 
+                      // GCSsweep （回收阶段，用于对除了字符串之外的所有其他数据类型进行回收）和
+                      // GCSfinalize （终止阶段） 。
+
   lu_byte gckind;  /* kind of GC running */
   lu_byte gcstopem;  /* stops emergency collections */
   lu_byte genminormul;  /* control for minor generational collections */
@@ -268,16 +290,21 @@ typedef struct global_State {
   lu_byte gcpause;  /* size of pause between successive GCs */
   lu_byte gcstepmul;  /* GC "speed" */
   lu_byte gcstepsize;  /* (log2 of) GC granularity */
-  GCObject *allgc;  /* list of all collectable objects */
-  GCObject **sweepgc;  /* current position of sweep in list */
+  GCObject *allgc;  /* list of all collectable objects *///存放待GC对象的链表，所有对象创建之后都会放入该链表中
+  GCObject **sweepgc;  /* current position of sweep in list *///待处理的回收数据都存放在rootgc链表中，
+                                                                // 由于回收阶段不是一次性全部回收这个链表的所有数据，
+                                                                // 所以使用这个变量来保存当前回收的位置，下一次从这个位置开始继续回收操作
+
   GCObject *finobj;  /* list of collectable objects with finalizers */
-  GCObject *gray;  /* list of gray objects */
-  GCObject *grayagain;  /* list of objects to be traversed atomically */
-  GCObject *weak;  /* list of tables with weak values */
+  GCObject *gray;  /* list of gray objects *///存放灰色节点的链表
+  GCObject *grayagain;  /* list of objects to be traversed atomically *///存放需要一次性扫描处理的灰色节点链表，也就是说，这个链表上所有数据的处理需要一步到位，不能被打断
+  GCObject *weak;  /* list of tables with weak values *///存放弱表的链表
   GCObject *ephemeron;  /* list of ephemeron tables (weak keys) */
   GCObject *allweak;  /* list of all-weak tables */
   GCObject *tobefnz;  /* list of userdata to be GC */
-  GCObject *fixedgc;  /* list of objects not to be collected */
+  GCObject *fixedgc;  /* list of objects not to be collected */// 永远不回收的对象链表, 如保留关键字的字符串, 对象必须在创建之后马上
+                                                              //  从 allgc 链表移入该链表中, 用的是 lgc.c 中的 luaC_fix 函数 
+
   /* fields for generational collector */
   GCObject *survival;  /* start of objects that survived one GC cycle */
   GCObject *old1;  /* start of old1 objects */
