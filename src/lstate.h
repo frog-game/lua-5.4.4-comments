@@ -153,14 +153,14 @@ struct lua_longjmp;  /* defined in ldo.c */
 
 
 /* kinds of Garbage Collection */
-#define KGC_INC		0	/* incremental gc */
-#define KGC_GEN		1	/* generational gc */
+#define KGC_INC		0	/* incremental gc *///增量gc
+#define KGC_GEN		1	/* generational gc *///分代gc
 
-
+/// @brief Lua用一张hash table来管理所有的字符串资源
 typedef struct stringtable {
-  TString **hash;
-  int nuse;  /* number of elements */
-  int size;
+  TString **hash;//指向字符串的hash表
+  int nuse;  /* number of elements *///元素个数
+  int size;//hash table 大小 
 } stringtable;
 
 
@@ -211,6 +211,7 @@ typedef struct CallInfo {
 
 /*
 ** Bits in CallInfo status
+CallInfo->callstatus 字段的位标识
 */
 #define CIST_OAH	(1<<0)	/* original value of 'allowhook' */
 #define CIST_C		(1<<1)	/* call is running a C function */

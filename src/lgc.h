@@ -28,17 +28,18 @@
 /*
 ** Possible states of the Garbage Collector
 */
-#define GCSpropagate	0
-#define GCSenteratomic	1
-#define GCSatomic	2
-#define GCSswpallgc	3
-#define GCSswpfinobj	4
-#define GCSswptobefnz	5
-#define GCSswpend	6
-#define GCScallfin	7
-#define GCSpause	8
 
+#define GCSpropagate	0 // 传播阶段：标记对象 任务是不断从gray链表中取对象出来，把它们链接到合适的链表去，并标志它们的引用对象,这个阶段是分步的
+#define GCSenteratomic	1 // gc 转移到 GCSatomic的辅助状态 , 所有的GC状态必须在GCSpropagate状态或者GCSatomic状态两者之间
+#define GCSatomic	2 //原子阶段：一次性标记
+#define GCSswpallgc	3//清扫global_State.allgc
+#define GCSswpfinobj	4 //对global_State.finobj链表进行清扫
+#define GCSswptobefnz	5//对global_State.tobefnz链表进行清扫
+#define GCSswpend	6//清扫结束
+#define GCScallfin	7//会遍历global_State.tobefnz链表上的对象，然后调用其__gc函数，然后把它放入global_State.allgc链表中，会在下个GC循环回回收
+#define GCSpause	8 //gc 启动阶段  主要标记几个根集对象，如主线程，注册表，基础类型的元表 这个命名怪怪的？
 
+/// 是不是扫描阶段
 #define issweepphase(g)  \
 	(GCSswpallgc <= (g)->gcstate && (g)->gcstate <= GCSswpend)
 
@@ -51,94 +52,109 @@
 ** all objects are white again.
 */
 
+/// 是不是标记阶段
 #define keepinvariant(g)	((g)->gcstate <= GCSatomic)
 
 
 /*
 ** some useful bit tricks
 */
-#define resetbits(x,m)		((x) &= cast_byte(~(m)))
-#define setbits(x,m)		((x) |= (m))
-#define testbits(x,m)		((x) & (m))
-#define bitmask(b)		(1<<(b))
+
+//------------------------------------- 对二进制位 操作 begin ---------------------------------//
+#define resetbits(x,m)		((x) &= cast_byte(~(m))) //和resetbit 进行搭配用来将特定的位清零
+#define setbits(x,m)		((x) |= (m))//和l_setbit 进行搭配 实现设置一个变量的特定的位置1
+#define testbits(x,m)		((x) & (m))//和testbit 进行搭配用来检测特定位是不是1
+#define bitmask(b)		(1<<(b))//1向左进行偏移b位
 #define bit2mask(b1,b2)		(bitmask(b1) | bitmask(b2))
 #define l_setbit(x,b)		setbits(x, bitmask(b))
 #define resetbit(x,b)		resetbits(x, bitmask(b))
 #define testbit(x,b)		testbits(x, bitmask(b))
-
+//------------------------------------- 对二进制位 操作 end ---------------------------------//
 
 /*
 ** Layout for bit use in 'marked' field. First three bits are
 ** used for object "age" in generational mode. Last bit is used
 ** by tests.
 */
-#define WHITE0BIT	3  /* object is white (type 0) */
-#define WHITE1BIT	4  /* object is white (type 1) */
-#define BLACKBIT	5  /* object is black */
-#define FINALIZEDBIT	6  /* object has been marked for finalization */
 
-#define TESTBIT		7
-
-
-
-#define WHITEBITS	bit2mask(WHITE0BIT, WHITE1BIT)
+//------------------------------------- 位标记索引 begin ---------------------------------//
+#define WHITE0BIT	3  /* object is white (type 0) *///白色0  	bit2mask(3)   1000
+#define WHITE1BIT	4  /* object is white (type 1) *///白色1 	bit2mask(4)  10000
+#define BLACKBIT	5  /* object is black *///黑色				bit2mask(5) 100000
+#define FINALIZEDBIT	6  //用于标记userdata					110
+//  当 userdata 确认不被引用，则设置上这个标记 不同于颜色标记。
+// 主要还是userdata 能设置gc方法，释放内存要延迟到gc方法以后,这个标记可以保证元方法不被反复调用
 
 
-#define iswhite(x)      testbits((x)->marked, WHITEBITS)
-#define isblack(x)      testbit((x)->marked, BLACKBIT)
-#define isgray(x)  /* neither white nor black */  \
-	(!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))
+#define TESTBIT		7//测试位 就是 111
 
-#define tofinalize(x)	testbit((x)->marked, FINALIZEDBIT)
 
-#define otherwhite(g)	((g)->currentwhite ^ WHITEBITS)
+
+#define WHITEBITS	bit2mask(WHITE0BIT, WHITE1BIT)//用来切换白色、判断对象是否dead以及标记对象为白色 十进制:24 二进制:11000
+//------------------------------------- 位标记索引 end ---------------------------------//
+
+
+//------------------------------------- 位检测设置 begin ---------------------------------//
+#define iswhite(x)      testbits((x)->marked, WHITEBITS)//是不是白色  其实就是看第4位和第5位是不是1
+#define isblack(x)      testbit((x)->marked, BLACKBIT)//是不是黑色
+#define isgray(x)  /* neither white nor black */  \ 
+	(!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))//是不是灰色
+
+#define tofinalize(x)	testbit((x)->marked, FINALIZEDBIT)//是不是标记了userdata 
+
+#define otherwhite(g)	((g)->currentwhite ^ WHITEBITS)//非当前GC将要回收的白色类型  比如如果(g)->currentwhite是1000 1000 ^ 11000 = 10000，如果(g)->currentwhite的值是10000的话， 10000 ^ 11000 = 1000 结果正好相反。从这里的逻辑我们可以看出，white的值只有两种，要么是1000，要么是10000
 #define isdeadm(ow,m)	((m) & (ow))
-#define isdead(g,v)	isdeadm(otherwhite(g), (v)->marked)
+#define isdead(g,v)	isdeadm(otherwhite(g), (v)->marked) //如果是其他白,那么就说明真正死亡了,肯定会被清除掉, 当前白表示新创建的对象，是不一样的东西
 
-#define changewhite(x)	((x)->marked ^= WHITEBITS)
+#define changewhite(x)	((x)->marked ^= WHITEBITS) //改变白色位 比如如果((x)->marked是111000  111000 ^ 11000 = 100000 比如如果((x)->marked是101000  101000 ^ 11000 = 110000  比如如果((x)->marked是110000  110000 ^ 11000 = 101000  比如如果((x)->marked是100000  100000 ^ 11000 = 111000   注意看第4位和第5位是不是切换位标识了
 #define nw2black(x)  \
-	check_exp(!iswhite(x), l_setbit((x)->marked, BLACKBIT))
+	check_exp(!iswhite(x), l_setbit((x)->marked, BLACKBIT))//非白色到黑色
 
-#define luaC_white(g)	cast_byte((g)->currentwhite & WHITEBITS)
-
+#define luaC_white(g)	cast_byte((g)->currentwhite & WHITEBITS) //得到当前的白色状态 比如如果(g)->currentwhite是1000 1000 & 11000 = 01000， 1000 & 11000还是1000 是能获取当前白色值的状态 如果(g)->currentwhite是10000   10000 & 11000 = 10000， 10000 &11000还是10000
+//------------------------------------- 位检测设置 end ---------------------------------//
 
 /* object age in generational mode */
-#define G_NEW		0	/* created in current cycle */
-#define G_SURVIVAL	1	/* created in previous cycle */
-#define G_OLD0		2	/* marked old by frw. barrier in this cycle */
-#define G_OLD1		3	/* first full cycle as old */
-#define G_OLD		4	/* really old object (not to be visited) */
-#define G_TOUCHED1	5	/* old object touched this cycle */
-#define G_TOUCHED2	6	/* old object touched in previous cycle */
+//------------------------------------- 分代模式下对象年龄标识 begin ---------------------------------//
+#define G_NEW		0	/* created in current cycle *///(0代对象）本次cycle创建的新对象（没有引用任何old对象） 
+#define G_SURVIVAL	1	/* created in previous cycle *///(1代对象）上一轮cycle创建的对象 -- 只活过一轮，下一次如果是白色的话，仍然会被回收
+#define G_OLD0		2	/* marked old by frw. barrier in this cycle *///(1代对象）表示本次cycle创建的新对象，但是引用了old对象
 
-#define AGEBITS		7  /* all age bits (111) */
+//老年代对象
+#define G_OLD1		3	/* first full cycle as old *///（2代对象）作为老对象第一次存活了整个gc过程 
+#define G_OLD		4	/* really old object (not to be visited) *///（3代对象）表示真正的old对象，不会被回收 
+#define G_TOUCHED1	5	/* old object touched this cycle *///（3代对象）标记位G_OLD的对象在这次gc barrier_back的状态 新touch的对象，需要进入到grayagain中
+#define G_TOUCHED2	6	/* old object touched in previous cycle *///（3代对象）标记为G_OLD的对象在上一次gc barrier_back的状态前进到touched2 
 
-#define getage(o)	((o)->marked & AGEBITS)
-#define setage(o,a)  ((o)->marked = cast_byte(((o)->marked & (~AGEBITS)) | a))
-#define isold(o)	(getage(o) > G_SURVIVAL)
+#define AGEBITS		7  /* all age bits (111) *///age使用的位mask，age只使用了marked的0,1,2字段
 
-#define changeage(o,f,t)  \
+#define getage(o)	((o)->marked & AGEBITS)//获取年龄
+#define setage(o,a)  ((o)->marked = cast_byte(((o)->marked & (~AGEBITS)) | a))//设置年龄
+#define isold(o)	(getage(o) > G_SURVIVAL)//是不是旧对象
+
+#define changeage(o,f,t)  \ //改变年龄
 	check_exp(getage(o) == (f), (o)->marked ^= ((f)^(t)))
-
+//------------------------------------- 分代模式下对象年龄标识 end ---------------------------------//
 
 /* Default Values for GC parameters */
-#define LUAI_GENMAJORMUL         100
-#define LUAI_GENMINORMUL         20
+#define LUAI_GENMAJORMUL         100 //全局gc参数
+#define LUAI_GENMINORMUL         20 //局部gc参数
 
 /* wait memory to double before starting new cycle */
-#define LUAI_GCPAUSE    200
+#define LUAI_GCPAUSE    200 //等待内存翻倍数
 
 /*
 ** some gc parameters are stored divided by 4 to allow a maximum value
 ** up to 1023 in a 'lu_byte'.
 */
+
+//按4的倍数划分参数
 #define getgcparam(p)	((p) * 4)
 #define setgcparam(p,v)	((p) = (v) / 4)
 
-#define LUAI_GCMUL      100
+#define LUAI_GCMUL      100 //gc增长速度
 
 /* how much to allocate before next GC step (log2) */
-#define LUAI_GCSTEPSIZE 13      /* 8 KB */
+#define LUAI_GCSTEPSIZE 13      /* 8 KB *///gc的粒度值
 
 
 /*
@@ -146,7 +162,7 @@
 ** generational mode, the collector can go temporarily to incremental
 ** mode to improve performance. This is signaled by 'g->lastatomic != 0'.
 */
-#define isdecGCmodegen(g)	(g->gckind == KGC_GEN || g->lastatomic != 0)
+#define isdecGCmodegen(g)	(g->gckind == KGC_GEN || g->lastatomic != 0) //是不是分代gc
 
 
 /*
