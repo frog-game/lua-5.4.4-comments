@@ -369,13 +369,13 @@ struct lua_State {
 */
 union GCUnion {
   GCObject gc;  /* common header */
-  struct TString ts;
-  struct Udata u;
-  union Closure cl;
-  struct Table h;
-  struct Proto p;
-  struct lua_State th;  /* thread */
-  struct UpVal upv;
+  struct TString ts;//字符串
+  struct Udata u;//用户数据
+  union Closure cl;//闭包
+  struct Table h;//表
+  struct Proto p;//函数原型:存放函数字节码信息
+  struct lua_State th;  /* thread *///线程
+  struct UpVal upv;//上值
 };
 
 
@@ -387,23 +387,27 @@ union GCUnion {
 #define cast_u(o)	cast(union GCUnion *, (o))
 
 /* macros to convert a GCObject into a specific value */
-#define gco2ts(o)  \
-	check_exp(novariant((o)->tt) == LUA_TSTRING, &((cast_u(o))->ts))
-#define gco2u(o)  check_exp((o)->tt == LUA_VUSERDATA, &((cast_u(o))->u))
-#define gco2lcl(o)  check_exp((o)->tt == LUA_VLCL, &((cast_u(o))->cl.l))
-#define gco2ccl(o)  check_exp((o)->tt == LUA_VCCL, &((cast_u(o))->cl.c))
-#define gco2cl(o)  \
-	check_exp(novariant((o)->tt) == LUA_TFUNCTION, &((cast_u(o))->cl))
-#define gco2t(o)  check_exp((o)->tt == LUA_VTABLE, &((cast_u(o))->h))
-#define gco2p(o)  check_exp((o)->tt == LUA_VPROTO, &((cast_u(o))->p))
-#define gco2th(o)  check_exp((o)->tt == LUA_VTHREAD, &((cast_u(o))->th))
-#define gco2upv(o)	check_exp((o)->tt == LUA_VUPVAL, &((cast_u(o))->upv))
 
+//----------------------------- 转换GCobject到指定类型 begin ----------------------------//
+#define gco2ts(o)  \
+	check_exp(novariant((o)->tt) == LUA_TSTRING, &((cast_u(o))->ts))//转换成字符串
+#define gco2u(o)  check_exp((o)->tt == LUA_VUSERDATA, &((cast_u(o))->u))//转换成userdata
+#define gco2lcl(o)  check_exp((o)->tt == LUA_VLCL, &((cast_u(o))->cl.l))//转换成lua闭包
+#define gco2ccl(o)  check_exp((o)->tt == LUA_VCCL, &((cast_u(o))->cl.c))//转换成c闭包
+#define gco2cl(o)  \
+	check_exp(novariant((o)->tt) == LUA_TFUNCTION, &((cast_u(o))->cl))//转换成函数
+#define gco2t(o)  check_exp((o)->tt == LUA_VTABLE, &((cast_u(o))->h))//转换成表
+#define gco2p(o)  check_exp((o)->tt == LUA_VPROTO, &((cast_u(o))->p))//转换成函数原型
+#define gco2th(o)  check_exp((o)->tt == LUA_VTHREAD, &((cast_u(o))->th)) //转换成线程
+#define gco2upv(o)	check_exp((o)->tt == LUA_VUPVAL, &((cast_u(o))->upv)) //转换成上值
+//----------------------------- 转换GCobject到指定类型 end ----------------------------//
 
 /*
 ** macro to convert a Lua object into a GCObject
 ** (The access to 'tt' tries to ensure that 'v' is actually a Lua object.)
 */
+
+//将lua对象转换成GCObject对象
 #define obj2gco(v)	check_exp((v)->tt >= LUA_TSTRING, &(cast_u(v)->gc))
 
 

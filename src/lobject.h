@@ -19,16 +19,17 @@
 /*
 ** Extra types for collectable non-values
 */
-#define LUA_TUPVAL	LUA_NUMTYPES  /* upvalues */
-#define LUA_TPROTO	(LUA_NUMTYPES+1)  /* function prototypes */
-#define LUA_TDEADKEY	(LUA_NUMTYPES+2)  /* removed keys in tables */
+#define LUA_TUPVAL	LUA_NUMTYPES  /* upvalues *///上值
+#define LUA_TPROTO	(LUA_NUMTYPES+1)  /* function prototypes *///函数原型 不是一个公开类型
+#define LUA_TDEADKEY	(LUA_NUMTYPES+2)  /* removed keys in tables *///DEADKEY
 
 
 
 /*
 ** number of all possible types (including LUA_TNONE but excluding DEADKEY)
 */
-#define LUA_TOTALTYPES		(LUA_TPROTO + 2)
+ 
+#define LUA_TOTALTYPES		(LUA_TPROTO + 2)//所有类型的总数量（包括LUA_TNONE但不包括DEADKEY）
 
 
 /*
@@ -38,20 +39,29 @@
 ** bit 6: whether value is collectable
 */
 
+// 这里是对TValue里面的lu_byte类型tt做的解释
+// tt是一个unsigned char数据
+// 0-3表示数据的基础类型（9种类型）
+// 4-5表示（这个数据的扩展，比如说下面的长字符串、短字符串、浮点数、整数、lua闭包、c函数和c闭包这些数据扩展）
+// 6表示是否是垃圾回收对象
+
 /* add variant bits to a type */
-#define makevariant(t,v)	((t) | ((v) << 4))
+#define makevariant(t,v)	((t) | ((v) << 4))//向类型添加bit位
 
 
 
 /*
 ** Union of all Lua values
 */
+
+/// @brief GCObject和其他不需要进行进行GC的数据放在一个联合体里面构成了Value类型
+// lua5.3以后 number类型就有了两个类型float和int 也就是下面的 lua_Number n和 lua_Integer i
 typedef union Value {
-  struct GCObject *gc;    /* collectable objects */
-  void *p;         /* light userdata */
-  lua_CFunction f; /* light C functions */
-  lua_Integer i;   /* integer numbers */
-  lua_Number n;    /* float numbers */
+  struct GCObject *gc;    /* collectable objects */// 可回收的对象
+  void *p;         /* light userdata *///轻量级userdata
+  lua_CFunction f; /* light C functions *///函数指针 例如（typedef int (*lua_CFunction)(lua_State *L)）
+  lua_Integer i;   /* integer numbers *///int整型值 
+  lua_Number n;    /* float numbers *///n是float类型的值 
 } Value;
 
 
@@ -60,39 +70,42 @@ typedef union Value {
 ** an actual value plus a tag with its type.
 */
 
+///tt_来标记数据到底是什么类型的
 #define TValuefields	Value value_; lu_byte tt_
 
+/// @brief 基础数据类型
 typedef struct TValue {
   TValuefields;
 } TValue;
 
 
-#define val_(o)		((o)->value_)
+#define val_(o)		((o)->value_)//获取TValue的Value部分
 #define valraw(o)	(val_(o))
 
 
 /* raw type tag of a TValue */
-#define rawtt(o)	((o)->tt_)
+#define rawtt(o)	((o)->tt_)//获取数据类型
 
 /* tag with no variants (bits 0-3) */
-#define novariant(t)	((t) & 0x0F)
+#define novariant(t)	((t) & 0x0F)//获取低四位 也就是0-3位
 
 /* type tag of a TValue (bits 0-3 for tags + variant bits 4-5) */
-#define withvariant(t)	((t) & 0x3F)
+#define withvariant(t)	((t) & 0x3F)//获取0,5位 数据的基础类型 + 数据的扩展扩展类型
 #define ttypetag(o)	withvariant(rawtt(o))
 
 /* type of a TValue */
-#define ttype(o)	(novariant(rawtt(o)))
+#define ttype(o)	(novariant(rawtt(o)))//数据的基础类型
 
 
 /* Macros to test type */
-#define checktag(o,t)		(rawtt(o) == (t))
-#define checktype(o,t)		(ttype(o) == (t))
+#define checktag(o,t)		(rawtt(o) == (t))//检测类型是否相等
+#define checktype(o,t)		(ttype(o) == (t))//检测数据基础类型是否相等
 
 
 /* Macros for internal tests */
 
 /* collectable object has the same tag as the original value */
+///返回obj的tt_是否等于gc里面的tt
 #define righttt(obj)		(ttypetag(obj) == gcvalue(obj)->tt)
 
 /*
@@ -101,6 +114,12 @@ typedef struct TValue {
 ** and it is not dead. The option 'L == NULL' allows other
 ** macros using this one to be used where L is not available.
 */
+
+// 检查obj的生存期
+// iscollectable(obj)检查obj是否为GC对象
+// righttt(obj)返回obj的tt_是否等于gc里面的tt
+// isdead(obj)返回obj是否已经被清理
+// 总而言之，返回true代表未被GC的和不需要GC的，返回false代表已经被GC了的
 #define checkliveness(L,obj) \
 	((void)L, lua_longassert(!iscollectable(obj) || \
 		(righttt(obj) && (L == NULL || !isdead(G(L),gcvalue(obj))))))
@@ -109,10 +128,18 @@ typedef struct TValue {
 /* Macros to set values */
 
 /* set a value's tag */
+
+// 在lua里面的值是无关类型的，就是靠下面的操作来让变量类型相互变化
+// 通过改变TValue的tt_和Value里面的具体值（比如：i,n,f,b等）
+// set函数是设置新的值，改变的有tt_
+// chg函数也是改变新的值，但是没有改变tt_
+// 不需要GC的值复制操作 直接替换Value和tt，需要GC的值复制操作还要检查一下生存期
 #define settt_(o,t)	((o)->tt_=(t))
 
 
 /* main macro to copy values (from 'obj2' to 'obj1') */
+
+///把obj2复制给obj1
 #define setobj(L,obj1,obj2) \
 	{ TValue *io1=(obj1); const TValue *io2=(obj2); \
           io1->value_ = io2->value_; settt_(io1, io2->tt_); \
@@ -124,15 +151,15 @@ typedef struct TValue {
 */
 
 /* from stack to stack */
-#define setobjs2s(L,o1,o2)	setobj(L,s2v(o1),s2v(o2))
+#define setobjs2s(L,o1,o2)	setobj(L,s2v(o1),s2v(o2))//stack->stack
 /* to stack (not from same stack) */
-#define setobj2s(L,o1,o2)	setobj(L,s2v(o1),o2)
+#define setobj2s(L,o1,o2)	setobj(L,s2v(o1),o2)//obj->stack
 /* from table to same table */
-#define setobjt2t	setobj
+#define setobjt2t	setobj //table->table
 /* to new object */
-#define setobj2n	setobj
+#define setobj2n	setobj //object->new object
 /* to table */
-#define setobj2t	setobj
+#define setobj2t	setobj //object->table
 
 
 /*
@@ -143,19 +170,24 @@ typedef struct TValue {
 ** their real delta is always the maximum value that fits in
 ** that field.
 */
+
+/// @brief 数据栈
+、、
 typedef union StackValue {
   TValue val;
   struct {
     TValuefields;
-    unsigned short delta;
-  } tbclist;
+    unsigned short delta;//当两个tbc变量之间的距离不适合无符号短型时，将使用虚拟条目 它们用delta == 0表示，其实际delta始终是该字段中适合的最大值
+  } tbclist;//此堆栈中所有活动的将要关闭的变量的列表
 } StackValue;
 
 
 /* index to stack elements */
+//第一个自由索引堆栈中的元素槽
 typedef StackValue *StkId;
 
 /* convert a 'StackValue' to a 'TValue' */
+//StackValue转Tvalue类型
 #define s2v(o)	(&(o)->val)
 
 
@@ -167,32 +199,34 @@ typedef StackValue *StkId;
 */
 
 /* Standard nil */
-#define LUA_VNIL	makevariant(LUA_TNIL, 0)
+#define LUA_VNIL	makevariant(LUA_TNIL, 0) //nil类型
 
 /* Empty slot (which might be different from a slot containing nil) */
-#define LUA_VEMPTY	makevariant(LUA_TNIL, 1)
+#define LUA_VEMPTY	makevariant(LUA_TNIL, 1)//空槽位
 
 /* Value returned for a key not found in a table (absent key) */
-#define LUA_VABSTKEY	makevariant(LUA_TNIL, 2)
+#define LUA_VABSTKEY	makevariant(LUA_TNIL, 2) //表中没有找到key时候返回的类型
 
 
 /* macro to test for (any kind of) nil */
-#define ttisnil(v)		checktype((v), LUA_TNIL)
+#define ttisnil(v)		checktype((v), LUA_TNIL) //基础类型是不是nil类型
 
 
 /* macro to test for a standard nil */
-#define ttisstrictnil(o)	checktag((o), LUA_VNIL)
+#define ttisstrictnil(o)	checktag((o), LUA_VNIL)//Tvalue的tt_是不是nil类型
 
 
-#define setnilvalue(obj) settt_(obj, LUA_VNIL)
+#define setnilvalue(obj) settt_(obj, LUA_VNIL)//设置tt_为nil类型
 
 
-#define isabstkey(v)		checktag((v), LUA_VABSTKEY)
+#define isabstkey(v)		checktag((v), LUA_VABSTKEY) //Tvalue的tt_是不是LUA_VABSTKEY类型
 
 
 /*
 ** macro to detect non-standard nils (used only in assertions)
 */
+
+//用来检测基础类型和Tvalue的tt_是不是nil类型
 #define isnonstrictnil(v)	(ttisnil(v) && !ttisstrictnil(v))
 
 
@@ -201,14 +235,19 @@ typedef StackValue *StkId;
 ** (In any definition, values associated with absent keys must also
 ** be accepted as empty.)
 */
+//是不是nil类型
 #define isempty(v)		ttisnil(v)
 
 
 /* macro defining a value corresponding to an absent key */
+// 散列表查找规则为计算出key的hash，根据hash访问Node数组得到slot所在的位置，
+// 然后通过next顺着hash冲突链查找。
+// 如果找到就范围对应TValue，找不到返回TValue常量absentkey，值为{NULL, LUA_TNIL}
 #define ABSTKEYCONSTANT		{NULL}, LUA_VABSTKEY
 
 
 /* mark an entry as empty */
+// 设置Tvalue的tt_为LUA_VEMPTY类型
 #define setempty(v)		settt_(v, LUA_VEMPTY)
 
 
@@ -223,19 +262,19 @@ typedef StackValue *StkId;
 */
 
 
-#define LUA_VFALSE	makevariant(LUA_TBOOLEAN, 0)
-#define LUA_VTRUE	makevariant(LUA_TBOOLEAN, 1)
+#define LUA_VFALSE	makevariant(LUA_TBOOLEAN, 0)// 标记 bool false
+#define LUA_VTRUE	makevariant(LUA_TBOOLEAN, 1)// 标记 bool true
 
-#define ttisboolean(o)		checktype((o), LUA_TBOOLEAN)
-#define ttisfalse(o)		checktag((o), LUA_VFALSE)
-#define ttistrue(o)		checktag((o), LUA_VTRUE)
-
-
-#define l_isfalse(o)	(ttisfalse(o) || ttisnil(o))
+#define ttisboolean(o)		checktype((o), LUA_TBOOLEAN) //检测TValue->tt_是不是bool
+#define ttisfalse(o)		checktag((o), LUA_VFALSE)//检测TValue->tt_是不是false
+#define ttistrue(o)		checktag((o), LUA_VTRUE)//检测TValue->tt_是不是true
 
 
-#define setbfvalue(obj)		settt_(obj, LUA_VFALSE)
-#define setbtvalue(obj)		settt_(obj, LUA_VTRUE)
+#define l_isfalse(o)	(ttisfalse(o) || ttisnil(o)) //检测TValue->tt_是不是false 或者nil
+
+
+#define setbfvalue(obj)		settt_(obj, LUA_VFALSE) //设置TValue->tt_为false
+#define setbtvalue(obj)		settt_(obj, LUA_VTRUE)//设置TValue->tt_为true
 
 /* }================================================================== */
 
@@ -246,17 +285,20 @@ typedef StackValue *StkId;
 ** ===================================================================
 */
 
-#define LUA_VTHREAD		makevariant(LUA_TTHREAD, 0)
+#define LUA_VTHREAD		makevariant(LUA_TTHREAD, 0) //线程
 
-#define ttisthread(o)		checktag((o), ctb(LUA_VTHREAD))
+#define ttisthread(o)		checktag((o), ctb(LUA_VTHREAD)) //是不是可回收的线程类型
 
-#define thvalue(o)	check_exp(ttisthread(o), gco2th(val_(o).gc))
+#define thvalue(o)	check_exp(ttisthread(o), gco2th(val_(o).gc)) //如果是可回收的线程类型,那么就吧GCobject转换成线程了类型
 
+// 将obj指向的对象 Value 的 union 元素设为(GCObjec *)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为 LUA_VTHREAD 类型 并添加可回收属性
 #define setthvalue(L,obj,x) \
   { TValue *io = (obj); lua_State *x_ = (x); \
     val_(io).gc = obj2gco(x_); settt_(io, ctb(LUA_VTHREAD)); \
     checkliveness(L,io); }
 
+// 对上面setthvalue宏的封装 唯一区别就是 将StackValue 的o转Tvalue的o类型
 #define setthvalue2s(L,o,t)	setthvalue(L,s2v(o),t)
 
 /* }================================================================== */
@@ -272,27 +314,36 @@ typedef StackValue *StkId;
 ** Common Header for all collectable objects (in macro form, to be
 ** included in other objects)
 */
+
+// 所有需要GC操作的数据都会加一个CommonHeader类型的宏定义
+// next指向下一个GC链表的数据
+// tt代表数据的类型以及扩展类型以及GC位的标志
+// marked是执行GC的标记位，就是一坨二进制，用于具体的GC算法
 #define CommonHeader	struct GCObject *next; lu_byte tt; lu_byte marked
 
 
 /* Common type for all collectable objects */
+///lua里面所有需要垃圾回收对象的联合体
 typedef struct GCObject {
   CommonHeader;
 } GCObject;
 
 
 /* Bit mark for collectable types */
-#define BIT_ISCOLLECTABLE	(1 << 6)
+#define BIT_ISCOLLECTABLE	(1 << 6) //复合类型包含标记位：会被GC标记
 
-#define iscollectable(o)	(rawtt(o) & BIT_ISCOLLECTABLE)
+#define iscollectable(o)	(rawtt(o) & BIT_ISCOLLECTABLE) // 是否需要进行GC操作
 
 /* mark a tag as collectable */
-#define ctb(t)			((t) | BIT_ISCOLLECTABLE)
+#define ctb(t)			((t) | BIT_ISCOLLECTABLE) //标记位回收类型
 
-#define gcvalue(o)	check_exp(iscollectable(o), val_(o).gc)
+#define gcvalue(o)	check_exp(iscollectable(o), val_(o).gc) //获取 GCObject 指针
 
-#define gcvalueraw(v)	((v).gc)
+#define gcvalueraw(v)	((v).gc) //获取原始gc指针
 
+
+// 将obj指向的对象 Value 的 union 元素设为(GCObjec *)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为i_g->tt类型 并添加可回收属性
 #define setgcovalue(L,obj,x) \
   { TValue *io = (obj); GCObject *i_g=(x); \
     val_(io).gc = i_g; settt_(io, ctb(i_g->tt)); }
@@ -307,30 +358,36 @@ typedef struct GCObject {
 */
 
 /* Variant tags for numbers */
-#define LUA_VNUMINT	makevariant(LUA_TNUMBER, 0)  /* integer numbers */
-#define LUA_VNUMFLT	makevariant(LUA_TNUMBER, 1)  /* float numbers */
+#define LUA_VNUMINT	makevariant(LUA_TNUMBER, 0)  /* integer numbers *///整数类型
+#define LUA_VNUMFLT	makevariant(LUA_TNUMBER, 1)  /* float numbers *///float类型
 
-#define ttisnumber(o)		checktype((o), LUA_TNUMBER)
-#define ttisfloat(o)		checktag((o), LUA_VNUMFLT)
-#define ttisinteger(o)		checktag((o), LUA_VNUMINT)
+#define ttisnumber(o)		checktype((o), LUA_TNUMBER)//是不是number类型
+#define ttisfloat(o)		checktag((o), LUA_VNUMFLT)//是不是float类型
+#define ttisinteger(o)		checktag((o), LUA_VNUMINT)//是不是int类型
 
 #define nvalue(o)	check_exp(ttisnumber(o), \
-	(ttisinteger(o) ? cast_num(ivalue(o)) : fltvalue(o)))
-#define fltvalue(o)	check_exp(ttisfloat(o), val_(o).n)
-#define ivalue(o)	check_exp(ttisinteger(o), val_(o).i)
+	(ttisinteger(o) ? cast_num(ivalue(o)) : fltvalue(o)))//获取number的值,如果是int 那么就返回int 如果是float 那么就返回float
+#define fltvalue(o)	check_exp(ttisfloat(o), val_(o).n) //获取float
+#define ivalue(o)	check_exp(ttisinteger(o), val_(o).i)//获取int
 
-#define fltvalueraw(v)	((v).n)
-#define ivalueraw(v)	((v).i)
+#define fltvalueraw(v)	((v).n) //获取原生float值
+#define ivalueraw(v)	((v).i)//获取原生int值
 
+// 将obj指向的对象 Value 的 union 元素设为(lua_Number *)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为 LUA_VNUMFLT类型
 #define setfltvalue(obj,x) \
   { TValue *io=(obj); val_(io).n=(x); settt_(io, LUA_VNUMFLT); }
 
+// 将obj指向的对象 Value 的 union 元素设为(lua_Number)类型, 并指向 x 指向的对象;
 #define chgfltvalue(obj,x) \
   { TValue *io=(obj); lua_assert(ttisfloat(io)); val_(io).n=(x); }
 
+// 将obj指向的对象 Value 的 union 元素设为(lua_Integer)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为 LUA_VNUMINT类型
 #define setivalue(obj,x) \
   { TValue *io=(obj); val_(io).i=(x); settt_(io, LUA_VNUMINT); }
 
+// 将obj指向的对象 Value 的 union 元素设为(lua_Integer)类型, 并指向 x 指向的对象;
 #define chgivalue(obj,x) \
   { TValue *io=(obj); lua_assert(ttisinteger(io)); val_(io).i=(x); }
 
@@ -344,42 +401,52 @@ typedef struct GCObject {
 */
 
 /* Variant tags for strings */
-#define LUA_VSHRSTR	makevariant(LUA_TSTRING, 0)  /* short strings */
-#define LUA_VLNGSTR	makevariant(LUA_TSTRING, 1)  /* long strings */
+#define LUA_VSHRSTR	makevariant(LUA_TSTRING, 0)  /* short strings *///短字符串
+#define LUA_VLNGSTR	makevariant(LUA_TSTRING, 1)  /* long strings *///长字符串
 
-#define ttisstring(o)		checktype((o), LUA_TSTRING)
-#define ttisshrstring(o)	checktag((o), ctb(LUA_VSHRSTR))
-#define ttislngstring(o)	checktag((o), ctb(LUA_VLNGSTR))
+#define ttisstring(o)		checktype((o), LUA_TSTRING)//tt是不是string类型
+#define ttisshrstring(o)	checktag((o), ctb(LUA_VSHRSTR))//tt是不是短字符串类型
+#define ttislngstring(o)	checktag((o), ctb(LUA_VLNGSTR))//tt是不是长字符串类型
 
-#define tsvalueraw(v)	(gco2ts((v).gc))
+#define tsvalueraw(v)	(gco2ts((v).gc))//获取原生的gc类型
 
+//将GCobject转成字符串
 #define tsvalue(o)	check_exp(ttisstring(o), gco2ts(val_(o).gc))
 
+
+// 将obj指向的对象 Value 的 union 元素设为(GCObjec *)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为 x_->tt类型，并添加可回收属性
 #define setsvalue(L,obj,x) \
   { TValue *io = (obj); TString *x_ = (x); \
     val_(io).gc = obj2gco(x_); settt_(io, ctb(x_->tt)); \
     checkliveness(L,io); }
 
 /* set a string to the stack */
+// 对上面的封装 唯一区别就是 将StackValue 的o转Tvalue的o类型
 #define setsvalue2s(L,o,s)	setsvalue(L,s2v(o),s)
 
 /* set a string to a new object */
+// 对setsvalue宏的封装
 #define setsvalue2n	setsvalue
 
 
 /*
 ** Header for a string value.
 */
+
+/// @brief lua字符串的数据结构
 typedef struct TString {
-  CommonHeader;
-  lu_byte extra;  /* reserved words for short strings; "has hash" for longs */
-  lu_byte shrlen;  /* length for short strings */
-  unsigned int hash;
+  CommonHeader;//代表需要GC
+  lu_byte extra;  /* reserved words for short strings; "has hash" for longs */// 用于标记是否是虚拟机保留的字符串，如果这个值为1，那么不会GC（保留字符串即是lua中的关键字）
+  lu_byte shrlen;  /* length for short strings *///shrlen保留字符串的长度(因为lua并不以\0结尾来识别字符串的长度，故需要一个len域来记录其长度)
+  unsigned int hash;//字符串的hash值。
+  // 短串：该hash值是在创建时就计算出来的
+ 	// 长串：只有真正需要它的hash值时，才会手动调用luaS_hashlongstr函数生成该值,lua内部现在只有在把长串作为table的key时，才会去计算它。
   union {
-    size_t lnglen;  /* length for long strings */
-    struct TString *hnext;  /* linked list for hash table */
+    size_t lnglen;  /* length for long strings *///表示长字符的长度
+    struct TString *hnext;  /* linked list for hash table *///代表链接下一个字符串
   } u;
-  char contents[1];
+  char contents[1];//字符串存储的地方,因为是c语言后面还会在加个'\0' 所以字符串的总大小是 #define sizelstring(l)  (offsetof(TString, contents) + ((l) + 1) * sizeof(char))
 } TString;
 
 
@@ -387,17 +454,17 @@ typedef struct TString {
 /*
 ** Get the actual string (array of bytes) from a 'TString'.
 */
-#define getstr(ts)  ((ts)->contents)
+#define getstr(ts)  ((ts)->contents)//获取内容
 
 
 /* get the actual string (array of bytes) from a Lua value */
-#define svalue(o)       getstr(tsvalue(o))
+#define svalue(o)       getstr(tsvalue(o))//从 Lua 值中获取实际字符串
 
 /* get string length from 'TString *s' */
-#define tsslen(s)	((s)->tt == LUA_VSHRSTR ? (s)->shrlen : (s)->u.lnglen)
+#define tsslen(s)	((s)->tt == LUA_VSHRSTR ? (s)->shrlen : (s)->u.lnglen) //从TString *s'获取字符串长度
 
 /* get string length from 'TValue *o' */
-#define vslen(o)	tsslen(tsvalue(o))
+#define vslen(o)	tsslen(tsvalue(o))//从TValue *o'中获取字符串长度
 
 /* }================================================================== */
 
@@ -413,21 +480,26 @@ typedef struct TString {
 ** Light userdata should be a variant of userdata, but for compatibility
 ** reasons they are also different types.
 */
-#define LUA_VLIGHTUSERDATA	makevariant(LUA_TLIGHTUSERDATA, 0)
+#define LUA_VLIGHTUSERDATA	makevariant(LUA_TLIGHTUSERDATA, 0) //标记为light userdata
 
-#define LUA_VUSERDATA		makevariant(LUA_TUSERDATA, 0)
+#define LUA_VUSERDATA		makevariant(LUA_TUSERDATA, 0)//标记位full userdata
 
-#define ttislightuserdata(o)	checktag((o), LUA_VLIGHTUSERDATA)
-#define ttisfulluserdata(o)	checktag((o), ctb(LUA_VUSERDATA))
+#define ttislightuserdata(o)	checktag((o), LUA_VLIGHTUSERDATA) //检测 TValue->tt 是不是 light userdata
+#define ttisfulluserdata(o)	checktag((o), ctb(LUA_VUSERDATA))//检测 TValue->tt 是不是 full userdata 并且是回收类型
 
-#define pvalue(o)	check_exp(ttislightuserdata(o), val_(o).p)
-#define uvalue(o)	check_exp(ttisfulluserdata(o), gco2u(val_(o).gc))
+#define pvalue(o)	check_exp(ttislightuserdata(o), val_(o).p) //获取light userdata的指针
+#define uvalue(o)	check_exp(ttisfulluserdata(o), gco2u(val_(o).gc))//获取full userdata指针  userdata指针是通过gco2u函数转换过来的
 
-#define pvalueraw(v)	((v).p)
+#define pvalueraw(v)	((v).p)//获取原生的light userdata指针
 
+// 将obj指向的对象 Value 的 union 元素设为(void *)类型 void*这里是light userdata类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为LUA_VLIGHTUSERDATA类型
 #define setpvalue(obj,x) \
   { TValue *io=(obj); val_(io).p=(x); settt_(io, LUA_VLIGHTUSERDATA); }
 
+
+// 将obj指向的对象 Value 的 union 元素设为(GCObjec *)类型 void*这里是light userdata类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为LUA_VUSERDATA类型 并添加可回收属性
 #define setuvalue(L,obj,x) \
   { TValue *io = (obj); Udata *x_ = (x); \
     val_(io).gc = obj2gco(x_); settt_(io, ctb(LUA_VUSERDATA)); \
@@ -435,6 +507,8 @@ typedef struct TString {
 
 
 /* Ensures that addresses after this type are always fully aligned. */
+
+/// @brief 这里是给Udata可以额外存储一组数据的结构体,就是下面 Udata结构体里面的UValue uv[1]这个玩意的类型
 typedef union UValue {
   TValue uv;
   LUAI_MAXALIGN;  /* ensures maximum alignment for udata bytes */
@@ -445,13 +519,16 @@ typedef union UValue {
 ** Header for userdata with user values;
 ** memory area follows the end of this structure.
 */
+
+/// @brief 使用了Uvalue数组的 userdata 
+// 有点像这样的内存布局 | Udata | 内存块... |
 typedef struct Udata {
   CommonHeader;
-  unsigned short nuvalue;  /* number of user values */
-  size_t len;  /* number of bytes */
-  struct Table *metatable;
-  GCObject *gclist;
-  UValue uv[1];  /* user values */
+  unsigned short nuvalue;  /* number of user values *///用户自定义值长度
+  size_t len;  /* number of bytes *///记录UserData长度
+  struct Table *metatable;//UserData数据独立元表
+  GCObject *gclist;//GC相关的链表
+  UValue uv[1];  /* user values *///用户自定义值内容
 } Udata;
 
 
@@ -464,25 +541,30 @@ typedef struct Udata {
 ** this representation. (The 'bindata' field in its end ensures correct
 ** alignment for binary data following this header.)
 */
+
+/// @brief 没有使用Uvalue数组的 userdata
 typedef struct Udata0 {
   CommonHeader;
-  unsigned short nuvalue;  /* number of user values */
-  size_t len;  /* number of bytes */
-  struct Table *metatable;
-  union {LUAI_MAXALIGN;} bindata;
+  unsigned short nuvalue;  /* number of user values *////用户自定义值长度
+  size_t len;  /* number of bytes *///记录UserData长度
+  struct Table *metatable;//UserData数据独立元表
+  union {LUAI_MAXALIGN;} bindata;//指向C语言结构体的指针,便于后面直接将这部分内存直接转换成结构体 例如: xxxxx = (struct xxxxx *)lua_newuserdata(L, sizeof(struct xxxxx));
 } Udata0;
 
 
 /* compute the offset of the memory area of a userdata */
+
+///计算用户数据的内存区域的偏移量
+// offsetof 是结构成员相对于结构开头的字节偏移量
 #define udatamemoffset(nuv) \
 	((nuv) == 0 ? offsetof(Udata0, bindata)  \
                     : offsetof(Udata, uv) + (sizeof(UValue) * (nuv)))
 
 /* get the address of the memory block inside 'Udata' */
-#define getudatamem(u)	(cast_charp(u) + udatamemoffset((u)->nuvalue))
+#define getudatamem(u)	(cast_charp(u) + udatamemoffset((u)->nuvalue)) //返回内存块的地址
 
 /* compute the size of a userdata */
-#define sizeudata(nuv,nb)	(udatamemoffset(nuv) + (nb))
+#define sizeudata(nuv,nb)	(udatamemoffset(nuv) + (nb))//计算userdata的总大小
 
 /* }================================================================== */
 
@@ -493,17 +575,19 @@ typedef struct Udata0 {
 ** ===================================================================
 */
 
-#define LUA_VPROTO	makevariant(LUA_TPROTO, 0)
+#define LUA_VPROTO	makevariant(LUA_TPROTO, 0)//标记位函数类型
 
 
 /*
 ** Description of an upvalue for function prototypes
 */
+
+/// @brief 函数原型的上值描述
 typedef struct Upvaldesc {
-  TString *name;  /* upvalue name (for debug information) */
-  lu_byte instack;  /* whether it is in stack (register) */
-  lu_byte idx;  /* index of upvalue (in stack or in outer function's list) */
-  lu_byte kind;  /* kind of corresponding variable */
+  TString *name;  /* upvalue name (for debug information) *///上值的名字
+  lu_byte instack;  /* whether it is in stack (register) */// 是否在寄存器中
+  lu_byte idx;  /* index of upvalue (in stack or in outer function's list) *///upvalue在栈或外部函数列表中index
+  lu_byte kind;  /* kind of corresponding variable *///
 } Upvaldesc;
 
 
@@ -573,13 +657,13 @@ typedef struct Proto {
 ** ===================================================================
 */
 
-#define LUA_VUPVAL	makevariant(LUA_TUPVAL, 0)
+#define LUA_VUPVAL	makevariant(LUA_TUPVAL, 0)//上值
 
 
 /* Variant tags for functions */
-#define LUA_VLCL	makevariant(LUA_TFUNCTION, 0)  /* Lua closure */
-#define LUA_VLCF	makevariant(LUA_TFUNCTION, 1)  /* light C function */
-#define LUA_VCCL	makevariant(LUA_TFUNCTION, 2)  /* C closure */
+#define LUA_VLCL	makevariant(LUA_TFUNCTION, 0)  /* Lua closure *///Lua闭包
+#define LUA_VLCF	makevariant(LUA_TFUNCTION, 1)  /* light C function *///C函数指针
+#define LUA_VCCL	makevariant(LUA_TFUNCTION, 2)  /* C closure *///C语言闭包
 
 #define ttisfunction(o)		checktype(o, LUA_TFUNCTION)
 #define ttisLclosure(o)		checktag((o), ctb(LUA_VLCL))
@@ -616,16 +700,22 @@ typedef struct Proto {
 /*
 ** Upvalues for Lua closures
 */
+
+/// @brief 上值
+// 一个UpVal当它所属的那个函数返回之后（调用了return）
+// 或者Lua运行堆栈发生改变
+// 函数已经不处于合理堆栈下标的时候，
+// 该函数所包含的UpVal即会切换到close状态
 typedef struct UpVal {
   CommonHeader;
-  lu_byte tbc;  /* true if it represents a to-be-closed variable */
-  TValue *v;  /* points to stack or to its own value */
+  lu_byte tbc;  /* true if it represents a to-be-closed variable */// to-be-closed类型变量时候他为true
+  TValue *v;  /* points to stack or to its own value *///指向堆栈或指向其自身值
   union {
-    struct {  /* (when open) */
+    struct {  /* (when open) */ //open状态时候
       struct UpVal *next;  /* linked list */
       struct UpVal **previous;
-    } open;
-    TValue value;  /* the value (when closed) */
+    } open;//和lua_State结构体中的UpVal *openupval字段一一对应
+    TValue value;  /* the value (when closed) *///close状态时候生效
   } u;
 } UpVal;
 
@@ -665,9 +755,9 @@ typedef union Closure {
 ** ===================================================================
 */
 
-#define LUA_VTABLE	makevariant(LUA_TTABLE, 0)
+#define LUA_VTABLE	makevariant(LUA_TTABLE, 0)//表
 
-#define ttistable(o)		checktag((o), ctb(LUA_VTABLE))
+#define ttistable(o)		checktag((o), ctb(LUA_VTABLE))//是不是表
 
 #define hvalue(o)	check_exp(ttistable(o), gco2t(val_(o).gc))
 

@@ -60,19 +60,19 @@ typedef struct lua_State lua_State;
 /*
 ** basic types
 */
-#define LUA_TNONE		(-1)
+#define LUA_TNONE		(-1) //无类型
 
-#define LUA_TNIL		0
-#define LUA_TBOOLEAN		1
-#define LUA_TLIGHTUSERDATA	2
-#define LUA_TNUMBER		3
-#define LUA_TSTRING		4
-#define LUA_TTABLE		5
-#define LUA_TFUNCTION		6
-#define LUA_TUSERDATA		7
-#define LUA_TTHREAD		8
+#define LUA_TNIL		0 //空类型
+#define LUA_TBOOLEAN		1 //bool
+#define LUA_TLIGHTUSERDATA	2 // light userdata(需要关注内存释放)
+#define LUA_TNUMBER		3 //双精度浮点数
+#define LUA_TSTRING		4 //字符串
+#define LUA_TTABLE		5 //表
+#define LUA_TFUNCTION		6 //函数
+#define LUA_TUSERDATA		7 //full userdata（不需要关注内存释放）
+#define LUA_TTHREAD		8 //lua线程
 
-#define LUA_NUMTYPES		9
+#define LUA_NUMTYPES		9 //基本类型 总数
 
 
 

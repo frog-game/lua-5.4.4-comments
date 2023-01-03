@@ -28,8 +28,7 @@
 */
 #define MAXUPVAL	255
 
-
-#define upisopen(up)	((up)->v != &(up)->u.value)
+#define upisopen(up)	((up)->v != &(up)->u.value)//是不是open的
 
 
 #define uplevel(up)	check_exp(upisopen(up), cast(StkId, (up)->v))

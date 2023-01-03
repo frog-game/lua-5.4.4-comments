@@ -29,15 +29,15 @@
 ** Possible states of the Garbage Collector
 */
 
-#define GCSpropagate	0 // 传播阶段：标记对象 任务是不断从gray链表中取对象出来，把它们链接到合适的链表去，并标志它们的引用对象,这个阶段是分步的
+#define GCSpropagate	0 // 分多次执行，直到 gray 链表处理完，进入 GCSatomic
 #define GCSenteratomic	1 // gc 转移到 GCSatomic的辅助状态 , 所有的GC状态必须在GCSpropagate状态或者GCSatomic状态两者之间
-#define GCSatomic	2 //原子阶段：一次性标记
-#define GCSswpallgc	3//清扫global_State.allgc
-#define GCSswpfinobj	4 //对global_State.finobj链表进行清扫
-#define GCSswptobefnz	5//对global_State.tobefnz链表进行清扫
-#define GCSswpend	6//清扫结束
-#define GCScallfin	7//会遍历global_State.tobefnz链表上的对象，然后调用其__gc函数，然后把它放入global_State.allgc链表中，会在下个GC循环回回收
-#define GCSpause	8 //gc 启动阶段  主要标记几个根集对象，如主线程，注册表，基础类型的元表 这个命名怪怪的？
+#define GCSatomic	2 //一次性的处理所有需要回顾一遍的地方, 保证一致性, 然后进入清理阶段
+#define GCSswpallgc	3//清扫global_State.allgc 可以分多次执行, 清理完后进入 GCSswpfinobj
+#define GCSswpfinobj	4 //对global_State.finobj链表进行清扫 可以分多次执行, 清理完 后进入 GCSswptobefnz
+#define GCSswptobefnz	5//对global_State.tobefnz链表进行清扫  可以分多次执行, 清理完 后进入 GCSswpend
+#define GCSswpend	6//sweep main thread 然后进入 GCScallfin
+#define GCScallfin	7// 执行一些 finalizer (__gc) 然后进入 GCSpause, 完成循环
+#define GCSpause	8 //处于两次完整 GC 流程中间的休息状态
 
 /// 是不是扫描阶段
 #define issweepphase(g)  \
@@ -98,7 +98,7 @@
 #define iswhite(x)      testbits((x)->marked, WHITEBITS)//是不是白色  其实就是看第4位和第5位是不是1
 #define isblack(x)      testbit((x)->marked, BLACKBIT)//是不是黑色
 #define isgray(x)  /* neither white nor black */  \ 
-	(!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))//是不是灰色
+	(!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))//是不是灰色 意思就是3,4,5位都的是0
 
 #define tofinalize(x)	testbit((x)->marked, FINALIZEDBIT)//是不是标记了userdata 
 
@@ -123,7 +123,7 @@
 #define G_OLD1		3	/* first full cycle as old *///（2代对象）作为老对象第一次存活了整个gc过程 
 #define G_OLD		4	/* really old object (not to be visited) *///（3代对象）表示真正的old对象，不会被回收 
 #define G_TOUCHED1	5	/* old object touched this cycle *///（3代对象）标记位G_OLD的对象在这次gc barrier_back的状态 新touch的对象，需要进入到grayagain中
-#define G_TOUCHED2	6	/* old object touched in previous cycle *///（3代对象）标记为G_OLD的对象在上一次gc barrier_back的状态前进到touched2 
+#define G_TOUCHED2	6	/* old object touched in previous cycle *///（3代对象）标记为G_OLD的对象在上一次gc barrier_back的状态前进到touched2  从G_TOUCHED1转成G_TOUCHED2，并设置为黑色，仍然存在于grayagain中
 
 #define AGEBITS		7  /* all age bits (111) *///age使用的位mask，age只使用了marked的0,1,2字段
 
@@ -168,10 +168,10 @@
 /*
 ** Control when GC is running:
 */
-#define GCSTPUSR	1  /* bit true when GC stopped by user */
-#define GCSTPGC		2  /* bit true when GC stopped by itself */
-#define GCSTPCLS	4  /* bit true when closing Lua state */
-#define gcrunning(g)	((g)->gcstp == 0)
+#define GCSTPUSR	1  /* bit true when GC stopped by user */// 用户停止gc
+#define GCSTPGC		2  /* bit true when GC stopped by itself *///gc自己停止
+#define GCSTPCLS	4  /* bit true when closing Lua state *///关闭lLua state时候
+#define gcrunning(g)	((g)->gcstp == 0)//gc是否正在运行
 
 
 /*
@@ -180,22 +180,27 @@
 ** 'condchangemem' is used only for heavy tests (forcing a full
 ** GC cycle on every opportunity)
 */
+
+/// 条件满足自动触发gc
 #define luaC_condGC(L,pre,pos) \
 	{ if (G(L)->GCdebt > 0) { pre; luaC_step(L); pos;}; \
 	  condchangemem(L,pre,pos); }
 
 /* more often than not, 'pre'/'pos' are empty */
+/// 随着内存的使用增加,通过对g-> GCdebt、g-> totalbytes等参数计算来触发GC
 #define luaC_checkGC(L)		luaC_condGC(L,(void)0,(void)0)
 
-
+/// 针对 TValue 标记过程向前走一步 如果新建对象是白色，而它被一个黑色对象引用了，那么将这个新建对象颜色从白色变为灰色 
 #define luaC_barrier(L,p,v) (  \
 	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ?  \
 	luaC_barrier_(L,obj2gco(p),gcvalue(v)) : cast_void(0))
 
+/// 标记过程向后走一步 此时将引用的它的黑色对象的颜色从黑色变为灰色，使得其重新被扫描一次
 #define luaC_barrierback(L,p,v) (  \
 	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ? \
 	luaC_barrierback_(L,p) : cast_void(0))
 
+/// 针对 GCObjec 标记过程向前走一步 如果新建对象是白色，而它被一个黑色对象引用了，那么将这个新建对象颜色从白色变为灰色 
 #define luaC_objbarrier(L,p,o) (  \
 	(isblack(p) && iswhite(o)) ? \
 	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))

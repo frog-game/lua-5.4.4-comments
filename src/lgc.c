@@ -32,77 +32,77 @@
 ** (Large enough to dissipate fixed overheads but small enough
 ** to allow small steps for the collector.)
 */
-#define GCSWEEPMAX	100
+#define GCSWEEPMAX	100 //每一步要扫描的最大元素数
 
 /*
 ** Maximum number of finalizers to call in each single step.
 */
-#define GCFINMAX	10
+#define GCFINMAX	10 //每一步中调用的_gc数量
 
 
 /*
 ** Cost of calling one finalizer.
 */
-#define GCFINALIZECOST	50
+#define GCFINALIZECOST	50 //控制gc进度
 
 
 /*
 ** The equivalent, in bytes, of one unit of "work" (visiting a slot,
 ** sweeping an object, etc.)
 */
-#define WORK2MEM	sizeof(TValue)
+#define WORK2MEM	sizeof(TValue) //通用数据类型大小
 
 
 /*
 ** macro to adjust 'pause': 'pause' is actually used like
 ** 'pause / PAUSEADJ' (value chosen by tests)
 */
-#define PAUSEADJ		100
+#define PAUSEADJ		100 //用来控制gc暂停
 
 
 /* mask with all color bits */
-#define maskcolors	(bitmask(BLACKBIT) | WHITEBITS)
+#define maskcolors	(bitmask(BLACKBIT) | WHITEBITS) //其实就是二进制 111000 翻译过来就是白色黑色灰色都标识上了
 
 /* mask with all GC bits */
-#define maskgcbits      (maskcolors | AGEBITS)
+#define maskgcbits      (maskcolors | AGEBITS) //其实就是二进制 111111 翻译过来就是白色黑色灰色年龄位都标识上了
 
 
 /* macro to erase all color bits then set only the current white bit */
 #define makewhite(g,x)	\
-  (x->marked = cast_byte((x->marked & ~maskcolors) | luaC_white(g)))
+  (x->marked = cast_byte((x->marked & ~maskcolors) | luaC_white(g)))//擦除所有的颜色位,保留当前的白色位
 
 /* make an object gray (neither white nor black) */
-#define set2gray(x)	resetbits(x->marked, maskcolors)
+#define set2gray(x)	resetbits(x->marked, maskcolors)//设置成灰色 也就是3,4,5位都是0
 
 
 /* make an object black (coming from any color) */
 #define set2black(x)  \
-  (x->marked = cast_byte((x->marked & ~WHITEBITS) | bitmask(BLACKBIT)))
+  (x->marked = cast_byte((x->marked & ~WHITEBITS) | bitmask(BLACKBIT))) //设置成黑色 3,4位为0 第5位为1 
 
 
-#define valiswhite(x)   (iscollectable(x) && iswhite(gcvalue(x)))
+#define valiswhite(x)   (iscollectable(x) && iswhite(gcvalue(x))) //被回收的gc对象是不是白色
 
-#define keyiswhite(n)   (keyiscollectable(n) && iswhite(gckey(n)))
+#define keyiswhite(n)   (keyiscollectable(n) && iswhite(gckey(n))) //被回收的键字段Key是不是白色
 
 
 /*
 ** Protected access to objects in values
 */
-#define gcvalueN(o)     (iscollectable(o) ? gcvalue(o) : NULL)
+#define gcvalueN(o)     (iscollectable(o) ? gcvalue(o) : NULL) //安全访问gcvalue
 
 
 #define markvalue(g,o) { checkliveness(g->mainthread,o); \
-  if (valiswhite(o)) reallymarkobject(g,gcvalue(o)); }
+  if (valiswhite(o)) reallymarkobject(g,gcvalue(o)); } //对value进行标记
 
-#define markkey(g, n)	{ if keyiswhite(n) reallymarkobject(g,gckey(n)); }
+#define markkey(g, n)	{ if keyiswhite(n) reallymarkobject(g,gckey(n)); }//对key进行标记
 
-#define markobject(g,t)	{ if (iswhite(t)) reallymarkobject(g, obj2gco(t)); }
+#define markobject(g,t)	{ if (iswhite(t)) reallymarkobject(g, obj2gco(t)); }//对object进行标记
 
 /*
 ** mark an object that can be NULL (either because it is really optional,
 ** or it was stripped as debug info, or inside an uncompleted structure)
 */
-#define markobjectN(g,t)	{ if (t) markobject(g,t); }
+#define markobjectN(g,t)	{ if (t) markobject(g,t); } //标记的object不能为null
 
 static void reallymarkobject (global_State *g, GCObject *o);
 static lu_mem atomic (lua_State *L);
@@ -119,9 +119,11 @@ static void entersweep (lua_State *L);
 /*
 ** one after last element in a hash array
 */
-#define gnodelast(h)	gnode(h, cast_sizet(sizenode(h)))
+#define gnodelast(h)	gnode(h, cast_sizet(sizenode(h))) //hash数组中最后一个元素
 
-
+/// @brief 通过GCObject类型获取gclist地址
+/// @param o 
+/// @return 
 static GCObject **getgclist (GCObject *o) {
   switch (o->tt) {
     case LUA_VTABLE: return &gco2t(o)->gclist;
@@ -143,10 +145,17 @@ static GCObject **getgclist (GCObject *o) {
 ** Link a collectable object 'o' with a known type into the list 'p'.
 ** (Must be a macro to access the 'gclist' field in different types.)
 */
+
+//将具有已知类型的可收集对象o链接到链表p中
+//等价于(o)->gclist = p  p里面的内容是o
 #define linkgclist(o,p)	linkgclist_(obj2gco(o), &(o)->gclist, &(p))
 
+/// @brief 将对象o连接到p链表上
+/// @param o 
+/// @param pnext 
+/// @param list 
 static void linkgclist_ (GCObject *o, GCObject **pnext, GCObject **list) {
-  lua_assert(!isgray(o));  /* cannot be in a gray list */
+  lua_assert(!isgray(o));  /* cannot be in a gray list */// 不能是灰色链表
   *pnext = *list;
   *list = o;
   set2gray(o);  /* now it is */
@@ -156,6 +165,7 @@ static void linkgclist_ (GCObject *o, GCObject **pnext, GCObject **list) {
 /*
 ** Link a generic collectable object 'o' into the list 'p'.
 */
+//将LUA_VTABLE,LUA_VLCL,LUA_VCCL,LUA_VTHREAD,LUA_VPROTO,LUA_VUSERDATA的类型链接到p中
 #define linkobjgclist(o,p) linkgclist_(obj2gco(o), getgclist(o), &(p))
 
 
@@ -168,6 +178,9 @@ static void linkgclist_ (GCObject *o, GCObject **pnext, GCObject **list) {
 ** its associated empty value is enough to signal that the entry is
 ** logically empty.
 */
+
+/// @brief 将未使用的key remove掉
+/// @param n 
 static void clearkey (Node *n) {
   lua_assert(isempty(gval(n)));
   if (keyiscollectable(n))
@@ -182,10 +195,17 @@ static void clearkey (Node *n) {
 ** other objects: if really collected, cannot keep them; for objects
 ** being finalized, keep them in keys, but not in values
 */
+
+/// @brief key或者value是否能从弱表中删除
+// 只有拥有显示构造的对象类型会被自动从weak表中移除，值类型boolean、number是不会自动从weak中移除的。
+// 而string类型虽然也由gc来负责清理，但是string没有显示的构造过程，因此也不会自动从weak表中移除，对于string的内存管理有单独的策略
+/// @param g 
+/// @param o 
+/// @return 
 static int iscleared (global_State *g, const GCObject *o) {
-  if (o == NULL) return 0;  /* non-collectable value */
+  if (o == NULL) return 0;  /* non-collectable value *///不能回收的值 
   else if (novariant(o->tt) == LUA_TSTRING) {
-    markobject(g, o);  /* strings are 'values', so are never weak */
+    markobject(g, o);  /* strings are 'values', so are never weak *///string 不会被移除
     return 0;
   }
   else return iswhite(o);
@@ -205,20 +225,25 @@ static int iscleared (global_State *g, const GCObject *o) {
 ** be done is generational mode, as its sweep does not distinguish
 ** whites from deads.)
 */
+
+/// @brief 把新建立联系的对象立刻标记 用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
+/// @param L 
+/// @param o 黑色 object
+/// @param v 白色 object
 void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
   global_State *g = G(L);
-  lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o));
-  if (keepinvariant(g)) {  /* must keep invariant? */
-    reallymarkobject(g, v);  /* restore invariant */
-    if (isold(o)) {
-      lua_assert(!isold(v));  /* white object could not be old */
-      setage(v, G_OLD0);  /* restore generational invariant */
+  lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o));//保持o是黑色,v是白色
+  if (keepinvariant(g)) {  /* must keep invariant? *///如果是标记阶段
+    reallymarkobject(g, v);  /* restore invariant *///对Object进行颜色标记
+    if (isold(o)) {//如果黑色对象是旧对象
+      lua_assert(!isold(v));  /* white object could not be old *///必须保证白色对象不是旧对象
+      setage(v, G_OLD0);  /* restore generational invariant *///将白色对象设置成old0
     }
   }
-  else {  /* sweep phase */
-    lua_assert(issweepphase(g));
-    if (g->gckind == KGC_INC)  /* incremental mode? */
-      makewhite(g, o);  /* mark 'o' as white to avoid other barriers */
+  else {  /* sweep phase *///扫描阶段
+    lua_assert(issweepphase(g));//验证一下是不是扫描阶段
+    if (g->gckind == KGC_INC)  /* incremental mode? *///如果是增量gc
+      makewhite(g, o);  /* mark 'o' as white to avoid other barriers *///将o标记位白色
   }
 }
 
@@ -227,19 +252,25 @@ void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
 ** barrier that moves collector backward, that is, mark the black object
 ** pointing to a white object as gray again.
 */
+
+/// @brief 将黑色对象再次标记为灰色。用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
+/// @param L 
+/// @param o 
 void luaC_barrierback_ (lua_State *L, GCObject *o) {
   global_State *g = G(L);
-  lua_assert(isblack(o) && !isdead(g, o));
+  lua_assert(isblack(o) && !isdead(g, o));//o必须是黑色并且没有死亡
   lua_assert((g->gckind == KGC_GEN) == (isold(o) && getage(o) != G_TOUCHED1));
-  if (getage(o) == G_TOUCHED2)  /* already in gray list? */
-    set2gray(o);  /* make it gray to become touched1 */
-  else  /* link it in 'grayagain' and paint it gray */
+  if (getage(o) == G_TOUCHED2)  /* already in gray list? *///TOUCHED2年龄阶段
+    set2gray(o);  /* make it gray to become touched1 *///设置成灰色
+  else  /* link it in 'grayagain' and paint it gray *///将其链接到g->grayagain链表当中
     linkobjgclist(o, g->grayagain);
-  if (isold(o))  /* generational mode? */
-    setage(o, G_TOUCHED1);  /* touched in current cycle */
+  if (isold(o))  /* generational mode? *///如果是旧的
+    setage(o, G_TOUCHED1);  /* touched in current cycle *///设置成G_TOUCHED1年龄阶段
 }
 
-
+/// @brief 设置对象永远不被回收（因为标灰了）
+/// @param L 
+/// @param o 
 void luaC_fix (lua_State *L, GCObject *o) {
   global_State *g = G(L);
   lua_assert(g->allgc == o);  /* object must be 1st in 'allgc' list! */
@@ -255,6 +286,12 @@ void luaC_fix (lua_State *L, GCObject *o) {
 ** create a new collectable object (with given type and size) and link
 ** it to 'allgc' list.
 */
+
+/// @brief 创建一个GCObject实例
+/// @param L 
+/// @param tt 
+/// @param sz 
+/// @return 
 GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
   global_State *g = G(L);
   GCObject *o = cast(GCObject *, luaM_newobject(L, novariant(tt), sz));
@@ -288,27 +325,31 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
 ** for at most two levels: An upvalue cannot refer to another upvalue
 ** (only closures can), and a userdata's metatable must be a table.
 */
+
+/// @brief 对对象进行颜色的标记
+/// @param g 
+/// @param o 
 static void reallymarkobject (global_State *g, GCObject *o) {
   switch (o->tt) {
-    case LUA_VSHRSTR:
-    case LUA_VLNGSTR: {
-      set2black(o);  /* nothing to visit */
+    case LUA_VSHRSTR://短串
+    case LUA_VLNGSTR: {//长串
+      set2black(o);  /* nothing to visit *///直接涂黑
       break;
     }
-    case LUA_VUPVAL: {
-      UpVal *uv = gco2upv(o);
-      if (upisopen(uv))
-        set2gray(uv);  /* open upvalues are kept gray */
+    case LUA_VUPVAL: {//上值
+      UpVal *uv = gco2upv(o);//GCObject转换成上值
+      if (upisopen(uv))//上值是不是open的
+        set2gray(uv);  /* open upvalues are kept gray *///涂灰
       else
-        set2black(uv);  /* closed upvalues are visited here */
-      markvalue(g, uv->v);  /* mark its content */
+        set2black(uv);  /* closed upvalues are visited here *///涂黑
+      markvalue(g, uv->v);  /* mark its content *///对内容进行标记
       break;
     }
-    case LUA_VUSERDATA: {
-      Udata *u = gco2u(o);
-      if (u->nuvalue == 0) {  /* no user values? */
-        markobjectN(g, u->metatable);  /* mark its metatable */
-        set2black(u);  /* nothing else to mark */
+    case LUA_VUSERDATA: {//userdata
+      Udata *u = gco2u(o);//GCObject转换成userdata
+      if (u->nuvalue == 0) {  /* no user values? *///没有用户自定义值
+        markobjectN(g, u->metatable);  /* mark its metatable *///标记元表
+        set2black(u);  /* nothing else to mark *///设置成黑色·
         break;
       }
       /* else... */
