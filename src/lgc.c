@@ -104,9 +104,9 @@
 */
 #define markobjectN(g,t)	{ if (t) markobject(g,t); } //标记的object不能为null
 
-static void reallymarkobject (global_State *g, GCObject *o);
-static lu_mem atomic (lua_State *L);
-static void entersweep (lua_State *L);
+static void reallymarkobject (global_State *g, GCObject *o);//前置声明
+static lu_mem atomic (lua_State *L);//前置声明
+static void entersweep (lua_State *L);//前置声明
 
 
 /*
@@ -148,24 +148,26 @@ static GCObject **getgclist (GCObject *o) {
 
 //将具有已知类型的可收集对象o链接到链表p中
 //等价于(o)->gclist = p  p里面的内容是o
+//个人感觉gclist改成gcnext更顺畅
 #define linkgclist(o,p)	linkgclist_(obj2gco(o), &(o)->gclist, &(p))
 
 /// @brief 将对象o连接到p链表上
 /// @param o 
 /// @param pnext 
 /// @param list 
+// 这个因为有二维指针，比较复杂，后面博客我上传示意图一看就明白了
 static void linkgclist_ (GCObject *o, GCObject **pnext, GCObject **list) {
   lua_assert(!isgray(o));  /* cannot be in a gray list */// 不能是灰色链表
   *pnext = *list;
   *list = o;
-  set2gray(o);  /* now it is */
+  set2gray(o);  /* now it is *///把object改成灰色
 }
 
 
 /*
 ** Link a generic collectable object 'o' into the list 'p'.
 */
-//将LUA_VTABLE,LUA_VLCL,LUA_VCCL,LUA_VTHREAD,LUA_VPROTO,LUA_VUSERDATA的类型链接到p中
+//将LUA_VTABLE,LUA_VLCL,LUA_VCCL,LUA_VTHREAD,LUA_VPROTO,LUA_VUSERDATA的类型对应的gclist链接到p中
 #define linkobjgclist(o,p) linkgclist_(obj2gco(o), getgclist(o), &(p))
 
 
@@ -182,8 +184,8 @@ static void linkgclist_ (GCObject *o, GCObject **pnext, GCObject **list) {
 /// @brief 将未使用的key remove掉
 /// @param n 
 static void clearkey (Node *n) {
-  lua_assert(isempty(gval(n)));
-  if (keyiscollectable(n))
+  lua_assert(isempty(gval(n)));//必须是nil类型
+  if (keyiscollectable(n))//
     setdeadkey(n);  /* unused key; remove it */
 }
 

@@ -798,6 +798,14 @@ typedef union Closure {
 */
 
 /// @brief Table的元素类型
+/// 假如是这样的lua代码
+// local t = {}
+// t["xxx"] = 2222;
+// 那么 上面例子中NodeKey的部分位"xxx"
+// key_tt是短字符串类型
+// key_val是"xxx"
+// i_val里面的tt_为整型
+// i_val里面的value_为2222
 typedef union Node {
   /// @brief key的部分
   struct NodeKey {
@@ -806,7 +814,7 @@ typedef union Node {
     int next;  /* for chaining *///用于哈希冲突的时候链接向下一个位置
     Value key_val;  /* key value *///代表key的具体数值
   } u;
-  TValue i_val;  /* direct access to node's value as a proper 'TValue' */
+  TValue i_val;  /* direct access to node's value as a proper 'TValue' *///TValue存储了数据的类型与数据值，就是上面的i_val里面的tt_为整型,i_val里面的value_为2222 其实这里的数据和TValuefields里面的数据一样的，这么写只是为了提供一个快捷访问
 } Node;
 
 
