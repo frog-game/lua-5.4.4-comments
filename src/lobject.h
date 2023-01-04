@@ -54,10 +54,12 @@
 ** Union of all Lua values
 */
 
-/// @brief GCObject和其他不需要进行进行GC的数据放在一个联合体里面构成了Value类型
+/// @brief 实际存储的值
+// GCObject和其他不需要进行进行GC的数据放在一个联合体里面构成了Value类型
 // lua5.3以后 number类型就有了两个类型float和int 也就是下面的 lua_Number n和 lua_Integer i
 typedef union Value {
   struct GCObject *gc;    /* collectable objects */// 可回收的对象
+  /*下面都是不可回收类型*/
   void *p;         /* light userdata *///轻量级userdata
   lua_CFunction f; /* light C functions *///函数指针 例如（typedef int (*lua_CFunction)(lua_State *L)）
   lua_Integer i;   /* integer numbers *///int整型值 
@@ -70,7 +72,8 @@ typedef union Value {
 ** an actual value plus a tag with its type.
 */
 
-///tt_来标记数据到底是什么类型的
+//Value 联合体 + 类型标签
+//tt_来标记数据到底是什么类型的
 #define TValuefields	Value value_; lu_byte tt_
 
 /// @brief 基础数据类型
@@ -585,20 +588,17 @@ typedef struct Udata0 {
 /// @brief 函数原型的上值描述
 typedef struct Upvaldesc {
   TString *name;  /* upvalue name (for debug information) *///上值的名字
-  lu_byte instack;  /* whether it is in stack (register) */// 是否在寄存器中
-  lu_byte idx;  /* index of upvalue (in stack or in outer function's list) *///upvalue在栈或外部函数列表中index
-  lu_byte kind;  /* kind of corresponding variable *///
+  lu_byte instack;  /* whether it is in stack (register) */// 是否是在函数栈中local变量（函数中的local变量存在寄存器中；instack 为0时代表的是闭包中的upvalue, instack 为1时 代表引用的是栈上的寄存器 
+  lu_byte idx;  /* index of upvalue (in stack or in outer function's list) *///instack 为0时 如果是闭包中的upvalue idx 是upvalue列表的索引值；instack 为1时 如果是函数栈中的local变量，idx 是寄存器的索引
+  lu_byte kind;  /* kind of corresponding variable *///变量类型 VDKREG,VDKREG,RDKCONST,RDKTOCLOSE,RDKCTC这几个类型
 } Upvaldesc;
 
-
-/*
-** Description of a local variable for function prototypes
-** (used for debug information)
-*/
+/// @brief 局部变量
 typedef struct LocVar {
-  TString *varname;
-  int startpc;  /* first point where variable is active */
-  int endpc;    /* first point where variable is dead */
+  TString *varname;//变量名字
+  /*局部变量的作用域信息*/
+  int startpc;  /* first point where variable is active *///该局部变量存活的第一个指令序号
+  int endpc;    /* first point where variable is dead *///该局部变量不存活的第一个指令序号
 } LocVar;
 
 
@@ -612,9 +612,11 @@ typedef struct LocVar {
 ** absolute-line array, but we must traverse the 'lineinfo' array
 ** linearly to compute a line.)
 */
+
+/// @brief 指令与绝对行的关联
 typedef struct AbsLineInfo {
-  int pc;
-  int line;
+  int pc;//指令索引
+  int line;//关联的代码行
 } AbsLineInfo;
 
 /*
@@ -665,32 +667,40 @@ typedef struct Proto {
 #define LUA_VLCF	makevariant(LUA_TFUNCTION, 1)  /* light C function *///C函数指针
 #define LUA_VCCL	makevariant(LUA_TFUNCTION, 2)  /* C closure *///C语言闭包
 
-#define ttisfunction(o)		checktype(o, LUA_TFUNCTION)
-#define ttisLclosure(o)		checktag((o), ctb(LUA_VLCL))
-#define ttislcf(o)		checktag((o), LUA_VLCF)
-#define ttisCclosure(o)		checktag((o), ctb(LUA_VCCL))
-#define ttisclosure(o)         (ttisLclosure(o) || ttisCclosure(o))
+#define ttisfunction(o)		checktype(o, LUA_TFUNCTION) //检测是不是函数
+#define ttisLclosure(o)		checktag((o), ctb(LUA_VLCL))//检测是不是lua闭包,并且是回收属性
+#define ttislcf(o)		checktag((o), LUA_VLCF)//检测是不是函数指针
+#define ttisCclosure(o)		checktag((o), ctb(LUA_VCCL))//检测是不是c闭包,并且是回收属性
+#define ttisclosure(o)         (ttisLclosure(o) || ttisCclosure(o))//检测是不是闭包,并且是回收属性
 
 
-#define isLfunction(o)	ttisLclosure(o)
+#define isLfunction(o)	ttisLclosure(o)//检测是不是lua闭包,并且是回收属性
 
-#define clvalue(o)	check_exp(ttisclosure(o), gco2cl(val_(o).gc))
-#define clLvalue(o)	check_exp(ttisLclosure(o), gco2lcl(val_(o).gc))
-#define fvalue(o)	check_exp(ttislcf(o), val_(o).f)
-#define clCvalue(o)	check_exp(ttisCclosure(o), gco2ccl(val_(o).gc))
+#define clvalue(o)	check_exp(ttisclosure(o), gco2cl(val_(o).gc))//GCobject转换成函数
+#define clLvalue(o)	check_exp(ttisLclosure(o), gco2lcl(val_(o).gc))//GCobject转换成lua闭包
+#define fvalue(o)	check_exp(ttislcf(o), val_(o).f)//获取c函数指针
+#define clCvalue(o)	check_exp(ttisCclosure(o), gco2ccl(val_(o).gc))//GCobject转换成c闭包
 
-#define fvalueraw(v)	((v).f)
+#define fvalueraw(v)	((v).f)//获取原生的c函数指针
 
+// 将obj指向的对象 Value 的 union 元素设为(GCobject *)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为LUA_VLCL类型,并设置回收属性
 #define setclLvalue(L,obj,x) \
   { TValue *io = (obj); LClosure *x_ = (x); \
     val_(io).gc = obj2gco(x_); settt_(io, ctb(LUA_VLCL)); \
     checkliveness(L,io); }
 
+// 对上面setclLvalue宏的封装 唯一区别就是 将StackValue 的o转Tvalue的o类型
 #define setclLvalue2s(L,o,cl)	setclLvalue(L,s2v(o),cl)
 
+// 将obj指向的对象 Value 的 union 元素设为(lua_CFunction)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为LUA_VLCF类型
 #define setfvalue(obj,x) \
   { TValue *io=(obj); val_(io).f=(x); settt_(io, LUA_VLCF); }
 
+
+// 将obj指向的对象 Value 的 union 元素设为(GCobject *)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为LUA_VCCL类型,并设置回收属性
 #define setclCvalue(L,obj,x) \
   { TValue *io = (obj); CClosure *x_ = (x); \
     val_(io).gc = obj2gco(x_); settt_(io, ctb(LUA_VCCL)); \
@@ -720,31 +730,37 @@ typedef struct UpVal {
 } UpVal;
 
 
-
+///nupvalues代表闭包中upvalues数组长度
+///gcList代表这个闭包结构体在垃圾清除的时候，要清除包括upvalues在内的一系列可回收对象
 #define ClosureHeader \
 	CommonHeader; lu_byte nupvalues; GCObject *gclist
 
+/// @brief 使用Lua提供的lua_pushcclosure这个C Api加入到虚拟栈中的C函数，它是对LClosure的一种C模拟
 typedef struct CClosure {
   ClosureHeader;
-  lua_CFunction f;
-  TValue upvalue[1];  /* list of upvalues */
+  lua_CFunction f;//c函数指针
+  TValue upvalue[1];  /* list of upvalues *///函数的upvalue指针列表，记录了该函数引用的所有upvals。
+  // 正是由于该字段的存在，导致函数对upvalue的访问要快于从全局表_G中向下查找。函数对upvalue的访问，
+  // 一般就2个步骤：(1)从closure的upvals数组中按索引号取出upvalue。(2)将upvalue加到luastate的stack中
 } CClosure;
 
-
+/// @brief 
 typedef struct LClosure {
-  ClosureHeader;
-  struct Proto *p;
-  UpVal *upvals[1];  /* list of upvalues */
+  ClosureHeader;//跟GC相关的结构，因为函数与是参与GC的
+  struct Proto *p;//因为Closure=函数+upvalue，所以p封装的就是纯粹的函数原型
+  UpVal *upvals[1];  /* list of upvalues *///函数的upvalue指针列表，记录了该函数引用的所有upvals。
+  // 正是由于该字段的存在，导致函数对upvalue的访问要快于从全局表_G中向下查找。函数对upvalue的访问，
+  // 一般就2个步骤：(1)从closure的upvals数组中按索引号取出upvalue。(2)将upvalue加到luastate的stack中
 } LClosure;
 
-
+/// @brief 闭包,注意这里是个联合体
 typedef union Closure {
-  CClosure c;
-  LClosure l;
+  CClosure c;//c闭包
+  LClosure l;//lua闭包
 } Closure;
 
 
-#define getproto(o)	(clLvalue(o)->p)
+#define getproto(o)	(clLvalue(o)->p)//获取函数原型指针
 
 /* }================================================================== */
 
@@ -759,13 +775,17 @@ typedef union Closure {
 
 #define ttistable(o)		checktag((o), ctb(LUA_VTABLE))//是不是表
 
-#define hvalue(o)	check_exp(ttistable(o), gco2t(val_(o).gc))
 
+#define hvalue(o)	check_exp(ttistable(o), gco2t(val_(o).gc))//GCobject转换成表
+
+// 将obj指向的对象 Value 的 union 元素设为(GCobject *)类型, 并指向 x 指向的对象;
+// Tvalue->tt_ 设为LUA_VTABLE类型,并设置回收属性
 #define sethvalue(L,obj,x) \
   { TValue *io = (obj); Table *x_ = (x); \
     val_(io).gc = obj2gco(x_); settt_(io, ctb(LUA_VTABLE)); \
     checkliveness(L,io); }
 
+// 对上面sethvalue宏的封装 唯一区别就是 将StackValue 的o转Tvalue的o类型
 #define sethvalue2s(L,o,h)	sethvalue(L,s2v(o),h)
 
 
@@ -776,18 +796,22 @@ typedef union Closure {
 ** 'TValue' allows for a smaller size for 'Node' both in 4-byte
 ** and 8-byte alignments.
 */
+
+/// @brief Table的元素类型
 typedef union Node {
+  /// @brief key的部分
   struct NodeKey {
-    TValuefields;  /* fields for value */
-    lu_byte key_tt;  /* key type */
-    int next;  /* for chaining */
-    Value key_val;  /* key value */
+    TValuefields;  /* fields for value *///Value 联合体 + 类型标签
+    lu_byte key_tt;  /* key type *///代表key的类型标记
+    int next;  /* for chaining *///用于哈希冲突的时候链接向下一个位置
+    Value key_val;  /* key value *///代表key的具体数值
   } u;
   TValue i_val;  /* direct access to node's value as a proper 'TValue' */
 } Node;
 
 
 /* copy a value into a key */
+///将值复制到key中
 #define setnodekey(L,node,obj) \
 	{ Node *n_=(node); const TValue *io_=(obj); \
 	  n_->u.key_val = io_->value_; n_->u.key_tt = io_->tt_; \
@@ -795,6 +819,7 @@ typedef union Node {
 
 
 /* copy a value from a key */
+//从node中的key复制值到obj
 #define getnodekey(L,obj,node) \
 	{ TValue *io_=(obj); const Node *n_=(node); \
 	  io_->value_ = n_->u.key_val; io_->tt_ = n_->u.key_tt; \
@@ -808,43 +833,44 @@ typedef union Node {
 ** is zero); 'alimit' is then used as a hint for #t.
 */
 
-#define BITRAS		(1 << 7)
-#define isrealasize(t)		(!((t)->flags & BITRAS))
-#define setrealasize(t)		((t)->flags &= cast_byte(~BITRAS))
-#define setnorealasize(t)	((t)->flags |= BITRAS)
+#define BITRAS		(1 << 7)//第8位为1
+#define isrealasize(t)		(!((t)->flags & BITRAS))//根据flags的第8为判断alimit是否为数组部分的实际大小
+#define setrealasize(t)		((t)->flags &= cast_byte(~BITRAS))//设置flags的第8为0 
+#define setnorealasize(t)	((t)->flags |= BITRAS)//根据flags的第8为判断alimit是否不为数组部分的实际大小
 
-
+/// @brief 按照key的数据类型分成数组部分和散列表部分，
+// 数组部分用于存储key值在数组大小范围内的键值对，其余数组部分不能存储的键值对则存储在散列表部分
 typedef struct Table {
   CommonHeader;
-  lu_byte flags;  /* 1<<p means tagmethod(p) is not present */
-  lu_byte lsizenode;  /* log2 of size of 'node' array */
-  unsigned int alimit;  /* "limit" of 'array' array */
-  TValue *array;  /* array part */
-  Node *node;
-  Node *lastfree;  /* any free position is before this position */
-  struct Table *metatable;
-  GCObject *gclist;
+  lu_byte flags;  /* 1<<p means tagmethod(p) is not present *///第8位为0，则表示alimit为数组的实际大小，否则需重新计算 
+  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希表的容量大小 注意不是实际大小 大小总是是2的整数次方
+  unsigned int alimit;  /* "limit" of 'array' array *///记录数组部分的大小
+  TValue *array;  /* array part *///指向数组部分的首地址
+  Node *node;//指向node数据块（即散列部分）首地址 哈希表存储在这
+  Node *lastfree;  /* any free position is before this position *///记录上一次从node数据块（即散列部分）末尾分配空闲Node的位置
+  struct Table *metatable;//存放该表的元表
+  GCObject *gclist;//GC相关的 
 } Table;
 
 
 /*
 ** Macros to manipulate keys inserted in nodes
 */
-#define keytt(node)		((node)->u.key_tt)
-#define keyval(node)		((node)->u.key_val)
+#define keytt(node)		((node)->u.key_tt)//获取key的类型
+#define keyval(node)		((node)->u.key_val)//获取key的值
 
-#define keyisnil(node)		(keytt(node) == LUA_TNIL)
-#define keyisinteger(node)	(keytt(node) == LUA_VNUMINT)
-#define keyival(node)		(keyval(node).i)
-#define keyisshrstr(node)	(keytt(node) == ctb(LUA_VSHRSTR))
-#define keystrval(node)		(gco2ts(keyval(node).gc))
+#define keyisnil(node)		(keytt(node) == LUA_TNIL)//key的类型是不是空
+#define keyisinteger(node)	(keytt(node) == LUA_VNUMINT)//key的类型是不是整数
+#define keyival(node)		(keyval(node).i)//key的值是不是int类型
+#define keyisshrstr(node)	(keytt(node) == ctb(LUA_VSHRSTR))//key的类型是不是可回收的短字符串型
+#define keystrval(node)		(gco2ts(keyval(node).gc))//GCobject转换成字符串
 
-#define setnilkey(node)		(keytt(node) = LUA_TNIL)
+#define setnilkey(node)		(keytt(node) = LUA_TNIL)//key的类型设置成nil类型
 
-#define keyiscollectable(n)	(keytt(n) & BIT_ISCOLLECTABLE)
+#define keyiscollectable(n)	(keytt(n) & BIT_ISCOLLECTABLE)//key的类型是不是可回收类型
 
-#define gckey(n)	(keyval(n).gc)
-#define gckeyN(n)	(keyiscollectable(n) ? gckey(n) : NULL)
+#define gckey(n)	(keyval(n).gc)//获取key值的gc指针
+#define gckeyN(n)	(keyiscollectable(n) ? gckey(n) : NULL)//key的类型如果是可回收类型,那么就返回key值的gc指针,否则返回NULL
 
 
 /*
@@ -853,8 +879,8 @@ typedef struct Table {
 ** be found when searched in a special way. ('next' needs that to find
 ** keys removed from a table during a traversal.)
 */
-#define setdeadkey(node)	(keytt(node) = LUA_TDEADKEY)
-#define keyisdead(node)		(keytt(node) == LUA_TDEADKEY)
+#define setdeadkey(node)	(keytt(node) = LUA_TDEADKEY)//设置key的类型为deadkey类型
+#define keyisdead(node)		(keytt(node) == LUA_TDEADKEY)//key的类型是否为deadkey类型
 
 /* }================================================================== */
 
@@ -863,11 +889,22 @@ typedef struct Table {
 /*
 ** 'module' operation for hashing (size is always a power of 2)
 */
+//(size&(size-1))==0 这个是用来判断size是否是2的正整数冪
+//比如size位16=10000 size-1=1111
+// 那么：
+// 10000
+// &1111
+// ----------
+//     0
+
+// (cast_int((s) & ((size)-1))) 看着像保留size-1的位数的值 比如上面size-1是4个1,那么就是保留低的hash值
+//总的结合起来看其实就是 s % size
 #define lmod(s,size) \
 	(check_exp((size&(size-1))==0, (cast_int((s) & ((size)-1)))))
 
 
 #define twoto(x)	(1<<(x))
+// t 为表，返回 Table 的 node 数组大小 等价于求hash表大小
 #define sizenode(t)	(twoto((t)->lsizenode))
 
 
