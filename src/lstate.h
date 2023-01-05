@@ -96,7 +96,7 @@
 
 
 /* true if this thread does not have non-yieldable calls in the stack */
-/// @brief 利用nCcalls 高16位 来判断协程是否可以yield 
+/// @brief 利用nCcalls 高16位 来判断线程是否可以yield 
 #define yieldable(L)		(((L)->nCcalls & 0xffff0000) == 0)
 
 /* real number of C calls */

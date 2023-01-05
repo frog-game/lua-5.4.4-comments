@@ -87,6 +87,8 @@ typedef LUAI_UACINT l_uacInt;
 /*
 ** Internal assertions for in-house debugging
 */
+
+// 断言只在开发过程中有效，发布版是要去掉的
 #if defined LUAI_ASSERT
 #undef NDEBUG
 #include <assert.h>
@@ -98,7 +100,7 @@ typedef LUAI_UACINT l_uacInt;
 /* to avoid problems with conditions too long */
 #define lua_longassert(c)	((c) ? (void)0 : lua_assert(0))
 #else
-#define lua_assert(c)		((void)0)
+#define lua_assert(c)		((void)0) //(void)0是个无用的空语句
 #define check_exp(c,e)		(e)
 #define lua_longassert(c)	((void)0)
 #endif

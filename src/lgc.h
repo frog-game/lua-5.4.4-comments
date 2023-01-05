@@ -29,7 +29,7 @@
 ** Possible states of the Garbage Collector
 */
 
-#define GCSpropagate	0 // 分多次执行，直到 gray 链表处理完，进入 GCSatomic
+#define GCSpropagate	0 // 传播阶段 分多次执行，直到 gray 链表处理完，进入 GCSatomic
 #define GCSenteratomic	1 // gc 转移到 GCSatomic的辅助状态 , 所有的GC状态必须在GCSpropagate状态或者GCSatomic状态两者之间
 #define GCSatomic	2 //一次性的处理所有需要回顾一遍的地方, 保证一致性, 然后进入清理阶段
 #define GCSswpallgc	3//清扫global_State.allgc 可以分多次执行, 清理完后进入 GCSswpfinobj
@@ -131,8 +131,8 @@
 #define setage(o,a)  ((o)->marked = cast_byte(((o)->marked & (~AGEBITS)) | a))//设置年龄
 #define isold(o)	(getage(o) > G_SURVIVAL)//是不是旧对象
 
-#define changeage(o,f,t)  \ //改变年龄
-	check_exp(getage(o) == (f), (o)->marked ^= ((f)^(t)))
+#define changeage(o,f,t)  \ //改变年龄 从f变到t 前提是o的年龄要等于f 举个例子changeage(curr, G_TOUCHED1, G_TOUCHED2); 如果getage(o) == (f) 那么marked的最地3位是101 101^=（101^110） 101^=011 o->marked=110
+	check_exp(getage(o) == (f), (o)->marked ^= ((f)^(t)))//这个公式是lua作者利用对同一个值进行两次异或等于本身原理
 //------------------------------------- 分代模式下对象年龄标识 end ---------------------------------//
 
 /* Default Values for GC parameters */
@@ -200,7 +200,7 @@
 	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ? \
 	luaC_barrierback_(L,p) : cast_void(0))
 
-/// 针对 GCObjec 标记过程向前走一步 如果新建对象是白色，而它被一个黑色对象引用了，那么将这个新建对象颜色从白色变为灰色 
+/// 针对 GCObject 标记过程向前走一步 如果新建对象是白色，而它被一个黑色对象引用了，那么将这个新建对象颜色从白色变为灰色 
 #define luaC_objbarrier(L,p,o) (  \
 	(isblack(p) && iswhite(o)) ? \
 	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))

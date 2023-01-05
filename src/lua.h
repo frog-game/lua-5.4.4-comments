@@ -70,7 +70,7 @@ typedef struct lua_State lua_State;
 #define LUA_TTABLE		5 //表
 #define LUA_TFUNCTION		6 //函数
 #define LUA_TUSERDATA		7 //full userdata（不需要关注内存释放）
-#define LUA_TTHREAD		8 //lua线程
+#define LUA_TTHREAD		8 //线程 这里的线程不是传统意义上的os线程,和协程有很大挂钩
 
 #define LUA_NUMTYPES		9 //基本类型 总数
 
@@ -508,7 +508,7 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 #define lua_getuservalue(L,idx)	lua_getiuservalue(L,idx,1)
 #define lua_setuservalue(L,idx)	lua_setiuservalue(L,idx,1)
 
-#define LUA_NUMTAGS		LUA_NUMTYPES
+#define LUA_NUMTAGS		LUA_NUMTYPES //基础类型枚举分界线
 
 /* }============================================================== */
 

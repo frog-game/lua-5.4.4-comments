@@ -292,7 +292,7 @@ typedef StackValue *StkId;
 
 #define ttisthread(o)		checktag((o), ctb(LUA_VTHREAD)) //是不是可回收的线程类型
 
-#define thvalue(o)	check_exp(ttisthread(o), gco2th(val_(o).gc)) //如果是可回收的线程类型,那么就吧GCobject转换成线程了类型
+#define thvalue(o)	check_exp(ttisthread(o), gco2th(val_(o).gc)) //如果是可回收的线程类型,那么就吧GCobject转换成线程类型
 
 // 将obj指向的对象 Value 的 union 元素设为(GCObjec *)类型, 并指向 x 指向的对象;
 // Tvalue->tt_ 设为 LUA_VTHREAD 类型 并添加可回收属性
@@ -851,7 +851,7 @@ typedef union Node {
 typedef struct Table {
   CommonHeader;
   lu_byte flags;  /* 1<<p means tagmethod(p) is not present *///第8位为0，则表示alimit为数组的实际大小，否则需重新计算 
-  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希表的容量大小 注意不是实际大小 大小总是是2的整数次方
+  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希部分的长度对数 注意不是实际大小 大小总是是2的整数次方    1 << lsizenode 才能得到实际的size
   unsigned int alimit;  /* "limit" of 'array' array *///记录数组部分的大小
   TValue *array;  /* array part *///指向数组部分的首地址
   Node *node;//指向node数据块（即散列部分）首地址 哈希表存储在这
@@ -911,8 +911,8 @@ typedef struct Table {
 	(check_exp((size&(size-1))==0, (cast_int((s) & ((size)-1)))))
 
 
-#define twoto(x)	(1<<(x))
-// t 为表，返回 Table 的 node 数组大小 等价于求hash表大小
+#define twoto(x)	(1<<(x)) //hash表实际的size
+// t 为表，返回 Table 的 node 数组大小 等价于求hash表实际的size
 #define sizenode(t)	(twoto((t)->lsizenode))
 
 

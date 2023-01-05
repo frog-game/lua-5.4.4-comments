@@ -247,6 +247,10 @@ static int equalkey (const TValue *k1, const Node *n2, int deadok) {
 /*
 ** Returns the real size of the 'array' array
 */
+
+/// @brief 通过一系列的位运算，计算出大于且最接近alimit的2的n次方，即数组的真实长度
+/// @param t 
+/// @return 数组的真实长度
 LUAI_FUNC unsigned int luaH_realasize (const Table *t) {
   if (limitequalsasize(t))
     return t->alimit;  /* this is the size */

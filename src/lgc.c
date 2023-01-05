@@ -102,7 +102,14 @@
 ** mark an object that can be NULL (either because it is really optional,
 ** or it was stripped as debug info, or inside an uncompleted structure)
 */
-#define markobjectN(g,t)	{ if (t) markobject(g,t); } //标记的object不能为null
+// NULL 代表null的userdata结构
+// 为什么会有NULL,如下解释
+// lua_newtable(L);
+// lua_pushlightuserdata(L, NULL);
+// lua_setfield(L, -2, "null");
+// 这样在实际调用时， setpvalue(L->top, p); 相当于 void *p = NULL， 最后是被封装到table变量里返回的。
+
+#define markobjectN(g,t)	{ if (t) markobject(g,t); } //N:表示可能的t==NULL,对object进行标记
 
 static void reallymarkobject (global_State *g, GCObject *o);//前置声明
 static lu_mem atomic (lua_State *L);//前置声明
@@ -148,7 +155,7 @@ static GCObject **getgclist (GCObject *o) {
 
 //将具有已知类型的可收集对象o链接到链表p中
 //等价于(o)->gclist = p  p里面的内容是o
-//个人感觉gclist改成gcnext更顺畅
+//个人感觉gclist命名改成gcnext命名更顺畅
 #define linkgclist(o,p)	linkgclist_(obj2gco(o), &(o)->gclist, &(p))
 
 /// @brief 将对象o连接到p链表上
@@ -184,9 +191,9 @@ static void linkgclist_ (GCObject *o, GCObject **pnext, GCObject **list) {
 /// @brief 将未使用的key remove掉
 /// @param n 
 static void clearkey (Node *n) {
-  lua_assert(isempty(gval(n)));//必须是nil类型
-  if (keyiscollectable(n))//
-    setdeadkey(n);  /* unused key; remove it */
+  lua_assert(isempty(gval(n)));//n必须是nil类型
+  if (keyiscollectable(n))//n必须是可回收类型
+    setdeadkey(n);  /* unused key; remove it *///设置key死亡状态
 }
 
 
@@ -198,7 +205,7 @@ static void clearkey (Node *n) {
 ** being finalized, keep them in keys, but not in values
 */
 
-/// @brief key或者value是否能从弱表中删除
+/// @brief o 为 weak table 的 key 或 value, 判断其是否需要 clear 
 // 只有拥有显示构造的对象类型会被自动从weak表中移除，值类型boolean、number是不会自动从weak中移除的。
 // 而string类型虽然也由gc来负责清理，但是string没有显示的构造过程，因此也不会自动从weak表中移除，对于string的内存管理有单独的策略
 /// @param g 
@@ -210,7 +217,7 @@ static int iscleared (global_State *g, const GCObject *o) {
     markobject(g, o);  /* strings are 'values', so are never weak *///string 不会被移除
     return 0;
   }
-  else return iswhite(o);
+  else return iswhite(o);//为白色表示没有其他对象引用它, 表示其可能需要 clear
 }
 
 
@@ -228,7 +235,7 @@ static int iscleared (global_State *g, const GCObject *o) {
 ** whites from deads.)
 */
 
-/// @brief 把新建立联系的对象立刻标记 用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
+/// @brief  向前设置barrier，把新建立联系的对象立刻标记 用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
 /// @param L 
 /// @param o 黑色 object
 /// @param v 白色 object
@@ -255,7 +262,7 @@ void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
 ** pointing to a white object as gray again.
 */
 
-/// @brief 将黑色对象再次标记为灰色。用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
+/// @brief 向后设置barrier 将黑色对象再次标记为灰色。用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
 /// @param L 
 /// @param o 
 void luaC_barrierback_ (lua_State *L, GCObject *o) {
@@ -329,6 +336,7 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
 */
 
 /// @brief 对对象进行颜色的标记
+//将 userdata, string, closed upvalue 涂黑, 其它类型对象涂灰等待进一步处理
 /// @param g 
 /// @param o 
 static void reallymarkobject (global_State *g, GCObject *o) {
@@ -358,10 +366,10 @@ static void reallymarkobject (global_State *g, GCObject *o) {
     }  /* FALLTHROUGH */
     case LUA_VLCL: case LUA_VCCL: case LUA_VTABLE:
     case LUA_VTHREAD: case LUA_VPROTO: {
-      linkobjgclist(o, g->gray);  /* to be visited later */
+      linkobjgclist(o, g->gray);  /* to be visited later *///丢灰色链表
       break;
     }
-    default: lua_assert(0); break;
+    default: lua_assert(0); break;//o->tt类型不对
   }
 }
 
@@ -369,6 +377,8 @@ static void reallymarkobject (global_State *g, GCObject *o) {
 /*
 ** mark metamethods for basic types
 */
+
+//标记基础类型的元表
 static void markmt (global_State *g) {
   int i;
   for (i=0; i < LUA_NUMTAGS; i++)
@@ -379,6 +389,10 @@ static void markmt (global_State *g) {
 /*
 ** mark all objects in list of being-finalized
 */
+
+/// @brief 遍历g->tobefnz链表中所有元素并标记（上一循环剩下的object）
+/// @param g 
+/// @return 
 static lu_mem markbeingfnz (global_State *g) {
   GCObject *o;
   lu_mem count = 0;
@@ -401,25 +415,29 @@ static lu_mem markbeingfnz (global_State *g) {
 ** upvalues, as they have nothing to be checked. (If the thread gets an
 ** upvalue later, it will be linked in the list again.)
 */
+
+/// @brief 标记open状态的UpValue
+/// @param g 
+/// @return 完成工作量
 static int remarkupvals (global_State *g) {
   lua_State *thread;
-  lua_State **p = &g->twups;
+  lua_State **p = &g->twups; //得到twups首地址
   int work = 0;  /* estimate of how much work was done here */
   while ((thread = *p) != NULL) {
-    work++;
-    if (!iswhite(thread) && thread->openupval != NULL)
-      p = &thread->twups;  /* keep marked thread with upvalues in the list */
+    work++;//工作量++
+    if (!iswhite(thread) && thread->openupval != NULL)//如果是白色并且open状态的上值链表不是null
+      p = &thread->twups;  /* keep marked thread with upvalues in the list *///获取下一个twups的首地址
     else {  /* thread is not marked or without upvalues */
       UpVal *uv;
       lua_assert(!isold(thread) || thread->openupval == NULL);
-      *p = thread->twups;  /* remove thread from the list */
-      thread->twups = thread;  /* mark that it is out of list */
-      for (uv = thread->openupval; uv != NULL; uv = uv->u.open.next) {
-        lua_assert(getage(uv) <= getage(thread));
-        work++;
-        if (!iswhite(uv)) {  /* upvalue already visited? */
+      *p = thread->twups;  /* remove thread from the list *///
+      thread->twups = thread;  /* mark that it is out of list *///加上面哪一步就等价于将thread移除了
+      for (uv = thread->openupval; uv != NULL; uv = uv->u.open.next) {//循环openupval链表
+        lua_assert(getage(uv) <= getage(thread));//上值年龄要小于线程年龄
+        work++;//工作量++
+        if (!iswhite(uv)) {  /* upvalue already visited? *///如果不是白色
           lua_assert(upisopen(uv) && isgray(uv));
-          markvalue(g, uv->v);  /* mark its value */
+          markvalue(g, uv->v);  /* mark its value *///对uv->v进行标记
         }
       }
     }
@@ -427,7 +445,8 @@ static int remarkupvals (global_State *g) {
   return work;
 }
 
-
+/// @brief 清除灰色链表
+/// @param g 
 static void cleargraylists (global_State *g) {
   g->gray = g->grayagain = NULL;
   g->weak = g->allweak = g->ephemeron = NULL;
@@ -437,6 +456,9 @@ static void cleargraylists (global_State *g) {
 /*
 ** mark root set and reset all gray lists, to start a new collection
 */
+
+/// @brief 标记根集并重置所有灰名单，以开始新集合
+/// @param g 
 static void restartcollection (global_State *g) {
   cleargraylists(g);
   markobject(g, g->mainthread);
@@ -464,13 +486,17 @@ static void restartcollection (global_State *g) {
 ** back to a gray list, but then it must become OLD. (That is what
 ** 'correctgraylist' does when it finds a TOUCHED2 object.)
 */
+
+/// @brief 如果是touched1状态把黑色对象link进灰色链表,否则如果是touched2状态改变他的年龄到G_OLD
+/// @param g 
+/// @param o 黑色对象
 static void genlink (global_State *g, GCObject *o) {
   lua_assert(isblack(o));
-  if (getage(o) == G_TOUCHED1) {  /* touched in this cycle? */
-    linkobjgclist(o, g->grayagain);  /* link it back in 'grayagain' */
+  if (getage(o) == G_TOUCHED1) {  /* touched in this cycle? */// touched1状态
+    linkobjgclist(o, g->grayagain);  /* link it back in 'grayagain' *///把object放到灰色链表
   }  /* everything else do not need to be linked back */
-  else if (getage(o) == G_TOUCHED2)
-    changeage(o, G_TOUCHED2, G_OLD);  /* advance age */
+  else if (getage(o) == G_TOUCHED2)// touched2状态
+    changeage(o, G_TOUCHED2, G_OLD);  /* advance age *///改变年龄从G_TOUCHED2到G_OLD
 }
 
 
@@ -480,25 +506,39 @@ static void genlink (global_State *g, GCObject *o) {
 ** atomic phase. In the atomic phase, if table has any white value,
 ** put it in 'weak' list, to be cleared.
 */
+
+/// @brief 遍历strong key, weak value情况
+//  若 gc 处在 GCSpropagate 阶段, 并且g->gray不为空 将 weak table 加入到 g->grayagain 链表中, 在 atomic phase 再次访问. 
+//  否则按下面的规则添加到对应 list:
+//  1. 若table数组部分中有元素, 并且是atomic phase阶段 加入到 g->weak list.
+//     若table数组部分中没有元素 并且不是atomic phase阶段 加入到 g->grayagain list.
+//  2. table hash部分
+//    1) val is nil: 移除它
+//    2) val is not nil: 标记 key, 若 value is 白色 (且不为不可回收对象), 
+//    	   是atomic phase阶段 加入到 g->weak list
+//         不是atomic phase阶段 加入到 g->grayagain list.
+    
+/// @param g 
+/// @param h 
 static void traverseweakvalue (global_State *g, Table *h) {
-  Node *n, *limit = gnodelast(h);
+  Node *n, *limit = gnodelast(h);//得到最后一个元素
   /* if there is array part, assume it may have white values (it is not
      worth traversing it now just to check) */
-  int hasclears = (h->alimit > 0);
-  for (n = gnode(h, 0); n < limit; n++) {  /* traverse hash part */
-    if (isempty(gval(n)))  /* entry is empty? */
-      clearkey(n);  /* clear its key */
+  int hasclears = (h->alimit > 0);//是不是有元素
+  for (n = gnode(h, 0); n < limit; n++) {  /* traverse hash part *///遍历hash元素
+    if (isempty(gval(n)))  /* entry is nil? *///如果是nil值
+      clearkey(n);  /* clear its key *///移除它
     else {
-      lua_assert(!keyisnil(n));
-      markkey(g, n);
-      if (!hasclears && iscleared(g, gcvalueN(gval(n))))  /* a white value? */
-        hasclears = 1;  /* table will have to be cleared */
+      lua_assert(!keyisnil(n));//key类型不能为空
+      markkey(g, n);//标记
+      if (!hasclears && iscleared(g, gcvalueN(gval(n))))  /* a white value? *///如果数组部分没有值,但是hash表中有白色的值
+        hasclears = 1;  /* table will have to be cleared *///说明要清除
     }
   }
-  if (g->gcstate == GCSatomic && hasclears)
-    linkgclist(h, g->weak);  /* has to be cleared later */
+  if (g->gcstate == GCSatomic && hasclears)//如果是GCSatomic阶段并且有元素需要清除
+    linkgclist(h, g->weak);  /* has to be cleared later *///放入弱链表
   else
-    linkgclist(h, g->grayagain);  /* must retraverse it in atomic phase */
+    linkgclist(h, g->grayagain);  /* must retraverse it in atomic phase *///放入灰色链表 等到原子阶段遍历他
 }
 
 
@@ -514,95 +554,155 @@ static void traverseweakvalue (global_State *g, Table *h) {
 ** must be kept in some gray list for post-processing; this is done
 ** by 'genlink'.
 */
+
+/// @brief 遍历weak key, strong value情况
+// 1. 遍历数组如果有白色值就进行标记,并marked设置为true
+// 2. 遍历hash部分,按倒序或者正序遍历进行标记,标记好以后进行如下操作
+//   若 gc 处在 GCSpropagate: 把h放入g->grayagain中
+//   否则按如下规则处理
+//    val is nil:  移除它
+//    white key-white value:  把h放入g->ephemeron
+//    white key-marked value: 把h放入g->allweak
+//    marked key-white value: 标记 value
+//    其他:如果是touched1状态把黑色对象link进灰色链表,否则如果是touched2状态改变他的年龄到G_OLD
+/// @param g 
+/// @param h 
+/// @param inv true:倒序遍历
+/// @return 标记了任何 object 返回true, 否则 false.
 static int traverseephemeron (global_State *g, Table *h, int inv) {
-  int marked = 0;  /* true if an object is marked in this traversal */
-  int hasclears = 0;  /* true if table has white keys */
-  int hasww = 0;  /* true if table has entry "white-key -> white-value" */
+  int marked = 0;  /* true if an object is marked in this traversal *///如果在此遍历中标记了对象,那么就为true
+  int hasclears = 0;  /* true if table has white keys *///如果有白色的值,那么就为true
+  int hasww = 0;  /* true if table has entry "white-key -> white-value" *///如果table中有 白色的key->白色的value 那么就为true
   unsigned int i;
-  unsigned int asize = luaH_realasize(h);
-  unsigned int nsize = sizenode(h);
+  unsigned int asize = luaH_realasize(h);//得到数组的真实长度
+  unsigned int nsize = sizenode(h);//得到hash表的真实长度
   /* traverse array part */
-  for (i = 0; i < asize; i++) {
-    if (valiswhite(&h->array[i])) {
-      marked = 1;
-      reallymarkobject(g, gcvalue(&h->array[i]));
+  for (i = 0; i < asize; i++) {//遍历数组
+    if (valiswhite(&h->array[i])) {//回收对象是白色
+      marked = 1;//进行标记
+      reallymarkobject(g, gcvalue(&h->array[i]));//标记
     }
   }
   /* traverse hash part; if 'inv', traverse descending
      (see 'convergeephemerons') */
-  for (i = 0; i < nsize; i++) {
-    Node *n = inv ? gnode(h, nsize - 1 - i) : gnode(h, i);
-    if (isempty(gval(n)))  /* entry is empty? */
-      clearkey(n);  /* clear its key */
-    else if (iscleared(g, gckeyN(n))) {  /* key is not marked (yet)? */
-      hasclears = 1;  /* table must be cleared */
-      if (valiswhite(gval(n)))  /* value not marked yet? */
-        hasww = 1;  /* white-white entry */
+  for (i = 0; i < nsize; i++) {//遍历hash
+    Node *n = inv ? gnode(h, nsize - 1 - i) : gnode(h, i);//通过是倒序还是正序决定取最后一个还是第一个node
+    if (isempty(gval(n)))  /* entry is nil? *///是nil类型
+      clearkey(n);  /* clear its key *///清除它
+    else if (iscleared(g, gckeyN(n))) {  /* key is not marked (yet)? *///能否移除
+      hasclears = 1;  /* table must be cleared *///hasclears设置位true
+      if (valiswhite(gval(n)))  /* value not marked yet? *///回收对象是白色
+        hasww = 1;  /* white-white entry *///hasww设置位true
     }
-    else if (valiswhite(gval(n))) {  /* value not marked yet? */
-      marked = 1;
-      reallymarkobject(g, gcvalue(gval(n)));  /* mark it now */
+    else if (valiswhite(gval(n))) {  /* value not marked yet? *///回收对象是白色
+      marked = 1; //marked设置为1
+      reallymarkobject(g, gcvalue(gval(n)));  /* mark it now *///标记value
     }
   }
   /* link table into proper list */
-  if (g->gcstate == GCSpropagate)
-    linkgclist(h, g->grayagain);  /* must retraverse it in atomic phase */
-  else if (hasww)  /* table has white->white entries? */
-    linkgclist(h, g->ephemeron);  /* have to propagate again */
-  else if (hasclears)  /* table has white keys? */
-    linkgclist(h, g->allweak);  /* may have to clean white keys */
+  ///将表链接到正确的列表
+  if (g->gcstate == GCSpropagate)//传播阶段
+    linkgclist(h, g->grayagain);  /* must retraverse it in atomic phase *///扔grayagain链表
+  else if (hasww)  /* table has white->white entries? *///hasww位true
+    linkgclist(h, g->ephemeron);  /* have to propagate again *///ephemeron链用途：如果键在后面的 atomic 阶段发现是有效的，则需 mark 其值
+  else if (hasclears)  /* table has white keys? *///hasclears为true
+    linkgclist(h, g->allweak);  /* may have to clean white keys *///键不可达，值可达，后期需要清理掉不可达的键
   else
-    genlink(g, obj2gco(h));  /* check whether collector still needs to see it */
+    genlink(g, obj2gco(h));  /* check whether collector still needs to see it *///如果是touched1状态把黑色对象link进灰色链表,否则如果是touched2状态改变他的年龄到G_OLD
   return marked;
 }
 
 
+/// @brief 遍历strong key, strong value情况
+//    1. 标记 数组部分
+//       对value进行标记
+//    2. node part
+//       value is nil: 移除它
+//       value is not nil: 标记 key, 标记 value
+/// @param g 
+/// @param h 
 static void traversestrongtable (global_State *g, Table *h) {
-  Node *n, *limit = gnodelast(h);
+  Node *n, *limit = gnodelast(h);//得到最后一个元素
   unsigned int i;
-  unsigned int asize = luaH_realasize(h);
-  for (i = 0; i < asize; i++)  /* traverse array part */
-    markvalue(g, &h->array[i]);
-  for (n = gnode(h, 0); n < limit; n++) {  /* traverse hash part */
-    if (isempty(gval(n)))  /* entry is empty? */
-      clearkey(n);  /* clear its key */
+  unsigned int asize = luaH_realasize(h);//得到数组的真实长度
+  for (i = 0; i < asize; i++)  /* traverse array part *///遍历数组
+    markvalue(g, &h->array[i]);//进行标记
+  for (n = gnode(h, 0); n < limit; n++) {  /* traverse hash part *///遍历hash
+    if (isempty(gval(n)))  /* entry is empty? *///如果是nil
+      clearkey(n);  /* clear its key *///删除它
     else {
       lua_assert(!keyisnil(n));
-      markkey(g, n);
-      markvalue(g, gval(n));
+      markkey(g, n);//标记key
+      markvalue(g, gval(n));//标记Value
     }
   }
   genlink(g, obj2gco(h));
 }
 
+/// @brief 由下面的情况决定加入到哪个list
+//  a. strong key, weak value: 
+//    若 gc 处在 GCSpropagate 阶段, 并且g->gray不为空 将 weak table 加入到 g->grayagain 链表中, 在 atomic phase 再次访问. 
+//    否则按下面的规则添加到对应 list:
+//    1. 若table数组部分中有元素, 并且是atomic phase阶段 加入到 g->weak list.
+//     若table数组部分中没有元素 并且不是atomic phase阶段 加入到 g->grayagain list.
+//    2. table hash部分
+//      1) val is nil: 移除它
+//      2) val is not nil: 标记 key, 若 value is 白色 (且不为不可回收对象), 
+//    	   是atomic phase阶段 加入到 g->weak list
+//         不是atomic phase阶段 加入到 g->grayagain list. 
 
+//  b. weak key, strong value: 
+//    1. 遍历数组如果有白色值就进行标记,并marked设置为true
+//     2. 遍历hash部分,按倒序或者正序遍历进行标记,标记好以后进行如下操作
+//      若 gc 处在 GCSpropagate: 把h放入g->grayagain中
+//      否则按如下规则处理
+//        val is nil:  移除它
+//        white key-white value:  把h放入g->ephemeron
+//        white key-marked value: 把h放入g->allweak
+//        marked key-white value: 标记 value
+//        其他:如果是touched1状态把黑色对象link进灰色链表,否则如果是touched2状态改变他的年龄到G_OLD
+//  c. weak key, weak value:
+//    把h放入g->allweak
+ 
+//  d. strong key, strong value: 
+//    1. 标记 数组部分
+//       对value进行标记
+//    2. node part
+//       value is nil: 移除它
+//       value is not nil: 标记 key, 标记 value
+/// @param g 
+/// @param h 
+/// @return table 内存大小
 static lu_mem traversetable (global_State *g, Table *h) {
   const char *weakkey, *weakvalue;
-  const TValue *mode = gfasttm(g, h->metatable, TM_MODE);
-  markobjectN(g, h->metatable);
-  if (mode && ttisstring(mode) &&  /* is there a weak mode? */
-      (cast_void(weakkey = strchr(svalue(mode), 'k')),
-       cast_void(weakvalue = strchr(svalue(mode), 'v')),
-       (weakkey || weakvalue))) {  /* is really weak? */
-    if (!weakkey)  /* strong keys? */
-      traverseweakvalue(g, h);
-    else if (!weakvalue)  /* strong values? */
-      traverseephemeron(g, h, 0);
-    else  /* all weak */
+  const TValue *mode = gfasttm(g, h->metatable, TM_MODE);//从元方法中获取弱表信息
+  markobjectN(g, h->metatable);//对object标记
+  if (mode && ttisstring(mode) &&  /* is there a weak mode? *///是weak mode
+      (cast_void(weakkey = strchr(svalue(mode), 'k')),//得到key
+       cast_void(weakvalue = strchr(svalue(mode), 'v')),//得到value
+       (weakkey || weakvalue))) {  /* is really weak? *///如果有weakkey或者有weakvalue 或者两者存在
+    if (!weakkey)  /* strong keys? *///strong key, weak value
+      traverseweakvalue(g, h);//// 遍历strong key, strong value情况
+    else if (!weakvalue)  /* strong values? *///weak key, strong value
+      traverseephemeron(g, h, 0);// 遍历weak key, strong value情况
+    else  /* all weak *///weak key, weak value
       linkgclist(h, g->allweak);  /* nothing to traverse now */
   }
-  else  /* not weak */
-    traversestrongtable(g, h);
-  return 1 + h->alimit + 2 * allocsizenode(h);
+  else  /* not weak *///strong key, strong value
+    traversestrongtable(g, h);// 遍历strong key, strong value情况
+  return 1 + h->alimit + 2 * allocsizenode(h);//返回table内存大小
 }
 
-
+/// @brief 遍历userdata
+/// @param g 
+/// @param u 
+/// @return 用户自定义长度
 static int traverseudata (global_State *g, Udata *u) {
   int i;
-  markobjectN(g, u->metatable);  /* mark its metatable */
+  markobjectN(g, u->metatable);  /* mark its metatable *///标记元表
   for (i = 0; i < u->nuvalue; i++)
-    markvalue(g, &u->uv[i].uv);
-  genlink(g, obj2gco(u));
+    markvalue(g, &u->uv[i].uv);//自定义上值进行标记
+  genlink(g, obj2gco(u));//如果是touched1状态把黑色对象link进灰色链表,否则如果是touched2状态改变他的年龄到G_OLD
   return 1 + u->nuvalue;
 }
 
@@ -612,6 +712,11 @@ static int traverseudata (global_State *g, Udata *u) {
 ** arrays can be larger than needed; the extra slots are filled with
 ** NULL, so the use of 'markobjectN')
 */
+
+/// @brief 遍历函数原型
+/// @param g 
+/// @param f 
+/// @return 
 static int traverseproto (global_State *g, Proto *f) {
   int i;
   markobjectN(g, f->source);
@@ -692,6 +797,10 @@ static int traversethread (global_State *g, lua_State *th) {
 /*
 ** traverse one gray object, turning it to black.
 */
+
+/// @brief 只 traverse 一个 gray object, 将其标记为 black, 并从 gray list 移除
+/// @param g 
+/// @return 
 static lu_mem propagatemark (global_State *g) {
   GCObject *o = g->gray;
   nw2black(o);

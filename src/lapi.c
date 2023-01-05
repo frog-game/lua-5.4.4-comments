@@ -1383,7 +1383,7 @@ LUA_API int lua_setiuservalue (lua_State *L, int idx, int n) {
 	"results from function overflow current stack size")
 
 /// @brief 在保护模式下调用一个函数(或一个可调用对象)
-/// @param L 线程状态
+/// @param L 线程
 /// @param nargs 目标函数的参数个数
 /// @param nresults 目标函数返回值个数
 /// @param ctx continuation-function 上下文环境
@@ -1568,7 +1568,7 @@ LUA_API int lua_dump (lua_State *L, lua_Writer writer, void *data, int strip) {
 
 /// @brief 返回线程 L 的状态。
 // 对于普通线程，状态可以是 LUA_OK ,如果线程以错误完成 lua_resume 的执行，则可以是错误代码，如果线程被挂起，则可以是 LUA_YIELD 。
-// 您只能在状态 LUA_OK 的线程中调用函数。您可以恢复状态 LUA_OK （启动新协程）或 LUA_YIELD （恢复协程）的线程。
+// 您只能在状态 LUA_OK 的线程中调用函数。您可以恢复状态 LUA_OK （启动新线程）或 LUA_YIELD （恢复线程）的线程。
 /// @param L 
 /// @return 
 LUA_API int lua_status (lua_State *L) {
