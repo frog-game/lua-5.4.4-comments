@@ -335,7 +335,7 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
 ** (only closures can), and a userdata's metatable must be a table.
 */
 
-/// @brief 对对象进行颜色的标记
+/// @brief 对对象进行标记
 //将 userdata, string, closed upvalue 涂黑, 其它类型对象涂灰等待进一步处理
 /// @param g 
 /// @param o 
@@ -693,17 +693,17 @@ static lu_mem traversetable (global_State *g, Table *h) {
   return 1 + h->alimit + 2 * allocsizenode(h);//返回table内存大小
 }
 
-/// @brief 遍历userdata
+/// @brief 标记userdata: metatable, upvalues,
 /// @param g 
 /// @param u 
-/// @return 用户自定义长度
+/// @return 返回工作单元数量
 static int traverseudata (global_State *g, Udata *u) {
   int i;
   markobjectN(g, u->metatable);  /* mark its metatable *///标记元表
   for (i = 0; i < u->nuvalue; i++)
     markvalue(g, &u->uv[i].uv);//自定义上值进行标记
   genlink(g, obj2gco(u));//如果是touched1状态把黑色对象link进灰色链表,否则如果是touched2状态改变他的年龄到G_OLD
-  return 1 + u->nuvalue;
+  return 1 + u->nuvalue;//返回工作单元数量
 }
 
 
@@ -713,44 +713,52 @@ static int traverseudata (global_State *g, Udata *u) {
 ** NULL, so the use of 'markobjectN')
 */
 
-/// @brief 遍历函数原型
+/// @brief 标记函数原型 source, constants (k), upvalues name, inested protos,locvar varname
 /// @param g 
 /// @param f 
-/// @return 
+/// @return 返回工作单元数量
 static int traverseproto (global_State *g, Proto *f) {
   int i;
-  markobjectN(g, f->source);
-  for (i = 0; i < f->sizek; i++)  /* mark literals */
+  markobjectN(g, f->source);//标记文件名
+  for (i = 0; i < f->sizek; i++)  /* mark literals *///标记常量表
     markvalue(g, &f->k[i]);
-  for (i = 0; i < f->sizeupvalues; i++)  /* mark upvalue names */
+  for (i = 0; i < f->sizeupvalues; i++)  /* mark upvalue names *///标记上值名字
     markobjectN(g, f->upvalues[i].name);
-  for (i = 0; i < f->sizep; i++)  /* mark nested protos */
+  for (i = 0; i < f->sizep; i++)  /* mark nested protos *///标记子函数表
     markobjectN(g, f->p[i]);
-  for (i = 0; i < f->sizelocvars; i++)  /* mark local-variable names */
+  for (i = 0; i < f->sizelocvars; i++)  /* mark local-variable names *///标记局部变量
     markobjectN(g, f->locvars[i].varname);
-  return 1 + f->sizek + f->sizeupvalues + f->sizep + f->sizelocvars;
+  return 1 + f->sizek + f->sizeupvalues + f->sizep + f->sizelocvars;//返回工作单元数量
 }
 
-
+/// @brief 标记 C闭包中所有的 upvalues 
+/// @param g 
+/// @param cl 
+/// @return //返回工作单元数量
 static int traverseCclosure (global_State *g, CClosure *cl) {
   int i;
   for (i = 0; i < cl->nupvalues; i++)  /* mark its upvalues */
-    markvalue(g, &cl->upvalue[i]);
-  return 1 + cl->nupvalues;
+    markvalue(g, &cl->upvalue[i]);//标记上值
+  return 1 + cl->nupvalues;//返回工作单元数量
 }
 
 /*
 ** Traverse a Lua closure, marking its prototype and its upvalues.
 ** (Both can be NULL while closure is being created.)
 */
+
+/// @brief 标记 Lua closure 引用的对象: proto, upvalues,
+/// @param g 
+/// @param cl 
+/// @return //返回工作单元数量
 static int traverseLclosure (global_State *g, LClosure *cl) {
   int i;
-  markobjectN(g, cl->p);  /* mark its prototype */
+  markobjectN(g, cl->p);  /* mark its prototype *///标记函数原型
   for (i = 0; i < cl->nupvalues; i++) {  /* visit its upvalues */
     UpVal *uv = cl->upvals[i];
-    markobjectN(g, uv);  /* mark upvalue */
+    markobjectN(g, uv);  /* mark upvalue *///标记上值
   }
-  return 1 + cl->nupvalues;
+  return 1 + cl->nupvalues;//返回工作单元数量
 }
 
 
@@ -766,31 +774,36 @@ static int traverseLclosure (global_State *g, LClosure *cl) {
 ** (which can only happen in generational mode) or if the traverse is in
 ** the propagate phase (which can only happen in incremental mode).
 */
+
+/// @brief 标记线程
+/// @param g 
+/// @param th 
+/// @return //返回工作单元数量
 static int traversethread (global_State *g, lua_State *th) {
   UpVal *uv;
   StkId o = th->stack;
-  if (isold(th) || g->gcstate == GCSpropagate)
-    linkgclist(th, g->grayagain);  /* insert into 'grayagain' list */
+  if (isold(th) || g->gcstate == GCSpropagate)//如果线程是old,gcstate是GCSpropagate状态
+    linkgclist(th, g->grayagain);  /* insert into 'grayagain' list *///丢到g->grayagain列表
   if (o == NULL)
-    return 1;  /* stack not completely built yet */
+    return 1;  /* stack not completely built yet *///栈没有创建
   lua_assert(g->gcstate == GCSatomic ||
              th->openupval == NULL || isintwups(th));
-  for (; o < th->top; o++)  /* mark live elements in the stack */
+  for (; o < th->top; o++)  /* mark live elements in the stack *///标记栈上所有有效元素
     markvalue(g, s2v(o));
-  for (uv = th->openupval; uv != NULL; uv = uv->u.open.next)
+  for (uv = th->openupval; uv != NULL; uv = uv->u.open.next)///标记openupval
     markobject(g, uv);  /* open upvalues cannot be collected */
   if (g->gcstate == GCSatomic) {  /* final traversal? */
-    for (; o < th->stack_last + EXTRA_STACK; o++)
+    for (; o < th->stack_last + EXTRA_STACK; o++)//将栈上 free slot 置为 nil
       setnilvalue(s2v(o));  /* clear dead stack slice */
     /* 'remarkupvals' may have removed thread from 'twups' list */
-    if (!isintwups(th) && th->openupval != NULL) {
+    if (!isintwups(th) && th->openupval != NULL) {// 若 thread 上有 openupval, 则将其重新加入到 g->twups list 中
       th->twups = g->twups;  /* link it back to the list */
       g->twups = th;
     }
   }
-  else if (!g->gcemergency)
-    luaD_shrinkstack(th); /* do not change stack in emergency cycle */
-  return 1 + stacksize(th);
+  else if (!g->gcemergency)//没有紧急回收
+    luaD_shrinkstack(th); /* do not change stack in emergency cycle *///栈进行合理收缩
+  return 1 + stacksize(th);//返回工作单元数量
 }
 
 
@@ -800,11 +813,11 @@ static int traversethread (global_State *g, lua_State *th) {
 
 /// @brief 只 traverse 一个 gray object, 将其标记为 black, 并从 gray list 移除
 /// @param g 
-/// @return 
+/// @return //返回工作单元数量
 static lu_mem propagatemark (global_State *g) {
   GCObject *o = g->gray;
   nw2black(o);
-  g->gray = *getgclist(o);  /* remove from 'gray' list */
+  g->gray = *getgclist(o);  /* remove from 'gray' list *///返回下一个灰色对象,把当前的移除掉
   switch (o->tt) {
     case LUA_VTABLE: return traversetable(g, gco2t(o));
     case LUA_VUSERDATA: return traverseudata(g, gco2u(o));
@@ -816,12 +829,15 @@ static lu_mem propagatemark (global_State *g) {
   }
 }
 
-
+/// @brief 将gray链表的所有对象进行标记
+// 遍历灰色链表的过程中，可能会有新增对象会被扫描过的Table对象引用，这个Table对象将会放在grayagain里，所以需要这个
+/// @param g 
+/// @return //返回工作单元数量
 static lu_mem propagateall (global_State *g) {
   lu_mem tot = 0;
-  while (g->gray)
+  while (g->gray)//对灰色列表进行标记
     tot += propagatemark(g);
-  return tot;
+  return tot;//返回工作单元数量
 }
 
 
@@ -832,25 +848,29 @@ static lu_mem propagateall (global_State *g) {
 ** convergence on chains in the same table.
 **
 */
+
+/// @brief 不断遍历 weak table 的 ephemerons 链表, 直到一次遍历没有标记任何值为止.
+//  此函数结束后键是否可达已最终确定，mark 掉其可达键所关联的值
+/// @param g 
 static void convergeephemerons (global_State *g) {
   int changed;
   int dir = 0;
   do {
     GCObject *w;
-    GCObject *next = g->ephemeron;  /* get ephemeron list */
+    GCObject *next = g->ephemeron;  /* get ephemeron list *///获取ephemeron链表
     g->ephemeron = NULL;  /* tables may return to this list when traversed */
     changed = 0;
-    while ((w = next) != NULL) {  /* for each ephemeron table */
-      Table *h = gco2t(w);
-      next = h->gclist;  /* list is rebuilt during loop */
-      nw2black(h);  /* out of the list (for now) */
-      if (traverseephemeron(g, h, dir)) {  /* marked some value? */
-        propagateall(g);  /* propagate changes */
-        changed = 1;  /* will have to revisit all ephemeron tables */
+    while ((w = next) != NULL) {  /* for each ephemeron table *///遍历ephemeron 里面存的table
+      Table *h = gco2t(w);//强转为table
+      next = h->gclist;  /* list is rebuilt during loop *///获取下一个table
+      nw2black(h);  /* out of the list (for now) *///把table变黑
+      if (traverseephemeron(g, h, dir)) {  /* marked some value? *///如果有值被标记了
+        propagateall(g);  /* propagate changes *///将gray链表的所有对象进行标记
+        changed = 1;  /* will have to revisit all ephemeron tables *///重新遍历ephemeron tables
       }
     }
-    dir = !dir;  /* invert direction next time */
-  } while (changed);  /* repeat until no more changes */
+    dir = !dir;  /* invert direction next time *///下次反转方向
+  } while (changed);  /* repeat until no more changes *///直到没有变化了
 }
 
 /* }====================================================== */
@@ -866,6 +886,10 @@ static void convergeephemerons (global_State *g) {
 /*
 ** clear entries with unmarked keys from all weaktables in list 'l'
 */
+
+/// @brief 清除GCObject中的弱表中需要被清除的Key
+/// @param g 
+/// @param l 
 static void clearbykeys (global_State *g, GCObject *l) {
   for (; l; l = gco2t(l)->gclist) {
     Table *h = gco2t(l);
@@ -1726,10 +1750,13 @@ static int sweepstep (lua_State *L, global_State *g,
   }
 }
 
-
+/// @brief 
+// work:工作单元表示业务对象量
+/// @param L 
+/// @return 
 static lu_mem singlestep (lua_State *L) {
   global_State *g = G(L);
-  lu_mem work;
+  lu_mem work;//工作单元
   lua_assert(!g->gcstopem);  /* collector is not reentrant */
   g->gcstopem = 1;  /* no emergency collections while collecting */
   switch (g->gcstate) {

@@ -735,7 +735,7 @@ typedef struct UpVal {
 #define ClosureHeader \
 	CommonHeader; lu_byte nupvalues; GCObject *gclist
 
-/// @brief 使用Lua提供的lua_pushcclosure这个C Api加入到虚拟栈中的C函数，它是对LClosure的一种C模拟
+/// @brief 使用Lua提供的lua_pushcclosure这个C Api加入到虚拟栈中的C函数闭包，它是对LClosure的一种C模拟
 typedef struct CClosure {
   ClosureHeader;
   lua_CFunction f;//c函数指针

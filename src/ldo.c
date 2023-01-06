@@ -271,6 +271,9 @@ static int stackinuse (lua_State *L) {
 ** stacksize (equal to ERRORSTACKSIZE in this case), and so the stack
 ** will be reduced to a "regular" size.
 */
+
+/// @brief 将栈收缩到一个合适的尺寸
+/// @param L 
 void luaD_shrinkstack (lua_State *L) {
   int inuse = stackinuse(L);
   int nsize = inuse * 2;  /* proposed new size */

@@ -117,11 +117,11 @@
 //------------------------------------- 分代模式下对象年龄标识 begin ---------------------------------//
 #define G_NEW		0	/* created in current cycle *///(0代对象）本次cycle创建的新对象（没有引用任何old对象） 
 #define G_SURVIVAL	1	/* created in previous cycle *///(1代对象）上一轮cycle创建的对象 -- 只活过一轮，下一次如果是白色的话，仍然会被回收
-#define G_OLD0		2	/* marked old by frw. barrier in this cycle *///(1代对象）表示本次cycle创建的新对象，但是引用了old对象
+#define G_OLD0		2	/* marked old by frw. barrier in this cycle *///(1代对象） 当前gc循环被barrier forward的节点，如果被插入的节点为isold()为true的节点,表示本次cycle创建的新对象，但是引用了old对象
 
 //老年代对象
 #define G_OLD1		3	/* first full cycle as old *///（2代对象）作为老对象第一次存活了整个gc过程 
-#define G_OLD		4	/* really old object (not to be visited) *///（3代对象）表示真正的old对象，不会被回收 
+#define G_OLD		4	/* really old object (not to be visited) *///（3代对象）作为老对象活过了两次完整的gc，表示真正的old对象，不会被回收 
 #define G_TOUCHED1	5	/* old object touched this cycle *///（3代对象）标记位G_OLD的对象在这次gc barrier_back的状态 新touch的对象，需要进入到grayagain中
 #define G_TOUCHED2	6	/* old object touched in previous cycle *///（3代对象）标记为G_OLD的对象在上一次gc barrier_back的状态前进到touched2  从G_TOUCHED1转成G_TOUCHED2，并设置为黑色，仍然存在于grayagain中
 
