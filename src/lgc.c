@@ -61,9 +61,11 @@
 
 
 /* mask with all color bits */
+// 所有的颜色为都标记上
 #define maskcolors	(bitmask(BLACKBIT) | WHITEBITS) //其实就是二进制 111000 翻译过来就是白色黑色灰色都标识上了
 
 /* mask with all GC bits */
+// 所有的gc位为都标记上
 #define maskgcbits      (maskcolors | AGEBITS) //其实就是二进制 111111 翻译过来就是白色黑色灰色年龄位都标识上了
 
 
@@ -88,7 +90,7 @@
 /*
 ** Protected access to objects in values
 */
-#define gcvalueN(o)     (iscollectable(o) ? gcvalue(o) : NULL) //安全访问gcvalue
+#define gcvalueN(o)     (iscollectable(o) ? gcvalue(o) : NULL) //获取value 包含返回NULL
 
 
 #define markvalue(g,o) { checkliveness(g->mainthread,o); \
@@ -887,19 +889,19 @@ static void convergeephemerons (global_State *g) {
 ** clear entries with unmarked keys from all weaktables in list 'l'
 */
 
-/// @brief 清除GCObject中的弱表中需要被清除的Key
+/// @brief 清除列表l中所有弱表中带有未标记的Key
 /// @param g 
 /// @param l 
 static void clearbykeys (global_State *g, GCObject *l) {
-  for (; l; l = gco2t(l)->gclist) {
-    Table *h = gco2t(l);
-    Node *limit = gnodelast(h);
+  for (; l; l = gco2t(l)->gclist) {//遍历l链表
+    Table *h = gco2t(l); //得到table
+    Node *limit = gnodelast(h);//获取hash数组最后一个元素
     Node *n;
-    for (n = gnode(h, 0); n < limit; n++) {
-      if (iscleared(g, gckeyN(n)))  /* unmarked key? */
-        setempty(gval(n));  /* remove entry */
-      if (isempty(gval(n)))  /* is entry empty? */
-        clearkey(n);  /* clear its key */
+    for (n = gnode(h, 0); n < limit; n++) {//遍历hash
+      if (iscleared(g, gckeyN(n)))  /* unmarked key? *///如果key能移除
+        setempty(gval(n));  /* remove entry *///移除它
+      if (isempty(gval(n)))  /* is entry empty? *///如果n值是nil
+        clearkey(n);  /* clear its key *///移除key
     }
   }
 }
@@ -909,72 +911,81 @@ static void clearbykeys (global_State *g, GCObject *l) {
 ** clear entries with unmarked values from all weaktables in list 'l' up
 ** to element 'f'
 */
+
+/// @brief 清除列表 l 中所有弱表中带有未标记value 到元素 f
+/// @param g 
+/// @param l 
+/// @param f 
 static void clearbyvalues (global_State *g, GCObject *l, GCObject *f) {
-  for (; l != f; l = gco2t(l)->gclist) {
-    Table *h = gco2t(l);
-    Node *n, *limit = gnodelast(h);
+  for (; l != f; l = gco2t(l)->gclist) {//遍历l到f的链表
+    Table * h = gco2t(l);//转换成table
+    Node *n, *limit = gnodelast(h);//获取hash数组最后一个元素
     unsigned int i;
-    unsigned int asize = luaH_realasize(h);
-    for (i = 0; i < asize; i++) {
+    unsigned int asize = luaH_realasize(h);//得到数组的真实长度
+    for (i = 0; i < asize; i++) {//遍历数组
       TValue *o = &h->array[i];
-      if (iscleared(g, gcvalueN(o)))  /* value was collected? */
-        setempty(o);  /* remove entry */
+      if (iscleared(g, gcvalueN(o)))  /* value was collected? *///如果能被回收
+        setempty(o);  /* remove entry *///移除
     }
-    for (n = gnode(h, 0); n < limit; n++) {
-      if (iscleared(g, gcvalueN(gval(n))))  /* unmarked value? */
-        setempty(gval(n));  /* remove entry */
-      if (isempty(gval(n)))  /* is entry empty? */
-        clearkey(n);  /* clear its key */
+    for (n = gnode(h, 0); n < limit; n++) {//遍历数组
+      if (iscleared(g, gcvalueN(gval(n))))  /* unmarked value? *///值能被回收
+        setempty(gval(n));  /* remove entry *///移除
+      if (isempty(gval(n)))  /* is entry empty? *///值是nil
+        clearkey(n);  /* clear its key *///清除key
     }
   }
 }
 
-
+/// @brief 释放上值
+/// @param L 
+/// @param uv 
 static void freeupval (lua_State *L, UpVal *uv) {
-  if (upisopen(uv))
-    luaF_unlinkupval(uv);
-  luaM_free(L, uv);
+  if (upisopen(uv))//上值是open状态
+    luaF_unlinkupval(uv);//把当前UpVal从链表移除
+  luaM_free(L, uv);//释放内存
 }
 
-
+/// @brief 释放对象
+/// @param L 
+/// @param o 
 static void freeobj (lua_State *L, GCObject *o) {
   switch (o->tt) {
-    case LUA_VPROTO:
-      luaF_freeproto(L, gco2p(o));
+    case LUA_VPROTO://函数类型
+      luaF_freeproto(L, gco2p(o)); //释放函数类型
       break;
     case LUA_VUPVAL:
-      freeupval(L, gco2upv(o));
+      freeupval(L, gco2upv(o));//释放上值
       break;
-    case LUA_VLCL: {
+    case LUA_VLCL: {//lua闭包
       LClosure *cl = gco2lcl(o);
-      luaM_freemem(L, cl, sizeLclosure(cl->nupvalues));
+      luaM_freemem(L, cl, sizeLclosure(cl->nupvalues));//释放lua闭包
       break;
     }
-    case LUA_VCCL: {
+    case LUA_VCCL: {//c闭包
       CClosure *cl = gco2ccl(o);
-      luaM_freemem(L, cl, sizeCclosure(cl->nupvalues));
+      luaM_freemem(L, cl, sizeCclosure(cl->nupvalues));//释放c闭包
       break;
     }
-    case LUA_VTABLE:
-      luaH_free(L, gco2t(o));
+    case LUA_VTABLE://表
+      luaH_free(L, gco2t(o));//释放表
       break;
-    case LUA_VTHREAD:
-      luaE_freethread(L, gco2th(o));
+    case LUA_VTHREAD://线程
+      luaE_freethread(L, gco2th(o));//释放线程
       break;
-    case LUA_VUSERDATA: {
+    case LUA_VUSERDATA: {//userdata
       Udata *u = gco2u(o);
-      luaM_freemem(L, o, sizeudata(u->nuvalue, u->len));
+      luaM_freemem(L, o, sizeudata(u->nuvalue, u->len));//释放userdata
       break;
     }
-    case LUA_VSHRSTR: {
+    case LUA_VSHRSTR: {//短字符串
       TString *ts = gco2ts(o);
-      luaS_remove(L, ts);  /* remove it from hash table */
-      luaM_freemem(L, ts, sizelstring(ts->shrlen));
+      luaS_remove(L, ts);  /* remove it from hash table *///从hash进行移除
+      luaM_freemem(L, ts, sizelstring(ts->shrlen));//释放段字符串
       break;
     }
-    case LUA_VLNGSTR: {
+    case LUA_VLNGSTR: {//长字符串
       TString *ts = gco2ts(o);
-      luaM_freemem(L, ts, sizelstring(ts->u.lnglen));
+      luaM_freemem(L, ts, sizelstring(ts->u.lnglen));//释放长字符串
       break;
     }
     default: lua_assert(0);
@@ -989,33 +1000,45 @@ static void freeobj (lua_State *L, GCObject *o) {
 ** collection cycle. Return where to continue the traversal or NULL if
 ** list is finished. ('*countout' gets the number of elements traversed.)
 */
+
+/// @brief 释放dead对象, 将非 dead 对象标记为 currentwhite 
+/// @param L 
+/// @param p 
+/// @param countin 每步扫描最大数量
+/// @param countout 遍历的元素数
+/// @return 
 static GCObject **sweeplist (lua_State *L, GCObject **p, int countin,
                              int *countout) {
-  global_State *g = G(L);
-  int ow = otherwhite(g);
+  global_State *g = G(L);//获取全局状态机
+  int ow = otherwhite(g);//非当前白
   int i;
-  int white = luaC_white(g);  /* current white */
-  for (i = 0; *p != NULL && i < countin; i++) {
-    GCObject *curr = *p;
+  int white = luaC_white(g);  /* current white *///得到当前白
+  for (i = 0; *p != NULL && i < countin; i++) {//循环遍历
+    GCObject *curr = *p;//得到当前的GCObject
     int marked = curr->marked;
-    if (isdeadm(ow, marked)) {  /* is 'curr' dead? */
-      *p = curr->next;  /* remove 'curr' from list */
-      freeobj(L, curr);  /* erase 'curr' */
+    if (isdeadm(ow, marked)) {  /* is 'curr' dead? *///如果是死亡状态
+      *p = curr->next;  /* remove 'curr' from list *///移除当前列表
+      freeobj(L, curr);  /* erase 'curr' *///进行释放
     }
     else {  /* change mark to 'white' */
-      curr->marked = cast_byte((marked & ~maskgcbits) | white);
-      p = &curr->next;  /* go to next element */
+      curr->marked = cast_byte((marked & ~maskgcbits) | white);//如果不是dead状态，就给标记处当前白
+      p = &curr->next;  /* go to next element *///移动到下一个元素
     }
   }
   if (countout)
-    *countout = i;  /* number of elements traversed */
-  return (*p == NULL) ? NULL : p;
+    *countout = i;  /* number of elements traversed *///遍历了多少个
+  return (*p == NULL) ? NULL : p;//如果list遍历已经完成那就返回Null
 }
 
 
 /*
 ** sweep a list until a live object (or end of list)
 */
+
+/// @brief  调用 sweeplist, sweep 过程中把非 dead 对象标记为 currentwhite 
+/// @param L 
+/// @param p 
+/// @return 
 static GCObject **sweeptolive (lua_State *L, GCObject **p) {
   GCObject **old = p;
   do {
@@ -1036,12 +1059,16 @@ static GCObject **sweeptolive (lua_State *L, GCObject **p) {
 /*
 ** If possible, shrink string table.
 */
+
+/// @brief 如果可能，收缩字符串表
+/// @param L 
+/// @param g 
 static void checkSizes (lua_State *L, global_State *g) {
-  if (!g->gcemergency) {
-    if (g->strt.nuse < g->strt.size / 4) {  /* string table too big? */
-      l_mem olddebt = g->GCdebt;
+  if (!g->gcemergency) {//不是紧急回收
+    if (g->strt.nuse < g->strt.size / 4) {  /* string table too big? *///字符串太大 里面的元素大于hash表的4分之一
+      l_mem olddebt = g->GCdebt;//得到需要回收的量
       luaS_resize(L, g->strt.size / 2);
-      g->GCestimate += g->GCdebt - olddebt;  /* correct estimate */
+      g->GCestimate += g->GCdebt - olddebt;  /* correct estimate *///计算存活下来的数量
     }
   }
 }
@@ -1051,50 +1078,57 @@ static void checkSizes (lua_State *L, global_State *g) {
 ** Get the next udata to be finalized from the 'tobefnz' list, and
 ** link it back into the 'allgc' list.
 */
+
+/// @brief 将tobefnz链表中的对象放到allgc链表中
+/// @param g 
+/// @return 
 static GCObject *udata2finalize (global_State *g) {
-  GCObject *o = g->tobefnz;  /* get first element */
+  GCObject *o = g->tobefnz;  /* get first element *///得到终结列表的第一个对象
   lua_assert(tofinalize(o));
-  g->tobefnz = o->next;  /* remove it from 'tobefnz' list */
-  o->next = g->allgc;  /* return it to 'allgc' list */
-  g->allgc = o;
-  resetbit(o->marked, FINALIZEDBIT);  /* object is "normal" again */
-  if (issweepphase(g))
-    makewhite(g, o);  /* "sweep" object */
-  else if (getage(o) == G_OLD1)
-    g->firstold1 = o;  /* it is the first OLD1 object in the list */
+  g->tobefnz = o->next;  /* remove it from 'tobefnz' list *///把对象移除g->tobefnz链表
+  o->next = g->allgc;  /* return it to 'allgc' list *///放到g->allgc链表中
+  g->allgc = o;//到了这一步那么o就放到g->allgc链表当中了
+  resetbit(o->marked, FINALIZEDBIT);  /* object is "normal" again *///标记userdata不在被引用
+  if (issweepphase(g))//扫描阶段
+    makewhite(g, o);  /* "sweep" object *///擦除所有的颜色位,保留当前的白色位
+  else if (getage(o) == G_OLD1)//年龄是G_OLD1
+    g->firstold1 = o;  /* it is the first OLD1 object in the list *///设置成列表中的第一个 OLD1 对象
   return o;
 }
 
-
+/// @brief 对于可挂起的过程，会保存上下文环境和 cotinuation-function，然后使用 luaD_call 调用目标函数；对于不可挂起的过程，则使用 luaD_callnoyield 去调用目标函数
+/// @param L 
+/// @param ud 
 static void dothecall (lua_State *L, void *ud) {
   UNUSED(ud);
   luaD_callnoyield(L, L->top - 2, 0);
 }
 
-
+/// @brief 每次调用一个需要回收的 userdata 的 gc 元方法
+/// @param L 
 static void GCTM (lua_State *L) {
-  global_State *g = G(L);
+  global_State *g = G(L);//获取全局状态机
   const TValue *tm;
   TValue v;
-  lua_assert(!g->gcemergency);
-  setgcovalue(L, &v, udata2finalize(g));
-  tm = luaT_gettmbyobj(L, &v, TM_GC);
-  if (!notm(tm)) {  /* is there a finalizer? */
+  lua_assert(!g->gcemergency);//不能是紧急回收状态
+  setgcovalue(L, &v, udata2finalize(g));//将tobefnz链表中的对象放到allgc链表中
+  tm = luaT_gettmbyobj(L, &v, TM_GC);//获取gc元方法
+  if (!notm(tm)) {  /* is there a finalizer? *///不是nil
     int status;
-    lu_byte oldah = L->allowhook;
-    int oldgcstp  = g->gcstp;
-    g->gcstp |= GCSTPGC;  /* avoid GC steps */
-    L->allowhook = 0;  /* stop debug hooks during GC metamethod */
-    setobj2s(L, L->top++, tm);  /* push finalizer... */
-    setobj2s(L, L->top++, &v);  /* ... and its argument */
-    L->ci->callstatus |= CIST_FIN;  /* will run a finalizer */
-    status = luaD_pcall(L, dothecall, NULL, savestack(L, L->top - 2), 0);
-    L->ci->callstatus &= ~CIST_FIN;  /* not running a finalizer anymore */
-    L->allowhook = oldah;  /* restore hooks */
-    g->gcstp = oldgcstp;  /* restore state */
-    if (l_unlikely(status != LUA_OK)) {  /* error while running __gc? */
-      luaE_warnerror(L, "__gc");
-      L->top--;  /* pops error object */
+    lu_byte oldah = L->allowhook;//暂存hook状态
+    int oldgcstp  = g->gcstp;//暂存gcstep状态
+    g->gcstp |= GCSTPGC;  /* avoid GC steps *///把GC停下来,好避开 GC steps 
+    L->allowhook = 0;  /* stop debug hooks during GC metamethod *///在 GC 元方法期间停止debug hook
+    setobj2s(L, L->top++, tm);  /* push finalizer... *///push gc 元方法
+    setobj2s(L, L->top++, &v);  /* ... and its argument *///push 参数
+    L->ci->callstatus |= CIST_FIN;  /* will run a finalizer *///调用状态增加CIST_FIN状态
+    status = luaD_pcall(L, dothecall, NULL, savestack(L, L->top - 2), 0);//在调用不出错的情况下，和lua_call行为一模一样,其处理方法主要取决于第四个参数 errfunc, 如果errfunc为0，则lua_pcall直接把错误信息通过lua_pushstring压栈，然后返回；然后errfunc不为0，则自动调用（L, errfunc）(errmsg)，errmsg表示原始出错信息
+    L->ci->callstatus &= ~CIST_FIN;  /* not running a finalizer anymore *///调用状态减去CIST_FIN状态
+    L->allowhook = oldah;  /* restore hooks *///还原hook状态
+    g->gcstp = oldgcstp;  /* restore state *///还原gcstp状态
+    if (l_unlikely(status != LUA_OK)) {  /* error while running __gc? *///如果发生了错误
+      luaE_warnerror(L, "__gc");//那么就告警
+      L->top--;  /* pops error object *///弹出错误对象
     }
   }
 }
@@ -1103,11 +1137,16 @@ static void GCTM (lua_State *L) {
 /*
 ** Call a few finalizers
 */
+
+/// @brief 调用最多n个准备终结的对象
+/// @param L 
+/// @param n 
+/// @return 
 static int runafewfinalizers (lua_State *L, int n) {
   global_State *g = G(L);
   int i;
   for (i = 0; i < n && g->tobefnz; i++)
-    GCTM(L);  /* call one finalizer */
+    GCTM(L);  /* call one finalizer *///调用userdata的元方法
   return i;
 }
 
@@ -1115,6 +1154,9 @@ static int runafewfinalizers (lua_State *L, int n) {
 /*
 ** call all pending finalizers
 */
+
+/// @brief 调用所有准备终结的对象
+/// @param L 
 static void callallpendingfinalizers (lua_State *L) {
   global_State *g = G(L);
   while (g->tobefnz)
@@ -1125,6 +1167,10 @@ static void callallpendingfinalizers (lua_State *L) {
 /*
 ** find last 'next' field in list 'p' list (to add elements in its end)
 */
+
+/// @brief 在list p中找到最后一个字段的下一个位置，好在末尾进行元素添加
+/// @param p 
+/// @return 
 static GCObject **findlast (GCObject **p) {
   while (*p != NULL)
     p = &(*p)->next;
@@ -1139,19 +1185,23 @@ static GCObject **findlast (GCObject **p) {
 ** don't need to be traversed. In incremental mode, 'finobjold1' is NULL,
 ** so the whole list is traversed.)
 */
+
+/// @brief 将带__gc函数的需要回收的(白色)对象放到global_State.tobefnz表中,留待以后清理
+/// @param g 
+/// @param all 
 static void separatetobefnz (global_State *g, int all) {
   GCObject *curr;
-  GCObject **p = &g->finobj;
-  GCObject **lastnext = findlast(&g->tobefnz);
-  while ((curr = *p) != g->finobjold1) {  /* traverse all finalizable objects */
+  GCObject **p = &g->finobj;//找到带有_gcH函数的链表
+  GCObject **lastnext = findlast(&g->tobefnz);//找到最后一个字段的下一个位置
+  while ((curr = *p) != g->finobjold1) {  /* traverse all finalizable objects *///遍历所有带__gc函数的对象
     lua_assert(tofinalize(curr));
-    if (!(iswhite(curr) || all))  /* not being collected? */
-      p = &curr->next;  /* don't bother with it */
+    if (!(iswhite(curr) || all))  /* not being collected? *///如果不是白色或者全部状态
+      p = &curr->next;  /* don't bother with it *///选择下一个
     else {
-      if (curr == g->finobjsur)  /* removing 'finobjsur'? */
-        g->finobjsur = curr->next;  /* correct it */
-      *p = curr->next;  /* remove 'curr' from 'finobj' list */
-      curr->next = *lastnext;  /* link at the end of 'tobefnz' list */
+      if (curr == g->finobjsur)  /* removing 'finobjsur'? *///移除掉当前带有_gc函数的生存对象
+        g->finobjsur = curr->next;  /* correct it *///指针指向下一个,等价于从g->finobjsur移除curr
+      *p = curr->next;  /* remove 'curr' from 'finobj' list *///指针指向下一个,等价于从g->finobj移除curr
+      curr->next = *lastnext;  /* link at the end of 'tobefnz' list *///这句话加下面两家等价于把对象放到global_State.tobefnz屁股后面
       *lastnext = curr;
       lastnext = &curr->next;
     }
@@ -1162,6 +1212,10 @@ static void separatetobefnz (global_State *g, int all) {
 /*
 ** If pointer 'p' points to 'o', move it to the next element.
 */
+
+/// @brief 如果指针p指向o，则将其移动到下一个元素。
+/// @param p 
+/// @param o 
 static void checkpointer (GCObject **p, GCObject *o) {
   if (o == *p)
     *p = o->next;
@@ -1172,6 +1226,10 @@ static void checkpointer (GCObject **p, GCObject *o) {
 ** Correct pointers to objects inside 'allgc' list when
 ** object 'o' is being removed from the list.
 */
+
+/// @brief  纠正指针
+/// @param g 
+/// @param o 
 static void correctpointers (global_State *g, GCObject *o) {
   checkpointer(&g->survival, o);
   checkpointer(&g->old1, o);
@@ -1184,27 +1242,34 @@ static void correctpointers (global_State *g, GCObject *o) {
 ** if object 'o' has a finalizer, remove it from 'allgc' list (must
 ** search the list to find it) and link it in 'finobj' list.
 */
+
+/// @brief 当对一个对像设置gc函数时, 例如setmetatable(tbl, {__gc == function() end}), 
+// LuaVM会调用luaC_checkfinalizer函数将对像tbl从global_State.allgc链表上移除,
+// 并将其添加到global_State.finobj上(ps.从这里可以得出一个结论,gc元表设置越早效率越高,因为这一操作需要遍历才实现).
+/// @param L 
+/// @param o 
+/// @param mt 
 void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt) {
-  global_State *g = G(L);
-  if (tofinalize(o) ||                 /* obj. is already marked... */
-      gfasttm(g, mt, TM_GC) == NULL ||    /* or has no finalizer... */
+  global_State *g = G(L);//获取全局状态机
+  if (tofinalize(o) ||                 /* obj. is already marked... *///已经进行了标记
+      gfasttm(g, mt, TM_GC) == NULL ||    /* or has no finalizer... *///当不含gc元方法或者是关闭步骤的时候
       (g->gcstp & GCSTPCLS))                   /* or closing state? */
-    return;  /* nothing to be done */
-  else {  /* move 'o' to 'finobj' list */
+    return;  /* nothing to be done *///啥也不做
+  else {  /* move 'o' to 'finobj' list *///把o从g->finobj进行移除
     GCObject **p;
-    if (issweepphase(g)) {
-      makewhite(g, o);  /* "sweep" object 'o' */
-      if (g->sweepgc == &o->next)  /* should not remove 'sweepgc' object */
-        g->sweepgc = sweeptolive(L, g->sweepgc);  /* change 'sweepgc' */
+    if (issweepphase(g)) {//是不是扫描阶段
+      makewhite(g, o);  /* "sweep" object 'o' *///擦除所有的颜色位,保留当前的白色位
+      if (g->sweepgc == &o->next)  /* should not remove 'sweepgc' object *///不应删除扫描对象
+        g->sweepgc = sweeptolive(L, g->sweepgc);  /* change 'sweepgc' *///标记为当前白
     }
     else
       correctpointers(g, o);
     /* search for pointer pointing to 'o' */
-    for (p = &g->allgc; *p != o; p = &(*p)->next) { /* empty */ }
-    *p = o->next;  /* remove 'o' from 'allgc' list */
-    o->next = g->finobj;  /* link it in 'finobj' list */
+    for (p = &g->allgc; *p != o; p = &(*p)->next) { /* empty */ }//这步是从g->allgc里面找到o
+    *p = o->next;  /* remove 'o' from 'allgc' list *///把o从allgc移除
+    o->next = g->finobj;  /* link it in 'finobj' list *///扔到finobj链表
     g->finobj = o;
-    l_setbit(o->marked, FINALIZEDBIT);  /* mark it as such */
+    l_setbit(o->marked, FINALIZEDBIT);  /* mark it as such *///标记
   }
 }
 
@@ -1213,11 +1278,11 @@ void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt) {
 
 /*
 ** {======================================================
-** Generational Collector
+** Generational Collector //分代gc
 ** =======================================================
 */
 
-static void setpause (global_State *g);
+static void setpause (global_State *g);//c语言前置声明
 
 
 /*
@@ -1226,26 +1291,30 @@ static void setpause (global_State *g);
 ** are now old---must be in a gray list. Everything else is not in a
 ** gray list. Open upvalues are also kept gray.
 */
+
+/// @brief  清除过期的对象，同时把所有对象存活的对象标记为G_OLD
+/// @param L 
+/// @param p 
 static void sweep2old (lua_State *L, GCObject **p) {
   GCObject *curr;
-  global_State *g = G(L);
-  while ((curr = *p) != NULL) {
-    if (iswhite(curr)) {  /* is 'curr' dead? */
-      lua_assert(isdead(g, curr));
-      *p = curr->next;  /* remove 'curr' from list */
-      freeobj(L, curr);  /* erase 'curr' */
+  global_State *g = G(L);//获取全局状态机
+  while ((curr = *p) != NULL) {//进行遍历
+    if (iswhite(curr)) {  /* is 'curr' dead? *///如果是白色的
+      lua_assert(isdead(g, curr));//其他白,说明肯定要被清除掉额
+      *p = curr->next;  /* remove 'curr' from list *///从p链表删除curr对象
+      freeobj(L, curr);  /* erase 'curr' *///释放curr
     }
-    else {  /* all surviving objects become old */
-      setage(curr, G_OLD);
-      if (curr->tt == LUA_VTHREAD) {  /* threads must be watched */
+    else {  /* all surviving objects become old *///把所有幸存的物体都变旧
+      setage(curr, G_OLD);//设置年龄为G_OLD
+      if (curr->tt == LUA_VTHREAD) {  /* threads must be watched *///如果是线程
         lua_State *th = gco2th(curr);
-        linkgclist(th, g->grayagain);  /* insert into 'grayagain' list */
+        linkgclist(th, g->grayagain);  /* insert into 'grayagain' list *///丢到grayagain链表
       }
-      else if (curr->tt == LUA_VUPVAL && upisopen(gco2upv(curr)))
-        set2gray(curr);  /* open upvalues are always gray */
+      else if (curr->tt == LUA_VUPVAL && upisopen(gco2upv(curr)))//如果是上值类型，并且是open状态的
+        set2gray(curr);  /* open upvalues are always gray *///上值必须设置成灰色
       else  /* everything else is black */
-        nw2black(curr);
-      p = &curr->next;  /* go to next element */
+        nw2black(curr);//其他的都是黑色
+      p = &curr->next;  /* go to next element *///下一个
     }
   }
 }
@@ -1262,6 +1331,14 @@ static void sweep2old (lua_State *L, GCObject **p) {
 ** here.  They will all be advanced in 'correctgraylist'. That function
 ** will also remove objects turned white here from any gray list.
 */
+
+/// @brief 从p开始到limit，如果该节点没有被mark过则清除，否则将age设置到下一状态
+/// @param L 
+/// @param g 
+/// @param p 
+/// @param limit 
+/// @param pfirstold1 
+/// @return 
 static GCObject **sweepgen (lua_State *L, global_State *g, GCObject **p,
                             GCObject *limit, GCObject **pfirstold1) {
   static const lu_byte nextage[] = {
@@ -1273,17 +1350,17 @@ static GCObject **sweepgen (lua_State *L, global_State *g, GCObject **p,
     G_TOUCHED1,  /* from G_TOUCHED1 (do not change) */
     G_TOUCHED2   /* from G_TOUCHED2 (do not change) */
   };
-  int white = luaC_white(g);
+  int white = luaC_white(g);//获取当前白
   GCObject *curr;
-  while ((curr = *p) != limit) {
-    if (iswhite(curr)) {  /* is 'curr' dead? */
-      lua_assert(!isold(curr) && isdead(g, curr));
-      *p = curr->next;  /* remove 'curr' from list */
-      freeobj(L, curr);  /* erase 'curr' */
+  while ((curr = *p) != limit) {//遍历
+    if (iswhite(curr)) {  /* is 'curr' dead? *///如果是白色
+      lua_assert(!isold(curr) && isdead(g, curr));//如果不是旧的并且已经死亡状态
+      *p = curr->next;  /* remove 'curr' from list *///从p链表中进行移除
+      freeobj(L, curr);  /* erase 'curr' *///释放空间
     }
-    else {  /* correct mark and age */
-      if (getage(curr) == G_NEW) {  /* new objects go back to white */
-        int marked = curr->marked & ~maskgcbits;  /* erase GC bits */
+    else {  /* correct mark and age */ //进行回收标记和年龄设置
+      if (getage(curr) == G_NEW) {  /* new objects go back to white *///新对象恢复为白色
+        int marked = curr->marked & ~maskgcbits;  /* erase GC bits *///释放gc bit位 就是把gc bit位都变成0
         curr->marked = cast_byte(marked | G_SURVIVAL | white);
       }
       else {  /* all other objects will be old, and so keep their color */

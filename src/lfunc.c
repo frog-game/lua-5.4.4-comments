@@ -179,7 +179,8 @@ void luaF_newtbcupval (lua_State *L, StkId level) {
   L->tbclist = level;
 }
 
-
+/// @brief 把当前UpVal从链表移除
+/// @param uv 
 void luaF_unlinkupval (UpVal *uv) {
   lua_assert(upisopen(uv));
   *uv->u.open.previous = uv->u.open.next;

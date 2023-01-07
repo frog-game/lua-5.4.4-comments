@@ -82,6 +82,10 @@ static void tablerehash (TString **vect, int osize, int nsize) {
 ** (This can degrade performance, but any non-zero size should work
 ** correctly.)
 */
+
+/// @brief 进行hash扩容
+/// @param L 
+/// @param nsize 
 void luaS_resize (lua_State *L, int nsize) {
   stringtable *tb = &G(L)->strt;
   int osize = tb->size;
@@ -160,7 +164,9 @@ TString *luaS_createlngstrobj (lua_State *L, size_t l) {
   return ts;
 }
 
-
+/// @brief 从hash进行移除
+/// @param L 
+/// @param ts 
 void luaS_remove (lua_State *L, TString *ts) {
   stringtable *tb = &G(L)->strt;
   TString **p = &tb->hash[lmod(ts->hash, tb->size)];

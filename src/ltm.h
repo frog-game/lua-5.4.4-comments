@@ -20,7 +20,7 @@
 typedef enum {
   TM_INDEX,//访问表中不存在的值
   TM_NEWINDEX,//对表中不存在的值进行赋值
-  TM_GC,//当对象被gc回收时将会调用
+  TM_GC,//当对象被gc回收时将会调用gc元方法
   TM_MODE,//弱引用表
   TM_LEN,
   TM_EQ,  /* last tag method with fast access */
