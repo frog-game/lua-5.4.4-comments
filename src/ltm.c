@@ -24,9 +24,10 @@
 #include "ltm.h"
 #include "lvm.h"
 
-
+/// @brief usedata名字
 static const char udatatypename[] = "userdata";
 
+/// @brief lua类型名字
 LUAI_DDEF const char *const luaT_typenames_[LUA_TOTALTYPES] = {
   "no value",
   "nil", "boolean", udatatypename, "number",
@@ -34,7 +35,8 @@ LUAI_DDEF const char *const luaT_typenames_[LUA_TOTALTYPES] = {
   "upvalue", "proto" /* these last cases are used for tests only */
 };
 
-
+/// @brief 初始化元方法名字
+/// @param L 
 void luaT_init (lua_State *L) {
   static const char *const luaT_eventname[] = {  /* ORDER TM */
     "__index", "__newindex",
@@ -48,7 +50,7 @@ void luaT_init (lua_State *L) {
   int i;
   for (i=0; i<TM_N; i++) {
     G(L)->tmname[i] = luaS_new(L, luaT_eventname[i]);
-    luaC_fix(L, obj2gco(G(L)->tmname[i]));  /* never collect these names */
+    luaC_fix(L, obj2gco(G(L)->tmname[i]));  /* never collect these names *///设置永不回收
   }
 }
 
@@ -57,17 +59,27 @@ void luaT_init (lua_State *L) {
 ** function to be used with macro "fasttm": optimized for absence of
 ** tag methods
 */
+
+/// @brief 根据 元方法名ename 获取 元表events 的元方法，若获取不到则根据元方法标识event设置 元方法events的flags
+/// @param events 
+/// @param event 
+/// @param ename 元方法名
+/// @return 
 const TValue *luaT_gettm (Table *events, TMS event, TString *ename) {
   const TValue *tm = luaH_getshortstr(events, ename);
   lua_assert(event <= TM_EQ);
-  if (notm(tm)) {  /* no tag method? */
+  if (notm(tm)) {  /* no tag method? *///若没找到元方法，则标记这个元表的flags，以便下次访问的时候节省查找耗时
     events->flags |= cast_byte(1u<<event);  /* cache this fact */
     return NULL;
   }
   else return tm;
 }
 
-
+/// @brief 根据 元方法标识event 获取 对象o 的元方法
+/// @param L 
+/// @param o 
+/// @param event 
+/// @return 
 const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
   Table *mt;
   switch (ttype(o)) {
@@ -78,7 +90,7 @@ const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
       mt = uvalue(o)->metatable;
       break;
     default:
-      mt = G(L)->mt[ttype(o)];
+      mt = G(L)->mt[ttype(o)];////非table非userdata类型的元表统统在global_State的mt数组内
   }
   return (mt ? luaH_getshortstr(mt, G(L)->tmname[event]) : &G(L)->nilvalue);
 }
@@ -88,6 +100,11 @@ const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
 ** Return the name of the type of an object. For tables and userdata
 ** with metatable, use their '__name' metafield, if present.
 */
+
+/// @brief 返回对象类型的名称。对于带有元表的表和用户数据，请使用其__name元字段（如果存在）
+/// @param L 
+/// @param o 
+/// @return 
 const char *luaT_objtypename (lua_State *L, const TValue *o) {
   Table *mt;
   if ((ttistable(o) && (mt = hvalue(o)->metatable) != NULL) ||
@@ -99,7 +116,12 @@ const char *luaT_objtypename (lua_State *L, const TValue *o) {
   return ttypename(ttype(o));  /* else use standard type name */
 }
 
-
+/// @brief 通过fasttm或luaT_gettmbyobj得到元方法后，判断它是否为函数，如果为函数则调用luaT_callTM
+/// @param L 
+/// @param f function
+/// @param p1 1号argument
+/// @param p2 2号argument
+/// @param p3 3号argument
 void luaT_callTM (lua_State *L, const TValue *f, const TValue *p1,
                   const TValue *p2, const TValue *p3) {
   StkId func = L->top;
@@ -115,7 +137,12 @@ void luaT_callTM (lua_State *L, const TValue *f, const TValue *p1,
     luaD_callnoyield(L, func, 0);
 }
 
-
+/// @brief 将元方法,第一,第二操作数先后压栈,再调用并取因返回值
+/// @param L 
+/// @param f function
+/// @param p1 1号argument
+/// @param p2 2号argument
+/// @param res 栈地址
 void luaT_callTMres (lua_State *L, const TValue *f, const TValue *p1,
                      const TValue *p2, StkId res) {
   ptrdiff_t result = savestack(L, res);
@@ -136,10 +163,10 @@ void luaT_callTMres (lua_State *L, const TValue *f, const TValue *p1,
 
 static int callbinTM (lua_State *L, const TValue *p1, const TValue *p2,
                       StkId res, TMS event) {
-  const TValue *tm = luaT_gettmbyobj(L, p1, event);  /* try first operand */
-  if (notm(tm))
-    tm = luaT_gettmbyobj(L, p2, event);  /* try second operand */
-  if (notm(tm)) return 0;
+  const TValue *tm = luaT_gettmbyobj(L, p1, event);  /* try first operand *///尝试第一个操作数
+  if (notm(tm))//如果是nil
+    tm = luaT_gettmbyobj(L, p2, event);  /* try second operand *///尝试第二个操作数
+  if (notm(tm)) return 0;//如果是nil
   luaT_callTMres(L, tm, p1, p2, res);
   return 1;
 }

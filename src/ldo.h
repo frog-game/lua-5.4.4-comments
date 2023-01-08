@@ -31,8 +31,11 @@
 #define luaD_checkstack(L,n)	luaD_checkstackaux(L,n,(void)0,(void)0)
 
 
+// 这两个宏来定位栈上的地址，是因为数据栈的内存地址是会随着数据栈的大小而变化。保存地址是不可能的，而应该记住一个相对量。savestack 和restorestack 两个宏就是做这个工作的。
 
+// 计算出p和栈的绝对偏移
 #define savestack(L,p)		((char *)(p) - (char *)L->stack)
+// 从绝对偏移返回栈地址
 #define restorestack(L,n)	((StkId)((char *)L->stack + (n)))
 
 

@@ -194,80 +194,96 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 ** has extra descriptions in the notes after the enumeration.
 */
 
+/// @brief Lua虚拟机采用定长指令，每条指令占4个字节
 typedef enum {
 /*----------------------------------------------------------------------
   name		args	description
 ------------------------------------------------------------------------*/
-OP_MOVE,/*	A B	R[A] := R[B]					*/
-OP_LOADI,/*	A sBx	R[A] := sBx					*/
-OP_LOADF,/*	A sBx	R[A] := (lua_Number)sBx				*/
-OP_LOADK,/*	A Bx	R[A] := K[Bx]					*/
-OP_LOADKX,/*	A	R[A] := K[extra arg]				*/
-OP_LOADFALSE,/*	A	R[A] := false					*/
-OP_LFALSESKIP,/*A	R[A] := false; pc++	(*)			*/
-OP_LOADTRUE,/*	A	R[A] := true					*/
-OP_LOADNIL,/*	A B	R[A], R[A+1], ..., R[A+B] := nil		*/
-OP_GETUPVAL,/*	A B	R[A] := UpValue[B]				*/
-OP_SETUPVAL,/*	A B	UpValue[B] := R[A]				*/
+/*赋值加载指令 begin*/
+OP_MOVE,/*	A B	R[A] := R[B]					*///将B寄存器的值赋值给A寄存器
+OP_LOADI,/*	A sBx	R[A] := sBx					*///加载整型立即数到寄存器
+OP_LOADF,/*	A sBx	R[A] := (lua_Number)sBx				*///加载浮点立即数到寄存器
+OP_LOADK,/*	A Bx	R[A] := K[Bx]					*///加载常量立即数到寄存器
+OP_LOADKX,/*	A	R[A] := K[extra arg]				*///加载常量,常量从下一条OP_EXTRAARG指令得到
+OP_LOADFALSE,/*	A	R[A] := false					*///加载false到寄存器
+OP_LFALSESKIP,/*A	R[A] := false; pc++	(*)			*///加载false到寄存器,同时跳过下一条指令
+OP_LOADTRUE,/*	A	R[A] := true					*///加载true到寄存器
+OP_LOADNIL,/*	A B	R[A], R[A+1], ..., R[A+B] := nil		*///加载nil到一批寄存器
+OP_GETUPVAL,/*	A B	R[A] := UpValue[B]				*/////读取一个上值到寄存器
+OP_SETUPVAL,/*	A B	UpValue[B] := R[A]				*///写一个寄存器值到上值
+/*赋值加载指令 end*/
 
-OP_GETTABUP,/*	A B C	R[A] := UpValue[B][K[C]:string]			*/
-OP_GETTABLE,/*	A B C	R[A] := R[B][R[C]]				*/
-OP_GETI,/*	A B C	R[A] := R[B][C]					*/
-OP_GETFIELD,/*	A B C	R[A] := R[B][K[C]:string]			*/
+/*表操作 begin*/
+OP_GETTABUP,/*	A B C	R[A] := UpValue[B][K[C]:string]			*///从表取值到寄存器,标在upvalue
+OP_GETTABLE,/*	A B C	R[A] := R[B][R[C]]				*///从表取值到寄存器
+OP_GETI,/*	A B C	R[A] := R[B][C]					*///从表取整型字段值给寄存器
+OP_GETFIELD,/*	A B C	R[A] := R[B][K[C]:string]			*///从表取字符串字段值给寄存器
 
-OP_SETTABUP,/*	A B C	UpValue[A][K[B]:string] := RK(C)		*/
-OP_SETTABLE,/*	A B C	R[A][R[B]] := RK(C)				*/
-OP_SETI,/*	A B C	R[A][B] := RK(C)				*/
-OP_SETFIELD,/*	A B C	R[A][K[B]:string] := RK(C)			*/
+OP_SETTABUP,/*	A B C	UpValue[A][K[B]:string] := RK(C)		*///设置寄存器值给表元素,表在upvalue
+OP_SETTABLE,/*	A B C	R[A][R[B]] := RK(C)				*///设置寄存器值给标元素
+OP_SETI,/*	A B C	R[A][B] := RK(C)				*///向表设置整型字段值
+OP_SETFIELD,/*	A B C	R[A][K[B]:string] := RK(C)			*///向表设置字符串字段值
 
-OP_NEWTABLE,/*	A B C k	R[A] := {}					*/
+OP_NEWTABLE,/*	A B C k	R[A] := {}					*///新建一个表
 
-OP_SELF,/*	A B C	R[A+1] := R[B]; R[A] := R[B][RK(C):string]	*/
+OP_SELF,/*	A B C	R[A+1] := R[B]; R[A] := R[B][RK(C):string]	*///准备一个对象方法的调用
+/*表操作 end*/
 
-OP_ADDI,/*	A B sC	R[A] := R[B] + sC				*/
 
-OP_ADDK,/*	A B C	R[A] := R[B] + K[C]:number			*/
-OP_SUBK,/*	A B C	R[A] := R[B] - K[C]:number			*/
-OP_MULK,/*	A B C	R[A] := R[B] * K[C]:number			*/
-OP_MODK,/*	A B C	R[A] := R[B] % K[C]:number			*/
-OP_POWK,/*	A B C	R[A] := R[B] ^ K[C]:number			*/
-OP_DIVK,/*	A B C	R[A] := R[B] / K[C]:number			*/
-OP_IDIVK,/*	A B C	R[A] := R[B] // K[C]:number			*/
+/*算术和位操作 begin*/
+OP_ADDI,/*	A B sC	R[A] := R[B] + sC				*///立即数加
 
-OP_BANDK,/*	A B C	R[A] := R[B] & K[C]:integer			*/
-OP_BORK,/*	A B C	R[A] := R[B] | K[C]:integer			*/
-OP_BXORK,/*	A B C	R[A] := R[B] ~ K[C]:integer			*/
+OP_ADDK,/*	A B C	R[A] := R[B] + K[C]:number			*///常量加
+OP_SUBK,/*	A B C	R[A] := R[B] - K[C]:number			*///常量减
+OP_MULK,/*	A B C	R[A] := R[B] * K[C]:number			*///常量乘
+OP_MODK,/*	A B C	R[A] := R[B] % K[C]:number			*///常量模
+OP_POWK,/*	A B C	R[A] := R[B] ^ K[C]:number			*///常量求幂
+OP_DIVK,/*	A B C	R[A] := R[B] / K[C]:number			*///常量除
+OP_IDIVK,/*	A B C	R[A] := R[B] // K[C]:number			*///常量整除
 
-OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*/
-OP_SHLI,/*	A B sC	R[A] := sC << R[B]				*/
+OP_BANDK,/*	A B C	R[A] := R[B] & K[C]:integer			*///常量与
+OP_BORK,/*	A B C	R[A] := R[B] | K[C]:integer			*///常量或
+OP_BXORK,/*	A B C	R[A] := R[B] ~ K[C]:integer			*///常量异或
 
-OP_ADD,/*	A B C	R[A] := R[B] + R[C]				*/
-OP_SUB,/*	A B C	R[A] := R[B] - R[C]				*/
-OP_MUL,/*	A B C	R[A] := R[B] * R[C]				*/
-OP_MOD,/*	A B C	R[A] := R[B] % R[C]				*/
-OP_POW,/*	A B C	R[A] := R[B] ^ R[C]				*/
-OP_DIV,/*	A B C	R[A] := R[B] / R[C]				*/
-OP_IDIV,/*	A B C	R[A] := R[B] // R[C]				*/
+OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*///立即数左移
+OP_SHLI,/*	A B sC	R[A] := sC << R[B]				*///立即数右移
 
-OP_BAND,/*	A B C	R[A] := R[B] & R[C]				*/
-OP_BOR,/*	A B C	R[A] := R[B] | R[C]				*/
-OP_BXOR,/*	A B C	R[A] := R[B] ~ R[C]				*/
-OP_SHL,/*	A B C	R[A] := R[B] << R[C]				*/
-OP_SHR,/*	A B C	R[A] := R[B] >> R[C]				*/
+OP_ADD,/*	A B C	R[A] := R[B] + R[C]				*///加
+OP_SUB,/*	A B C	R[A] := R[B] - R[C]				*///减
+OP_MUL,/*	A B C	R[A] := R[B] * R[C]				*///乘
+OP_MOD,/*	A B C	R[A] := R[B] % R[C]				*///模
+OP_POW,/*	A B C	R[A] := R[B] ^ R[C]				*///幂
+OP_DIV,/*	A B C	R[A] := R[B] / R[C]				*///浮点除
+OP_IDIV,/*	A B C	R[A] := R[B] // R[C]				*///整除
 
+OP_BAND,/*	A B C	R[A] := R[B] & R[C]				*///位与
+OP_BOR,/*	A B C	R[A] := R[B] | R[C]				*///位或
+OP_BXOR,/*	A B C	R[A] := R[B] ~ R[C]				*///位异或
+OP_SHL,/*	A B C	R[A] := R[B] << R[C]				*///左移
+OP_SHR,/*	A B C	R[A] := R[B] >> R[C]				*///右移
+
+/*---------------对上一条失败的算术运算尝试元方法 begin*/
 OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]	(*)	*/
 OP_MMBINI,/*	A sB C k	call C metamethod over R[A] and sB	*/
 OP_MMBINK,/*	A B C k		call C metamethod over R[A] and K[B]	*/
+/*---------------对上一条失败的算术运算尝试元方法 end*/
 
-OP_UNM,/*	A B	R[A] := -R[B]					*/
-OP_BNOT,/*	A B	R[A] := ~R[B]					*/
-OP_NOT,/*	A B	R[A] := not R[B]				*/
-OP_LEN,/*	A B	R[A] := #R[B] (length operator)			*/
+OP_UNM,/*	A B	R[A] := -R[B]					*///一元减
+OP_BNOT,/*	A B	R[A] := ~R[B]					*///位非
+/*算术和位操作 end*/
 
-OP_CONCAT,/*	A B	R[A] := R[A].. ... ..R[A + B - 1]		*/
+OP_NOT,/*	A B	R[A] := not R[B]				*///逻辑取反
 
+/*其他操作 begin*/
+OP_LEN,/*	A B	R[A] := #R[B] (length operator)			*///取长度
+OP_CONCAT,/*	A B	R[A] := R[A].. ... ..R[A + B - 1]		*///拼接对象
+/*其他操作 end*/
+
+/*to- begin*/
 OP_CLOSE,/*	A	close all upvalues >= R[A]			*/
 OP_TBC,/*	A	mark variable A "to be closed"			*/
+/*其他操作 end*/
+
 OP_JMP,/*	sJ	pc += sJ					*/
 OP_EQ,/*	A B k	if ((R[A] == R[B]) ~= k) then pc++		*/
 OP_LT,/*	A B k	if ((R[A] <  R[B]) ~= k) then pc++		*/

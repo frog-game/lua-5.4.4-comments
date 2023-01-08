@@ -618,7 +618,7 @@ static int traverseephemeron (global_State *g, Table *h, int inv) {
 /// @brief 遍历strong key, strong value情况
 //    1. 标记 数组部分
 //       对value进行标记
-//    2. node part
+//    2.hash 部分
 //       value is nil: 移除它
 //       value is not nil: 标记 key, 标记 value
 /// @param g 
@@ -646,7 +646,7 @@ static void traversestrongtable (global_State *g, Table *h) {
 //    若 gc 处在 GCSpropagate 阶段, 并且g->gray不为空 将 weak table 加入到 g->grayagain 链表中, 在 atomic phase 再次访问. 
 //    否则按下面的规则添加到对应 list:
 //    1. 若table数组部分中有元素, 并且是atomic phase阶段 加入到 g->weak list.
-//     若table数组部分中没有元素 并且不是atomic phase阶段 加入到 g->grayagain list.
+//       若table数组部分中没有元素 并且不是atomic phase阶段 加入到 g->grayagain list.
 //    2. table hash部分
 //      1) val is nil: 移除它
 //      2) val is not nil: 标记 key, 若 value is 白色 (且不为不可回收对象), 
@@ -669,12 +669,12 @@ static void traversestrongtable (global_State *g, Table *h) {
 //  d. strong key, strong value: 
 //    1. 标记 数组部分
 //       对value进行标记
-//    2. node part
+//    2. hash 部分
 //       value is nil: 移除它
 //       value is not nil: 标记 key, 标记 value
 /// @param g 
 /// @param h 
-/// @return table 内存大小
+/// @return 返回工作单元数量
 static lu_mem traversetable (global_State *g, Table *h) {
   const char *weakkey, *weakvalue;
   const TValue *mode = gfasttm(g, h->metatable, TM_MODE);//从元方法中获取弱表信息
@@ -692,7 +692,7 @@ static lu_mem traversetable (global_State *g, Table *h) {
   }
   else  /* not weak *///strong key, strong value
     traversestrongtable(g, h);// 遍历strong key, strong value情况
-  return 1 + h->alimit + 2 * allocsizenode(h);//返回table内存大小
+  return 1 + h->alimit + 2 * allocsizenode(h);//返回工作单元数量
 }
 
 /// @brief 标记userdata: metatable, upvalues,
