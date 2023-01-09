@@ -32,7 +32,7 @@
 
 
 /* Maximum number of registers in a Lua function (must fit in 8 bits) */
-#define MAXREGS		255
+#define MAXREGS		255//Lua 函数中的最大寄存器数
 
 
 #define hasjumps(e)	((e)->t != (e)->f)
@@ -196,6 +196,10 @@ void luaK_concat (FuncState *fs, int *l1, int l2) {
 ** Create a jump instruction and return its position, so its destination
 ** can be fixed later (with 'fixjump').
 */
+
+/// @brief 用来生成一个新的跳转指令
+/// @param fs 
+/// @return 
 int luaK_jump (FuncState *fs) {
   return codesJ(fs, OP_JMP, NO_JUMP, 0);
 }
@@ -303,6 +307,11 @@ static void patchlistaux (FuncState *fs, int list, int vtarget, int reg,
 ** (The assert means that we cannot fix a jump to a forward address
 ** because we only know addresses once code is generated.)
 */
+
+/// @brief 回填一个链表的跳转位置
+/// @param fs 
+/// @param list 
+/// @param target 
 void luaK_patchlist (FuncState *fs, int list, int target) {
   lua_assert(target <= fs->pc);
   patchlistaux(fs, list, target, NO_REG, target);

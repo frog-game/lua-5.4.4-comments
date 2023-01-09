@@ -2,6 +2,8 @@
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "{ \"*.lua.txt\": \"lua\" }": "",
-        "lua.h": "c"
+        "lua.h": "c",
+        "*.rh": "c",
+        "lstring.h": "c"
     }
 }

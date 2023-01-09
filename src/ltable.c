@@ -87,7 +87,7 @@
 
 #define hashpointer(t,p)	hashmod(t, point2uint(p))
 
-
+// 为了减少空表的维护成本，Lua定义了一个静态常量表，在初始化的时候让node指向这个dummynode。
 #define dummynode		(&dummynode_)
 
 static const Node dummynode_ = {

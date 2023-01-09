@@ -66,23 +66,23 @@ typedef enum {
 
 
 typedef struct expdesc {
-  expkind k;
+  expkind k;//表达式的类型
   union {
-    lua_Integer ival;    /* for VKINT */
-    lua_Number nval;  /* for VKFLT */
-    TString *strval;  /* for VKSTR */
-    int info;  /* for generic use */
-    struct {  /* for indexed variables */
+    lua_Integer ival;    /* for VKINT *///表达式是integer常量
+    lua_Number nval;  /* for VKFLT *///表达式是float常量
+    TString *strval;  /* for VKSTR *///表达式是string常量
+    int info;  /* for generic use *///通用
+    struct {  /* for indexed variables *///变量索引
       short idx;  /* index (R or "long" K) */
       lu_byte t;  /* table (register or upvalue) */
     } ind;
-    struct {  /* for local variables */
-      lu_byte ridx;  /* register holding the variable */
-      unsigned short vidx;  /* compiler index (in 'actvar.arr')  */
+    struct {  /* for local variables *///局部变量索引
+      lu_byte ridx;  /* register holding the variable *///寄存器保存变量
+      unsigned short vidx;  /* compiler index (in 'actvar.arr')  *///编译器索引
     } var;
   } u;
-  int t;  /* patch list of 'exit when true' */
-  int f;  /* patch list of 'exit when false' */
+  int t;  /* patch list of 'exit when true' */// 真时退出的patch列表
+  int f;  /* patch list of 'exit when false' */// 假时退出的patch列表
 } expdesc;
 
 
@@ -158,24 +158,24 @@ struct BlockCnt;  /* defined in lparser.c */
 
 /* state needed to generate code for a given function */
 typedef struct FuncState {
-  Proto *f;  /* current function header */
-  struct FuncState *prev;  /* enclosing function */
-  struct LexState *ls;  /* lexical state */
-  struct BlockCnt *bl;  /* chain of current blocks */
-  int pc;  /* next position to code (equivalent to 'ncode') */
-  int lasttarget;   /* 'label' of last 'jump label' */
-  int previousline;  /* last line that was saved in 'lineinfo' */
-  int nk;  /* number of elements in 'k' */
-  int np;  /* number of elements in 'p' */
-  int nabslineinfo;  /* number of elements in 'abslineinfo' */
-  int firstlocal;  /* index of first local var (in Dyndata array) */
-  int firstlabel;  /* index of first label (in 'dyd->label->arr') */
-  short ndebugvars;  /* number of elements in 'f->locvars' */
-  lu_byte nactvar;  /* number of active local variables */
-  lu_byte nups;  /* number of upvalues */
-  lu_byte freereg;  /* first free register */
-  lu_byte iwthabs;  /* instructions issued since last absolute line info */
-  lu_byte needclose;  /* function needs to close upvalues when returning */
+  Proto *f;  /* current function header */// 主要存放虚拟机指令，常量表
+  struct FuncState *prev;  /* enclosing function *///父函数体指针
+  struct LexState *ls;  /* lexical state *///词法状态
+  struct BlockCnt *bl;  /* chain of current blocks *///当前块链
+  int pc;  /* next position to code (equivalent to 'ncode') *///下一个指令，应当存放在Proto结构中的code列表的位置
+  int lasttarget;   /* 'label' of last 'jump label' *///最后一个跳转标签
+  int previousline;  /* last line that was saved in 'lineinfo' *///保存在行信息中的最后一行
+  int nk;  /* number of elements in 'k' *///当前常量的数量
+  int np;  /* number of elements in 'p' *///被编译的代码，Proto的数量
+  int nabslineinfo;  /* number of elements in 'abslineinfo' *///绝对行信息
+  int firstlocal;  /* index of first local var (in Dyndata array) */// 第一个local变量的位置
+  int firstlabel;  /* index of first label (in 'dyd->label->arr') *///第一个label位置
+  short ndebugvars;  /* number of elements in 'f->locvars' *///局部变量调试信息数量
+  lu_byte nactvar;  /* number of active local variables *///当前活跃变量的数量
+  lu_byte nups;  /* number of upvalues */// 当前upvalue的数量
+  lu_byte freereg;  /* first free register *///下一个可被使用的，空闲寄存器的位置
+  lu_byte iwthabs;  /* instructions issued since last absolute line info *///绝对行计数
+  lu_byte needclose;  /* function needs to close upvalues when returning *///是否需要关闭上值
 } FuncState;
 
 

@@ -28,8 +28,7 @@ isJ                           sJ(25)                     |   Op(7)     |
   corresponding unsigned argument.
 ===========================================================================*/
 
-
-enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
+enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组合的类型
 
 
 /*
@@ -195,6 +194,8 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 */
 
 /// @brief Lua虚拟机采用定长指令，每条指令占4个字节
+// 在Lua 5.3里，操作码占指令低6位，因此总共能够容纳64条指令，定义了47条指令。
+// Lua 5.4将操作码扩展到了7位，因此总共能够容纳128条指令，定义了83条
 typedef enum {
 /*----------------------------------------------------------------------
   name		args	description
@@ -279,54 +280,66 @@ OP_LEN,/*	A B	R[A] := #R[B] (length operator)			*///取长度
 OP_CONCAT,/*	A B	R[A] := R[A].. ... ..R[A + B - 1]		*///拼接对象
 /*其他操作 end*/
 
-/*to- begin*/
-OP_CLOSE,/*	A	close all upvalues >= R[A]			*/
-OP_TBC,/*	A	mark variable A "to be closed"			*/
-/*其他操作 end*/
+/*to-be-close变量 begin*/
+OP_CLOSE,/*	A	close all upvalues >= R[A]			*///关闭tbc
+OP_TBC,/*	A	mark variable A "to be closed"			*///标记寄存器为tbc
+/*to-be-close变量 end*/
 
-OP_JMP,/*	sJ	pc += sJ					*/
-OP_EQ,/*	A B k	if ((R[A] == R[B]) ~= k) then pc++		*/
-OP_LT,/*	A B k	if ((R[A] <  R[B]) ~= k) then pc++		*/
-OP_LE,/*	A B k	if ((R[A] <= R[B]) ~= k) then pc++		*/
+/*逻辑判断和跳转 begin*/
+OP_JMP,/*	sJ	pc += sJ					*///无条件跳转
+OP_EQ,/*	A B k	if ((R[A] == R[B]) ~= k) then pc++		*///相等测试,条件跳转
+OP_LT,/*	A B k	if ((R[A] <  R[B]) ~= k) then pc++		*///小于测试,条件跳转
+OP_LE,/*	A B k	if ((R[A] <= R[B]) ~= k) then pc++		*///小于等于测试,条件跳转
 
-OP_EQK,/*	A B k	if ((R[A] == K[B]) ~= k) then pc++		*/
-OP_EQI,/*	A sB k	if ((R[A] == sB) ~= k) then pc++		*/
-OP_LTI,/*	A sB k	if ((R[A] < sB) ~= k) then pc++			*/
-OP_LEI,/*	A sB k	if ((R[A] <= sB) ~= k) then pc++		*/
-OP_GTI,/*	A sB k	if ((R[A] > sB) ~= k) then pc++			*/
-OP_GEI,/*	A sB k	if ((R[A] >= sB) ~= k) then pc++		*/
+OP_EQK,/*	A B k	if ((R[A] == K[B]) ~= k) then pc++		*///常量相等测试,条件跳转
+OP_EQI,/*	A sB k	if ((R[A] == sB) ~= k) then pc++		*///立即数相等测试,条件跳转
+OP_LTI,/*	A sB k	if ((R[A] < sB) ~= k) then pc++			*///立即数小于测试,条件跳转
+OP_LEI,/*	A sB k	if ((R[A] <= sB) ~= k) then pc++		*///立即数小于等于测试,条件跳转
+OP_GTI,/*	A sB k	if ((R[A] > sB) ~= k) then pc++			*///立即数大于测试,条件跳转
+OP_GEI,/*	A sB k	if ((R[A] >= sB) ~= k) then pc++		*///立即数大于等于测试,条件跳转
 
-OP_TEST,/*	A k	if (not R[A] == k) then pc++			*/
-OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) */
+OP_TEST,/*	A k	if (not R[A] == k) then pc++			*///bool测试,条件跳转
+OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) *///bool测试,条件跳转
+/*逻辑判断和跳转 end*/
 
-OP_CALL,/*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) */
-OP_TAILCALL,/*	A B C k	return R[A](R[A+1], ... ,R[A+B-1])		*/
+/*函数调用 begin*/
+OP_CALL,/*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) *///函数调用 
+OP_TAILCALL,/*	A B C k	return R[A](R[A+1], ... ,R[A+B-1])		*///尾调用
 
-OP_RETURN,/*	A B C k	return R[A], ... ,R[A+B-2]	(see note)	*/
-OP_RETURN0,/*		return						*/
-OP_RETURN1,/*	A	return R[A]					*/
+OP_RETURN,/*	A B C k	return R[A], ... ,R[A+B-2]	(see note)	*///从函数调用返回
+OP_RETURN0,/*		return						*///返回无结果
+OP_RETURN1,/*	A	return R[A]					*///返回一个参数
+/*函数调用 end*/
 
-OP_FORLOOP,/*	A Bx	update counters; if loop continues then pc-=Bx; */
+/*for 循环 begin*/
+OP_FORLOOP,/*	A Bx	update counters; if loop continues then pc-=Bx; *///数值for循环
 OP_FORPREP,/*	A Bx	<check values and prepare counters>;
-                        if not to run then pc+=Bx+1;			*/
+                        if not to run then pc+=Bx+1;			*///数值for循环
 
-OP_TFORPREP,/*	A Bx	create upvalue for R[A + 3]; pc+=Bx		*/
-OP_TFORCALL,/*	A C	R[A+4], ... ,R[A+3+C] := R[A](R[A+1], R[A+2]);	*/
-OP_TFORLOOP,/*	A Bx	if R[A+2] ~= nil then { R[A]=R[A+2]; pc -= Bx }	*/
+OP_TFORPREP,/*	A Bx	create upvalue for R[A + 3]; pc+=Bx		*///通用for循环
+OP_TFORCALL,/*	A C	R[A+4], ... ,R[A+3+C] := R[A](R[A+1], R[A+2]);	*///通用for循环
+OP_TFORLOOP,/*	A Bx	if R[A+2] ~= nil then { R[A]=R[A+2]; pc -= Bx }	*///通用for循环
+/*for 循环 end*/
 
-OP_SETLIST,/*	A B C k	R[A][C+i] := R[A+i], 1 <= i <= B		*/
+/*表操作 begin*/
+OP_SETLIST,/*	A B C k	R[A][C+i] := R[A+i], 1 <= i <= B		*///给表设置一批数组元素
+/*表操作 end*/
 
-OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*/
+/*函数调用 begin*/
+OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*///根据函数原型新建一个闭包
 
-OP_VARARG,/*	A C	R[A], R[A+1], ..., R[A+C-2] = vararg		*/
+OP_VARARG,/*	A C	R[A], R[A+1], ..., R[A+C-2] = vararg		*///将函数的可变参数拷贝给寄存器
 
-OP_VARARGPREP,/*A	(adjust vararg parameters)			*/
+OP_VARARGPREP,/*A	(adjust vararg parameters)			*///跳转可变函数的调用信息
+/*函数调用 end*/
 
-OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
+/*附件参数 begin*/
+OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*///为上一条指令提供额外参数
+/*附件参数 end*/
 } OpCode;
 
 
-#define NUM_OPCODES	((int)(OP_EXTRAARG) + 1)
+#define NUM_OPCODES	((int)(OP_EXTRAARG) + 1)//指令数量
 
 
 
@@ -393,12 +406,19 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
 ** bit 6: instruction sets 'L->top' for next instruction (when C == 0)
 ** bit 7: instruction is an MM instruction (call a metamethod)
 */
+// ** 指令属性的掩码
+// ** 位0-2：操作码类型 也就是这些 {iABC, iABx, iAsBx, iAx, isJ}
+// ** 位3：寄存器A 
+// ** 位4：运算符是测试（下一条指令必须是跳转） 
+// ** 位5：指令使用上一条指令设置的L->top（当B == 0时） 
+// ** 位6：指令集L->top用于下一条指令（当C == 0时） 
+// ** 位7：指令是MM指令（调用元方法）
 
 LUAI_DDEC(const lu_byte luaP_opmodes[NUM_OPCODES];)
 
 #define getOpMode(m)	(cast(enum OpMode, luaP_opmodes[m] & 7))
-#define testAMode(m)	(luaP_opmodes[m] & (1 << 3))
-#define testTMode(m)	(luaP_opmodes[m] & (1 << 4))
+#define testAMode(m)	(luaP_opmodes[m] & (1 << 3))//判断当前指令是否会修改寄存器A
+#define testTMode(m)	(luaP_opmodes[m] & (1 << 4))//用来判断当前指令是否涉及一次条件跳转
 #define testITMode(m)	(luaP_opmodes[m] & (1 << 5))
 #define testOTMode(m)	(luaP_opmodes[m] & (1 << 6))
 #define testMMMode(m)	(luaP_opmodes[m] & (1 << 7))

@@ -1190,42 +1190,46 @@ static void simpleexp (LexState *ls, expdesc *v) {
   luaX_next(ls);
 }
 
-
+/// @brief 一元操作
+/// @param op 
+/// @return 
 static UnOpr getunopr (int op) {
   switch (op) {
     case TK_NOT: return OPR_NOT;
-    case '-': return OPR_MINUS;
-    case '~': return OPR_BNOT;
-    case '#': return OPR_LEN;
-    default: return OPR_NOUNOPR;
+    case '-': return OPR_MINUS;//负数
+    case '~': return OPR_BNOT;//非
+    case '#': return OPR_LEN;//求长度
+    default: return OPR_NOUNOPR;//不是一元操作
   }
 }
 
-
+/// @brief 二元操作
+/// @param op 
+/// @return 
 static BinOpr getbinopr (int op) {
   switch (op) {
-    case '+': return OPR_ADD;
-    case '-': return OPR_SUB;
-    case '*': return OPR_MUL;
-    case '%': return OPR_MOD;
-    case '^': return OPR_POW;
-    case '/': return OPR_DIV;
-    case TK_IDIV: return OPR_IDIV;
-    case '&': return OPR_BAND;
-    case '|': return OPR_BOR;
-    case '~': return OPR_BXOR;
-    case TK_SHL: return OPR_SHL;
-    case TK_SHR: return OPR_SHR;
-    case TK_CONCAT: return OPR_CONCAT;
-    case TK_NE: return OPR_NE;
-    case TK_EQ: return OPR_EQ;
-    case '<': return OPR_LT;
-    case TK_LE: return OPR_LE;
-    case '>': return OPR_GT;
-    case TK_GE: return OPR_GE;
-    case TK_AND: return OPR_AND;
-    case TK_OR: return OPR_OR;
-    default: return OPR_NOBINOPR;
+    case '+': return OPR_ADD;// 加 
+    case '-': return OPR_SUB;// 减
+    case '*': return OPR_MUL;// 乘
+    case '%': return OPR_MOD;// 模
+    case '^': return OPR_POW;// 幂
+    case '/': return OPR_DIV;// 除
+    case +: return OPR_IDIV;//  整除
+    case '&': return OPR_BAND;// 位与
+    case '|': return OPR_BOR;//  位或
+    case '~': return OPR_BXOR;// 位非 
+    case TK_SHL: return OPR_SHL;// 左移 /* '<<' */
+    case TK_SHR: return OPR_SHR;// 右移 /* '>>' */
+    case TK_CONCAT: return OPR_CONCAT; // 连接  /* '..' */
+    case TK_NE: return OPR_NE;//不等于  /* '~=' */
+    case TK_EQ: return OPR_EQ;//等于 /* '==' */
+    case '<': return OPR_LT;//小与
+    case TK_LE: return OPR_LE;//小于等于 /* '<=' */
+    case '>': return OPR_GT;//大于
+    case TK_GE: return OPR_GE;//大于等于  /* '>=' */
+    case TK_AND: return OPR_AND;//and操作
+    case TK_OR: return OPR_OR;//or操作
+    default: return OPR_NOBINOPR;//不是二元操作
   }
 }
 
@@ -1233,23 +1237,26 @@ static BinOpr getbinopr (int op) {
 /*
 ** Priority table for binary operators.
 */
+
+/// @brief 二元运算符的优先级表
+///
 static const struct {
-  lu_byte left;  /* left priority for each binary operator */
-  lu_byte right; /* right priority */
+  lu_byte left;  /* left priority for each binary operator *///每个二元运算符的左优先级
+  lu_byte right; /* right priority *///右优先级
 } priority[] = {  /* ORDER OPR */
    {10, 10}, {10, 10},           /* '+' '-' */
    {11, 11}, {11, 11},           /* '*' '%' */
-   {14, 13},                  /* '^' (right associative) */
+   {14, 13},                  /* '^' (right associative) *///右结合 a^b^c相当于a^(b^c)
    {11, 11}, {11, 11},           /* '/' '//' */
    {6, 6}, {4, 4}, {5, 5},   /* '&' '|' '~' */
    {7, 7}, {7, 7},           /* '<<' '>>' */
-   {9, 8},                   /* '..' (right associative) */
+   {9, 8},                   /* '..' (right associative) *///右结合 a..b..c相当于a..(b..c)
    {3, 3}, {3, 3}, {3, 3},   /* ==, <, <= */
    {3, 3}, {3, 3}, {3, 3},   /* ~=, >, >= */
    {2, 2}, {1, 1}            /* and, or */
 };
 
-#define UNARY_PRIORITY	12  /* priority for unary operators */
+#define UNARY_PRIORITY	12  /* priority for unary operators *///一元运算符的优先级
 
 
 /*

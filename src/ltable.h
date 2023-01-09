@@ -9,10 +9,9 @@
 
 #include "lobject.h"
 
-
-#define gnode(t,i)	(&(t)->node[i])
-#define gval(n)		(&(n)->i_val)
-#define gnext(n)	((n)->u.next)
+#define gnode(t,i)	(&(t)->node[i])//取表node中idx=i的Node值
+#define gval(n)		(&(n)->i_val)//提取Node中的val
+#define gnext(n)	((n)->u.next)//提取Node中的key的next
 
 
 /*
@@ -20,10 +19,13 @@
 ** may have any of these metamethods. (First access that fails after the
 ** clearing will set the bit again.)
 */
+
+// 清除快速访问元方法的所有位
 #define invalidateTMcache(t)	((t)->flags &= ~maskflags)
 
 
 /* true when 't' is using 'dummynode' as its hash part */
+//判断哈希表是否为空
 #define isdummy(t)		((t)->lastfree == NULL)
 
 

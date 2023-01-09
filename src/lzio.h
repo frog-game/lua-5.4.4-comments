@@ -17,6 +17,7 @@
 
 typedef struct Zio ZIO;
 
+///返回的是一个字符
 #define zgetc(z)  (((z)->n--)>0 ?  cast_uchar(*(z)->p++) : luaZ_fill(z))
 
 

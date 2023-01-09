@@ -441,7 +441,13 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
                                    luaZ_bufflen(ls->buff) - 2);
 }
 
-
+/// @brief 
+// Token解析函数，逐个读取字符流
+// 其中next函数：从ZIO文件流上读取下一个字符
+// 完成一个Token的切割，则返回Token结果
+/// @param ls 
+/// @param seminfo 
+/// @return 
 static int llex (LexState *ls, SemInfo *seminfo) {
   luaZ_resetbuffer(ls->buff);
   for (;;) {
@@ -561,7 +567,8 @@ static int llex (LexState *ls, SemInfo *seminfo) {
   }
 }
 
-
+/// @brief 逐个读取字符流字符，直到切割出一个完整的Token
+/// @param ls 
 void luaX_next (LexState *ls) {
   ls->lastline = ls->linenumber;
   if (ls->lookahead.token != TK_EOS) {  /* is there a look-ahead token? */

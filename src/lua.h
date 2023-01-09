@@ -89,7 +89,7 @@ typedef struct lua_State lua_State;
 
 
 /* type of numbers in Lua */
-/// @brief 数字类型
+/// @brief 数值类型
 typedef LUA_NUMBER lua_Number;
 
 

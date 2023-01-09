@@ -12,51 +12,53 @@
 #include "lopcodes.h"
 #include "lparser.h"
 
-
 /*
 ** Marks the end of a patch list. It is an invalid value both as an absolute
 ** address, and as a list link (would link an element to itself).
 */
-#define NO_JUMP (-1)
+#define NO_JUMP (-1)//patch list结束标识,代表不存在跳转
 
 
 /*
 ** grep "ORDER OPR" if you change these enums  (ORDER OP)
 */
 typedef enum BinOpr {
-  /* arithmetic operators */
+  /* arithmetic operators *///算术运算符
   OPR_ADD, OPR_SUB, OPR_MUL, OPR_MOD, OPR_POW,
   OPR_DIV, OPR_IDIV,
-  /* bitwise operators */
+  /* bitwise operators *///位运算符
   OPR_BAND, OPR_BOR, OPR_BXOR,
   OPR_SHL, OPR_SHR,
-  /* string operator */
+  /* string operator *///字符串操作
   OPR_CONCAT,
-  /* comparison operators */
+  /* comparison operators *///比较运算符
   OPR_EQ, OPR_LT, OPR_LE,
   OPR_NE, OPR_GT, OPR_GE,
-  /* logical operators */
+  /* logical operators *///逻辑运算符
   OPR_AND, OPR_OR,
   OPR_NOBINOPR
 } BinOpr;
 
 
 /* true if operation is foldable (that is, it is arithmetic or bitwise) */
+//是不是算术或者位运算
 #define foldbinop(op)	((op) <= OPR_SHR)
 
-
+///用于生成一条指令
 #define luaK_codeABC(fs,o,a,b,c)	luaK_codeABCk(fs,o,a,b,c,0)
 
-
+/// @brief 一元运算符
 typedef enum UnOpr { OPR_MINUS, OPR_BNOT, OPR_NOT, OPR_LEN, OPR_NOUNOPR } UnOpr;
 
 
 /* get (pointer to) instruction of given 'expdesc' */
+//获取指令
 #define getinstruction(fs,e)	((fs)->f->code[(e)->u.info])
 
-
+//回填指令中的返回值数量
 #define luaK_setmultret(fs,e)	luaK_setreturns(fs, e, LUA_MULTRET)
 
+//进行跳转
 #define luaK_jumpto(fs,t)	luaK_patchlist(fs, luaK_jump(fs), t)
 
 LUAI_FUNC int luaK_code (FuncState *fs, Instruction i);
