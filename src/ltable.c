@@ -43,7 +43,7 @@
 ** MAXABITS is the largest integer such that MAXASIZE fits in an
 ** unsigned int.
 */
-#define MAXABITS	cast_int(sizeof(int) * CHAR_BIT - 1)
+#define MAXABITS	cast_int(sizeof(int) * CHAR_BIT - 1) //31
 
 
 /*

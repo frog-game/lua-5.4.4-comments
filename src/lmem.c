@@ -75,7 +75,15 @@ static void *firsttry (global_State *g, void *block, size_t os, size_t ns) {
 */
 #define MINSIZEARRAY	4
 
-
+/// @brief 管理可变长数组的, 其主要策略是当数组空间不够时,扩大为原来的两倍, 无法增长则报错。
+/// @param L 
+/// @param block 
+/// @param nelems 原来元素个数
+/// @param psize 原来元素个数, 最后返回实际分配的元素个数
+/// @param size_elems 单个元素的大小
+/// @param limit 元素个数最大限制
+/// @param what 元素类型描述，出错打印错误信息用的
+/// @return 
 void *luaM_growaux_ (lua_State *L, void *block, int nelems, int *psize,
                      int size_elems, int limit, const char *what) {
   void *newblock;

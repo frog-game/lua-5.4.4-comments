@@ -30,10 +30,12 @@
 
 
 /* allocated size for hash nodes */
+//给hash节点分配大小
 #define allocsizenode(t)	(isdummy(t) ? 0 : sizenode(t))
 
 
 /* returns the Node, given the value of a table entry */
+// 返回table 元素
 #define nodefromval(v)	cast(Node *, (v))
 
 
