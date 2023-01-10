@@ -47,7 +47,9 @@ unsigned int luaS_hash (const char *str, size_t l, unsigned int seed) {
   return h;
 }
 
-
+/// @brief 如果长串没有计算过hash，则调用luaS_hashlongstr来计算
+/// @param ts 
+/// @return 
 unsigned int luaS_hashlongstr (TString *ts) {
   lua_assert(ts->tt == LUA_VLNGSTR);
   if (ts->extra == 0) {  /* no hash? */

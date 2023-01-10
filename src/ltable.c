@@ -51,12 +51,15 @@
 ** between 2^MAXABITS and the maximum size that, measured in bytes,
 ** fits in a 'size_t'.
 */
+
+//数组部分最大size
 #define MAXASIZE	luaM_limitN(1u << MAXABITS, TValue)
 
 /*
 ** MAXHBITS is the largest integer such that 2^MAXHBITS fits in a
 ** signed int.
 */
+
 #define MAXHBITS	(MAXABITS - 1)
 
 
@@ -65,6 +68,8 @@
 ** between 2^MAXHBITS and the maximum size such that, measured in bytes,
 ** it fits in a 'size_t'.
 */
+
+//hash部分最大size
 #define MAXHSIZE	luaM_limitN(1u << MAXHBITS, Node)
 
 
@@ -72,22 +77,28 @@
 ** When the original hash value is good, hashing by a power of 2
 ** avoids the cost of '%'.
 */
+
+//根据n的值，对其t进行lmod操作
 #define hashpow2(t,n)		(gnode(t, lmod((n), sizenode(t))))
 
 /*
 ** for other types, it is better to avoid modulo by power of 2, as
 ** they can have many 2 factors.
 */
+
+//对lsizenode2次幂减1取模（最后按位或1，是为了保持要用来取模的数字((sizenode(t)-1)|1)这段是不为0，是大于等于1的数）
+//返回值是 0 ~ (size - 1) 下标下的hash node桶
 #define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
 
-
+//字符串hash
 #define hashstr(t,str)		hashpow2(t, (str)->hash)
+//bool值hash
 #define hashboolean(t,p)	hashpow2(t, p)
 
-
+//数据的地址来求hash
 #define hashpointer(t,p)	hashmod(t, point2uint(p))
 
-// 为了减少空表的维护成本，Lua定义了一个静态常量表，在初始化的时候让node指向这个dummynode。
+// 定义了一个不可改写的空哈希表：dummynode 。让空表被初始化时，node 域指向这个 dummy 节点。它虽然是一个全局变量，但因为对其访问是只读的，所以不会引起线程安全问题。
 #define dummynode		(&dummynode_)
 
 static const Node dummynode_ = {
@@ -95,7 +106,7 @@ static const Node dummynode_ = {
    LUA_VNIL, 0, {NULL}}  /* key type, next, and key value */
 };
 
-
+//通过next顺着hash冲突链查找。如果找到就范围对应TValue，找不到返回TValue常量absentkey
 static const TValue absentkey = {ABSTKEYCONSTANT};
 
 
@@ -105,9 +116,14 @@ static const TValue absentkey = {ABSTKEYCONSTANT};
 ** remainder, which is faster. Otherwise, use an unsigned-integer
 ** remainder, which uses all bits and ensures a non-negative result.
 */
+
+/// @brief 返回对应整数值对散列表大小取余的key对应的节点 
+/// @param t 
+/// @param i key
+/// @return 
 static Node *hashint (const Table *t, lua_Integer i) {
-  lua_Unsigned ui = l_castS2U(i);
-  if (ui <= (unsigned int)INT_MAX)
+  lua_Unsigned ui = l_castS2U(i);//如果要对负数计算哈希值的话，先转成正数方便计算
+  if (ui <= (unsigned int)INT_MAX)//没有超过无符号int最大值 (unsigned int)INT_MAX = 2147483647
     return hashmod(t, cast_int(ui));
   else
     return hashmod(t, ui);
@@ -128,11 +144,33 @@ static Node *hashint (const Table *t, lua_Integer i) {
 ** INT_MIN.
 */
 #if !defined(l_hashfloat)
+/// @brief 浮点型数据的哈希算法
+// 在一个两个组合的表示中，INT_MAX没有一个精确的浮点数表示。但是INT_MAX有
+// 因为frexp的绝对值是一个比一小的数字（除非n是无穷大或无效数字）
+// 'frexp * -INT_MIN'的绝对值小于或等于INT_MAX。通过使用unsigned int可以避免加i时溢出，通过使用~u可以避免INT_MIN的问题
+
+// l_mathop:将返回值强转为lua_Number
+// rexp()用来把一个数分解为尾数和指数，其原型为：
+// double frexp(double x, int *exp);
+// 【参数】x 为待分解的浮点数，exp 为存储指数的指针。
+// 设返回值为 ret，则 x = ret * 2 exp，其中 exp 为整数，ret 的绝对值在 0.5（含） 到 1（不含） 之间。
+// 如果 x = 0，则 ret = exp = 0
+// 【返回值】将尾数 ret 返回。
+
+// frexp是一个C语言函数，功能是把一个浮点数分解为尾数和指数
+// 第一个参数是要分解的浮点数据，第二个参数是存储指数的指针
+// 返回的是尾数
+// 然后拿着返回的尾数来乘以-INT_MIN,结果用n保存
+// 下面判断n能不能转换为int,不能的话就报错
+// 可以的话就用unsigned int类型的u来保存ni加上之前的指数
+// 如果u超出了INT_MAX就返回~u,不然直接u
+/// @param n 
+/// @return 
 static int l_hashfloat (lua_Number n) {
   int i;
   lua_Integer ni;
   n = l_mathop(frexp)(n, &i) * -cast_num(INT_MIN);
-  if (!lua_numbertointeger(n, &ni)) {  /* is 'n' inf/-inf/NaN? */
+  if (!lua_numbertointeger(n, &ni)) {  /* is 'n' inf/-inf/NaN? *///不能转换成整型
     lua_assert(luai_numisnan(n) || l_mathop(fabs)(n) == cast_num(HUGE_VAL));
     return 0;
   }
@@ -148,44 +186,52 @@ static int l_hashfloat (lua_Number n) {
 ** returns the 'main' position of an element in a table (that is,
 ** the index of its hash value).
 */
+
+/// @brief mainposition函数通过key找到主位置的node桶
+/// @param t 
+/// @param key 
+/// @return 
 static Node *mainpositionTV (const Table *t, const TValue *key) {
   switch (ttypetag(key)) {
-    case LUA_VNUMINT: {
+    case LUA_VNUMINT: {//key为整数类型
       lua_Integer i = ivalue(key);
-      return hashint(t, i);
+      return hashint(t, i);//返回对应整数值对散列表大小取余的key对应的节点
     }
-    case LUA_VNUMFLT: {
+    case LUA_VNUMFLT: {//key为浮点类型
       lua_Number n = fltvalue(key);
-      return hashmod(t, l_hashfloat(n));
+      return hashmod(t, l_hashfloat(n));//返回值是 0 ~ (size - 1) 下标下的hash node桶
     }
-    case LUA_VSHRSTR: {
+    case LUA_VSHRSTR: {//key为短字符串类型
       TString *ts = tsvalue(key);
-      return hashstr(t, ts);
+      return hashstr(t, ts);//字符串对应的hash桶
     }
-    case LUA_VLNGSTR: {
+    case LUA_VLNGSTR: {//key为长字符串类型
       TString *ts = tsvalue(key);
-      return hashpow2(t, luaS_hashlongstr(ts));
+      return hashpow2(t, luaS_hashlongstr(ts));//如果长串没有计算过hash，则调用luaS_hashlongstr来计算，然后再使用hash & (2^t->lsizenode - 1)来获取hash node桶
     }
-    case LUA_VFALSE:
+    case LUA_VFALSE://bool false
       return hashboolean(t, 0);
-    case LUA_VTRUE:
+    case LUA_VTRUE://bool true
       return hashboolean(t, 1);
-    case LUA_VLIGHTUSERDATA: {
-      void *p = pvalue(key);
-      return hashpointer(t, p);
+    case LUA_VLIGHTUSERDATA: {// 指针类型（不需要GC）
+      void *p = pvalue(key);//获取对应的指针
+      return hashpointer(t, p);//获取p指针指向的地址值对表t的散列表Node大小的余,对应的节点
     }
-    case LUA_VLCF: {
-      lua_CFunction f = fvalue(key);
-      return hashpointer(t, f);
+    case LUA_VLCF: {// key为c函数类型
+      lua_CFunction f = fvalue(key);//获取c函数指针 
+      return hashpointer(t, f);// 获取f函数指针指向的地址值对表t的散列表Node大小的余,对应的节点 
     }
     default: {
-      GCObject *o = gcvalue(key);
-      return hashpointer(t, o);
+      GCObject *o = gcvalue(key);//默认情况获取key作为GC对象
+      return hashpointer(t, o);//获取GC对象o指针指向的地址值对表t的散列表Node大小的余,对应的节点
     }
   }
 }
 
-
+/// @brief mainposition函数通过key找到主位置的node桶
+/// @param t 
+/// @param nd 
+/// @return 
 l_sinline Node *mainpositionfromnode (const Table *t, Node *nd) {
   TValue key;
   getnodekey(cast(lua_State *, NULL), &key, nd);
@@ -213,22 +259,28 @@ l_sinline Node *mainpositionfromnode (const Table *t, Node *nd) {
 ** positive does not break anything.  (In particular, 'next' will return
 ** some other valid item on the table or nil.)
 */
+
+/// @brief 根据n2不同类型，判断k1和n2是否相等
+/// @param k1 是否为GC对象
+/// @param n2 
+/// @param deadok 用来标识是否需要检查n2是否被释放
+/// @return 
 static int equalkey (const TValue *k1, const Node *n2, int deadok) {
-  if ((rawtt(k1) != keytt(n2)) &&  /* not the same variants? */
-       !(deadok && keyisdead(n2) && iscollectable(k1)))
+  if ((rawtt(k1) != keytt(n2)) &&  /* not the same variants? *///不是相同类型，包含易变位 
+       !(deadok && keyisdead(n2) && iscollectable(k1)))//是否需要检查n2是否被释放，k1是否为GC对象 
    return 0;  /* cannot be same key */
   switch (keytt(n2)) {
-    case LUA_VNIL: case LUA_VFALSE: case LUA_VTRUE:
+    case LUA_VNIL: case LUA_VFALSE: case LUA_VTRUE://是nil,false,true
       return 1;
-    case LUA_VNUMINT:
-      return (ivalue(k1) == keyival(n2));
-    case LUA_VNUMFLT:
+    case LUA_VNUMINT://整数类型
+      return (ivalue(k1) == keyival(n2));//值部分相等
+    case LUA_VNUMFLT://float类型
       return luai_numeq(fltvalue(k1), fltvalueraw(keyval(n2)));
-    case LUA_VLIGHTUSERDATA:
+    case LUA_VLIGHTUSERDATA://light userdata
       return pvalue(k1) == pvalueraw(keyval(n2));
-    case LUA_VLCF:
+    case LUA_VLCF://c函数指针
       return fvalue(k1) == fvalueraw(keyval(n2));
-    case ctb(LUA_VLNGSTR):
+    case ctb(LUA_VLNGSTR)://是长字符串,并且标记回收类型
       return luaS_eqlngstr(tsvalue(k1), keystrval(n2));
     default:
       return gcvalue(k1) == gcvalueraw(keyval(n2));
@@ -241,6 +293,8 @@ static int equalkey (const TValue *k1, const Node *n2, int deadok) {
 ** part of table 't'. (Otherwise, the array part must be larger than
 ** 'alimit'.)
 */
+
+// 大小为零或者2的幂或存在于表中
 #define limitequalsasize(t)	(isrealasize(t) || ispow2((t)->alimit))
 
 

@@ -414,6 +414,8 @@
 ** MAXINTEGER may not have one, and therefore its conversion to float
 ** may have an ill-defined value.)
 */
+
+// 将一个Lua浮点数转换为一个Lua整数。这个宏假设n有对应的整数值。如果该值在Lua整数可表示范围内，就将其转换为一个整数赋给*p
 #define lua_numbertointeger(n,p) \
   ((n) >= (LUA_NUMBER)(LUA_MININTEGER) && \
    (n) < -(LUA_NUMBER)(LUA_MININTEGER) && \
