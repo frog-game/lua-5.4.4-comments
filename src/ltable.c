@@ -340,14 +340,16 @@ static int ispow2realasize (const Table *t) {
   return (!isrealasize(t) || ispow2(t->alimit));
 }
 
-
+/// @brief 设置alimit为表数组部分的实际大小，并设置对应的flags，返回表数组部分的实际大小
+/// @param t 
+/// @return 
 static unsigned int setlimittosize (Table *t) {
   t->alimit = luaH_realasize(t);
   setrealasize(t);
   return t->alimit;
 }
 
-
+// 获取表的数组部分的大小
 #define limitasasize(t)	check_exp(isrealasize(t), t->alimit)
 
 
@@ -357,12 +359,18 @@ static unsigned int setlimittosize (Table *t) {
 ** which may be in array part, nor for floats with integral values.)
 ** See explanation about 'deadok' in function 'equalkey'.
 */
+
+/// @brief 从表t的散列表部分查找键为key的值是否存在，存在则返回
+/// @param t 
+/// @param key 
+/// @param deadok 检查搜到的点是否被释放
+/// @return 
 static const TValue *getgeneric (Table *t, const TValue *key, int deadok) {
   Node *n = mainpositionTV(t, key);
   for (;;) {  /* check whether 'key' is somewhere in the chain */
     if (equalkey(key, n, deadok))
-      return gval(n);  /* that's it */
-    else {
+      return gval(n);  /* that's it *///检查n的key值和传入的key是否相等 */
+    else {//散列值冲突的解决 
       int nx = gnext(n);
       if (nx == 0)
         return &absentkey;  /* not found */
@@ -376,6 +384,10 @@ static const TValue *getgeneric (Table *t, const TValue *key, int deadok) {
 ** returns the index for 'k' if 'k' is an appropriate key to live in
 ** the array part of a table, 0 otherwise.
 */
+
+/// @brief 得到数组的索引
+/// @param k 
+/// @return 
 static unsigned int arrayindex (lua_Integer k) {
   if (l_castS2U(k) - 1u < MAXASIZE)  /* 'k' in [1, MAXASIZE]? */
     return cast_uint(k);  /* 'key' is an appropriate array index */
@@ -389,37 +401,49 @@ static unsigned int arrayindex (lua_Integer k) {
 ** elements in the array part, then elements in the hash part. The
 ** beginning of a traversal is signaled by 0.
 */
+
+/// @brief /1~alimit在数组   >alimit在hash
+/// @param L 
+/// @param t 
+/// @param key 
+/// @param asize 
+/// @return 
 static unsigned int findindex (lua_State *L, Table *t, TValue *key,
                                unsigned int asize) {
   unsigned int i;
   if (ttisnil(key)) return 0;  /* first iteration */
   i = ttisinteger(key) ? arrayindex(ivalue(key)) : 0;
-  if (i - 1u < asize)  /* is 'key' inside array part? */
+  if (i - 1u < asize)  /* is 'key' inside array part? *///在数组部分
     return i;  /* yes; that's the index */
   else {
-    const TValue *n = getgeneric(t, key, 1);
+    const TValue *n = getgeneric(t, key, 1);//找到hash中的位置
     if (l_unlikely(isabstkey(n)))
       luaG_runerror(L, "invalid key to 'next'");  /* key not found */
-    i = cast_int(nodefromval(n) - gnode(t, 0));  /* key index in hash table */
+    i = cast_int(nodefromval(n) - gnode(t, 0));  /* key index in hash table *///哈希表中的键索引
     /* hash elements are numbered after array ones */
     return (i + 1) + asize;
   }
 }
 
-
+/// @brief 根据key找到下一个key，迭代器的实现是用key去遍历的
+// 对lua表进行迭代访问，每次访问的时候 ，会调用luaH_next
+/// @param L 
+/// @param t 
+/// @param key 
+/// @return 
 int luaH_next (lua_State *L, Table *t, StkId key) {
-  unsigned int asize = luaH_realasize(t);
-  unsigned int i = findindex(L, t, s2v(key), asize);  /* find original key */
-  for (; i < asize; i++) {  /* try first array part */
-    if (!isempty(&t->array[i])) {  /* a non-empty entry? */
+  unsigned int asize = luaH_realasize(t);//得到数组真实长度
+  unsigned int i = findindex(L, t, s2v(key), asize);  /* find original key *///得到索引
+  for (; i < asize; i++) {  /* try first array part *///在数组中查找
+    if (!isempty(&t->array[i])) {  /* a non-empty entry? *///如果不是nil
       setivalue(s2v(key), i + 1);
       setobj2s(L, key + 1, &t->array[i]);
       return 1;
     }
   }
-  for (i -= asize; cast_int(i) < sizenode(t); i++) {  /* hash part */
-    if (!isempty(gval(gnode(t, i)))) {  /* a non-empty entry? */
-      Node *n = gnode(t, i);
+  for (i -= asize; cast_int(i) < sizenode(t); i++) {  /* hash part *///hash部分
+    if (!isempty(gval(gnode(t, i)))) {  /* a non-empty entry? *///不是nil
+      Node *n = gnode(t, i);//获取node
       getnodekey(L, s2v(key), n);
       setobj2s(L, key + 1, gval(n));
       return 1;
@@ -428,10 +452,12 @@ int luaH_next (lua_State *L, Table *t, StkId key) {
   return 0;  /* no more elements */
 }
 
-
+/// @brief 释放hash
+/// @param L 
+/// @param t 
 static void freehash (lua_State *L, Table *t) {
-  if (!isdummy(t))
-    luaM_freearray(L, t->node, cast_sizet(sizenode(t)));
+  if (!isdummy(t))//hash不是空
+    luaM_freearray(L, t->node, cast_sizet(sizenode(t)));//释放hash
 }
 
 
@@ -449,20 +475,42 @@ static void freehash (lua_State *L, Table *t) {
 ** will go to the array part; return the optimal size.  (The condition
 ** 'twotoi > 0' in the for loop stops the loop if 'twotoi' overflows.)
 */
+
+/// @brief 只有利用率超过50%的数组元素进入数组,否则进去hash
+// 首先，初始值，twotoi为1，i为0，a在循环初始时为0，它表示的是循环到目前为止数据小于2^i的数据数量。
+// 假设
+//     nums[0] = 1（1落在此区间）
+//     nums[1] = 1（2落在此区间）
+//     nums[2] = 1（3落在此区间）
+//     nums[3] = 0
+//     nums[4] = 0
+//     nums[5] = 1（20落在此区间）
+//     nums[6] = 0
+//     ...
+//     nums[n] = 0（其中n > 5 且 n <= MAXBITS）
+
+//     pna = 4
+//     i = 0，twotoi = 1，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 1，满足a > twotoi/2，也就是满足这个范围内数组利用率大于50%的原则，此时记录下这个范围，也就是 optimal = twotoi = 1，到目前为止的数据数量 na = a = 1
+//     i = 1，twotoi = 2，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 2，满足a > twotoi/2，记录下这个范围，也就是 optimal = twotoi = 2，到目前为止的数据数量 na = a = 2
+//     i = 2，twotoi = 4，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 3，此时满足a > twotoi/2，记录下这个范围，也就是 optimal = twotoi = 4，到目前为止的数据数量 na = a = 3
+//     i = 3，twotoi = 8，不满足（twotoi > 0 && *pna > twotoi / 2），结束，返回 optimal 为4。
+/// @param nums 前面已经计算好的计数数组
+/// @param pna  就是已经使用的数组部分元素个数+hash部分元素个数
+/// @return 
 static unsigned int computesizes (unsigned int nums[], unsigned int *pna) {
   int i;
-  unsigned int twotoi;  /* 2^i (candidate for optimal size) */
-  unsigned int a = 0;  /* number of elements smaller than 2^i */
-  unsigned int na = 0;  /* number of elements to go to array part */
-  unsigned int optimal = 0;  /* optimal size for array part */
-  /* loop while keys can fill more than half of total size */
+  unsigned int twotoi;  /* 2^i (candidate for optimal size) *///最佳尺寸
+  unsigned int a = 0;  /* number of elements smaller than 2^i *///小于 2^i 的元素数
+  unsigned int na = 0;  /* number of elements to go to array part *///要转到数组部分的元素数
+  unsigned int optimal = 0;  /* optimal size for array part *///数组部分最优尺寸
+  /* loop while keys can fill more than half of total size *///一直循环,直到键可以填充总大小的一半以上
   for (i = 0, twotoi = 1;
        twotoi > 0 && *pna > twotoi / 2;
        i++, twotoi *= 2) {
-    a += nums[i];
-    if (a > twotoi/2) {  /* more than half elements present? */
-      optimal = twotoi;  /* optimal size (till now) */
-      na = a;  /* all elements up to 'optimal' will go to array part */
+    a += nums[i];//加上当前数量
+    if (a > twotoi/2) {  /* more than half elements present? *///如果数量已经超过半数,那么素组的尺寸可以设置位这个大小
+      optimal = twotoi;  /* optimal size (till now) *///记录最佳尺寸
+      na = a;  /* all elements up to 'optimal' will go to array part *///记录下当前数组的大小
     }
   }
   lua_assert((optimal == 0 || optimal / 2 < na) && na <= optimal);
@@ -470,7 +518,10 @@ static unsigned int computesizes (unsigned int nums[], unsigned int *pna) {
   return optimal;
 }
 
-
+/// @brief 例如key值为第2^(i-1)到第2^i之间则增加nums[i]的计数，返回1标识已计数
+/// @param key 
+/// @param nums 
+/// @return 
 static int countint (lua_Integer key, unsigned int *nums) {
   unsigned int k = arrayindex(key);
   if (k != 0) {  /* is 'key' an appropriate array index? */
@@ -656,25 +707,30 @@ void luaH_resizearray (lua_State *L, Table *t, unsigned int nasize) {
 /*
 ** nums[i] = number of keys 'k' where 2^(i - 1) < k <= 2^i
 */
+
+/// @brief 对table 进行重新划分hash和数组部分的大小
+/// @param L 
+/// @param t 
+/// @param ek 
 static void rehash (lua_State *L, Table *t, const TValue *ek) {
-  unsigned int asize;  /* optimal size for array part */
-  unsigned int na;  /* number of keys in the array part */
+  unsigned int asize;  /* optimal size for array part *///优化后的数组部分的大小
+  unsigned int na;  /* number of keys in the array part *///记录数组部分存的元素个数
   unsigned int nums[MAXABITS + 1];
   int i;
-  int totaluse;
+  int totaluse;//记录表中元素的总数 
   for (i = 0; i <= MAXABITS; i++) nums[i] = 0;  /* reset counts */
-  setlimittosize(t);
-  na = numusearray(t, nums);  /* count keys in array part */
+  setlimittosize(t);//设置alimit为表数组部分的实际大小，并设置对应的flags，返回表数组部分的实际大小
+  na = numusearray(t, nums);  /* count keys in array part *///统计数组部分已经使用的元素数量
   totaluse = na;  /* all those keys are integer keys */
-  totaluse += numusehash(t, nums, &na);  /* count keys in hash part */
+  totaluse += numusehash(t, nums, &na);  /* count keys in hash part *///统计散列表部分已经使用的节点数量，并将key为整型的元素记录到nums对应的位置和na
   /* count extra key */
-  if (ttisinteger(ek))
+  if (ttisinteger(ek))//需要插入的ek如果是整型，则将其记录到nums对应的位置和na
     na += countint(ivalue(ek), nums);
   totaluse++;
   /* compute new size for array part */
-  asize = computesizes(nums, &na);
+  asize = computesizes(nums, &na);//计算数组部分新的大小
   /* resize the table to new computed sizes */
-  luaH_resize(L, t, asize, totaluse - na);
+  luaH_resize(L, t, asize, totaluse - na);//根据新的数组大小和散列表部分存入的元素个数调整数组大小和散列表大小
 }
 
 
@@ -723,24 +779,37 @@ static Node *getfreepos (Table *t) {
 ** put new key in its main position; otherwise (colliding node is in its main
 ** position), new key goes to an empty position.
 */
+
+/// @brief  
+// 这个函数的主要功能将一个key插入哈希表，并返回key关联的value指针。
+// 1. 首先通过key计算出主位置，如果主位置为空结点那最简单，将key设进该结点，然后返回结点的值指针。
+// 2. 如果不是空结点就要分情况，看a和b两种情况
+//   a.如果该结点就是主位置结点，那么要另找一个空闲位置，把Key放进去，和主结点链接起来，
+//   然后返回新结点的值指针。
+//   b.如果该结点不是主位置结点，把这个结点移到空闲位置去；然后我进驻这个位置，并返回结点的值指针。
+
+/// @param L 
+/// @param t 
+/// @param key 
+/// @param value 
 void luaH_newkey (lua_State *L, Table *t, const TValue *key, TValue *value) {
   Node *mp;
   TValue aux;
-  if (l_unlikely(ttisnil(key)))
+  if (l_unlikely(ttisnil(key)))//key是空值 报错
     luaG_runerror(L, "table index is nil");
-  else if (ttisfloat(key)) {
+  else if (ttisfloat(key)) {//key是float 转成int 不能就报错
     lua_Number f = fltvalue(key);
     lua_Integer k;
-    if (luaV_flttointeger(f, &k, F2Ieq)) {  /* does key fit in an integer? */
+    if (luaV_flttointeger(f, &k, F2Ieq)) {  /* does key fit in an integer? *///float 转int
       setivalue(&aux, k);
       key = &aux;  /* insert it as an integer */
     }
-    else if (l_unlikely(luai_numisnan(f)))
+    else if (l_unlikely(luai_numisnan(f)))//因为根据IEEE 754，nan值被认为不等于任何值，包括它自己
       luaG_runerror(L, "table index is NaN");
   }
   if (ttisnil(value))
     return;  /* do not insert nil values */
-  mp = mainpositionTV(t, key);
+  mp = mainpositionTV(t, key);//通过key找到主位置的node桶
   if (!isempty(gval(mp)) || isdummy(t)) {  /* main position is taken? */
     Node *othern;
     Node *f = getfreepos(t);  /* get a free place */
