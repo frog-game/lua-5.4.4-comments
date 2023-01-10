@@ -842,7 +842,7 @@ typedef union Node {
 */
 
 #define BITRAS		(1 << 7)//第8位为1
-#define isrealasize(t)		(!((t)->flags & BITRAS))//根据flags的第8为判断alimit是否为数组部分的实际大小
+#define isrealasize(t)		(!((t)->flags & BITRAS))//根据flags的第8位判断alimit是否为数组部分的实际大小
 #define setrealasize(t)		((t)->flags &= cast_byte(~BITRAS))//设置flags的第8为0 
 #define setnorealasize(t)	((t)->flags |= BITRAS)//根据flags的第8为判断alimit是否不为数组部分的实际大小
 
@@ -897,7 +897,7 @@ typedef struct Table {
 /*
 ** 'module' operation for hashing (size is always a power of 2)
 */
-//(size&(size-1))==0 这个是用来判断size是否是2的正整数冪
+//(size&(size-1))==0 这个是用来判断size是否是2的正整数幂或者0
 //比如size位16=10000 size-1=1111
 // 那么：
 // 10000

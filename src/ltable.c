@@ -294,7 +294,7 @@ static int equalkey (const TValue *k1, const Node *n2, int deadok) {
 ** 'alimit'.)
 */
 
-// 大小为零或者2的幂或存在于表中
+// 大小为零或者2的幂或alimit是数组部分的实际大小
 #define limitequalsasize(t)	(isrealasize(t) || ispow2((t)->alimit))
 
 
@@ -309,17 +309,18 @@ LUAI_FUNC unsigned int luaH_realasize (const Table *t) {
   if (limitequalsasize(t))
     return t->alimit;  /* this is the size */
   else {
-    unsigned int size = t->alimit;
+    unsigned int size = t->alimit;//假设size是10
     /* compute the smallest power of 2 not smaller than 'n' */
-    size |= (size >> 1);
-    size |= (size >> 2);
-    size |= (size >> 4);
-    size |= (size >> 8);
-    size |= (size >> 16);
-#if (UINT_MAX >> 30) > 3
-    size |= (size >> 32);  /* unsigned int has more than 32 bits */
+    //计算不小于n的最小2的指数倍
+    size |= (size >> 1);//10 |(10 >> 1) ---> 1010 | （1010>> 1）   ---> 1010 | （0101）  ---> 1111   size = 15
+    size |= (size >> 2);//1111|(1111 >> 2)---> 1111 | （11）---> 1111 size = 15
+    size |= (size >> 4);//1111|(1111 >> 4)---> 1111 | （0）---> 1111 size = 15
+    size |= (size >> 8);//1111|(1111 >> 8)---> 1111 | （0）---> 1111 size = 15
+    size |= (size >> 16);//1111|(1111 >> 16)---> 1111 | （0）---> 1111 size = 15
+#if (UINT_MAX >> 30) > 3//右移30位如果大于3 举例11111111111111111111111111111111 加入右移30剩下2位11如果2位11前面还有1那么肯定大于3
+    size |= (size >> 32);  /* unsigned int has more than 32 bits *///无符号 int 超过 32 位 要取32位以上的指数
 #endif
-    size++;
+    size++;//16
     lua_assert(ispow2(size) && size/2 < t->alimit && t->alimit < size);
     return size;
   }
@@ -331,6 +332,10 @@ LUAI_FUNC unsigned int luaH_realasize (const Table *t) {
 ** (If it is not, 'alimit' cannot be changed to any other value
 ** without changing the real size.)
 */
+
+/// @brief 检查数组的实际大小是否为 2 的幂 或者alimit是不是数组部分的实际大小
+/// @param t 
+/// @return 
 static int ispow2realasize (const Table *t) {
   return (!isrealasize(t) || ispow2(t->alimit));
 }
