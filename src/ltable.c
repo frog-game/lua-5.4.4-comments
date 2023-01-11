@@ -228,7 +228,7 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
   }
 }
 
-/// @brief mainposition函数通过key找到主位置的node桶
+/// @brief 函数通过key找到主位置的node桶
 /// @param t 
 /// @param nd 
 /// @return 
@@ -780,14 +780,7 @@ static Node *getfreepos (Table *t) {
 ** position), new key goes to an empty position.
 */
 
-/// @brief  
-// 这个函数的主要功能将一个key插入哈希表，并返回key关联的value指针。
-// 1. 首先通过key计算出主位置，如果主位置为空结点那最简单，将key设进该结点，然后返回结点的值指针。
-// 2. 如果不是空结点就要分情况，看a和b两种情况
-//   a.如果该结点就是主位置结点，那么要另找一个空闲位置，把Key放进去，和主结点链接起来，
-//   然后返回新结点的值指针。
-//   b.如果该结点不是主位置结点，把这个结点移到空闲位置去；然后我进驻这个位置，并返回结点的值指针。
-
+/// @brief  这个函数的主要功能将一个key插入哈希表，并返回key关联的value指针。
 /// @param L 
 /// @param t 
 /// @param key 
@@ -807,43 +800,45 @@ void luaH_newkey (lua_State *L, Table *t, const TValue *key, TValue *value) {
     else if (l_unlikely(luai_numisnan(f)))//因为根据IEEE 754，nan值被认为不等于任何值，包括它自己
       luaG_runerror(L, "table index is NaN");
   }
-  if (ttisnil(value))
+  if (ttisnil(value))//值是nil类型
     return;  /* do not insert nil values */
-  mp = mainpositionTV(t, key);//通过key找到主位置的node桶
-  if (!isempty(gval(mp)) || isdummy(t)) {  /* main position is taken? */
+  mp = mainpositionTV(t, key);//函数通过key找到主位置的node桶
+  if (!isempty(gval(mp)) || isdummy(t)) {  /* main position is taken? *///主位置桶被占，或者哈希表部分为空
     Node *othern;
-    Node *f = getfreepos(t);  /* get a free place */
+    Node *f = getfreepos(t);  /* get a free place *///// 找空闲位置，这里还涉及到没空闲位置会重建哈希表的操作
     if (f == NULL) {  /* cannot find a free place? */
-      rehash(L, t, key);  /* grow table */
+      rehash(L, t, key);  /* grow table *///如果没有找到位置就重建hash表的操作
       /* whatever called 'newkey' takes care of TM cache */
       luaH_set(L, t, key, value);  /* insert key into grown table */
       return;
     }
-    lua_assert(!isdummy(t));
-    othern = mainpositionfromnode(t, mp);
-    if (othern != mp) {  /* is colliding node out of its main position? */
+    lua_assert(!isdummy(t));//hash表不空
+    othern = mainpositionfromnode(t, mp);//通过主位置这个结点的key，计算出本来的主位置结点
+    if (othern != mp) {  /* is colliding node out of its main position? *///如果该结点就是主位置结点，那么要另找一个空闲位置，把Key放进去，和主结点链接起来
       /* yes; move colliding node into free position */
-      while (othern + gnext(othern) != mp)  /* find previous */
+      while (othern + gnext(othern) != mp)  /* find previous *///移动之前，要先把链接结点的偏移调整一下
         othern += gnext(othern);
       gnext(othern) = cast_int(f - othern);  /* rechain to point to 'f' */
-      *f = *mp;  /* copy colliding node into free pos. (mp->next also goes) */
-      if (gnext(mp) != 0) {
+      *f = *mp;  /* copy colliding node into free pos. (mp->next also goes) */// 把冲突结点移到空闲位置
+      if (gnext(mp) != 0) {    // 如果冲突结点也有链接结点，也要调整过来
         gnext(f) += cast_int(mp - f);  /* correct 'next' */
         gnext(mp) = 0;  /* now 'mp' is free */
       }
       setempty(gval(mp));
     }
-    else {  /* colliding node is in its own main position */
+    else {  /* colliding node is in its own main position *///如果该结点不是主位置结点，把这个结点移到空闲位置去；然后我进驻这个位置，并返回结点的值指针
       /* new node will go into free position */
-      if (gnext(mp) != 0)
+      if (gnext(mp) != 0)//把新的节点放到空闲位置
         gnext(f) = cast_int((mp + gnext(mp)) - f);  /* chain new position */
       else lua_assert(gnext(f) == 0);
       gnext(mp) = cast_int(f - mp);
       mp = f;
     }
   }
+
+  // 把key的值复制给节点,并返回节点的指针
   setnodekey(L, mp, key);
-  luaC_barrierback(L, obj2gco(t), key);
+  luaC_barrierback(L, obj2gco(t), key);//垃圾回收标记
   lua_assert(isempty(gval(mp)));
   setobj2t(L, gval(mp), value);
 }
@@ -857,27 +852,39 @@ void luaH_newkey (lua_State *L, Table *t, const TValue *key, TValue *value) {
 ** one more than the limit (so that it can be incremented without
 ** changing the real size of the array).
 */
+
+/// @brief 
+// 如果key的大小在数组大小范围内，那么就直接在数组中查找值并返回。
+// 否则，获取int的hash值对应的 hash node 桶，然后在slot-link上找到key对应的值并返回。（和链地址法的查找是一样的）
+// 如果找不到，则返回nil。
+
+// key在[1, sizearray)时在数组部分
+// key<=0或key>=sizearray则在哈希部分
+/// @param t 
+/// @param key 
+/// @return 
 const TValue *luaH_getint (Table *t, lua_Integer key) {
-  if (l_castS2U(key) - 1u < t->alimit)  /* 'key' in [1, t->alimit]? */
-    return &t->array[key - 1];
-  else if (!limitequalsasize(t) &&  /* key still may be in the array part? */
+  if (l_castS2U(key) - 1u < t->alimit)  /* 'key' in [1, t->alimit]? *///在数组大小范围
+    return &t->array[key - 1];//返回数组对应的下标内容
+  else if (!limitequalsasize(t) &&  /* key still may be in the array part? *///alimit是否为表的数组部分的实际大小 
            (l_castS2U(key) == t->alimit + 1 ||
             l_castS2U(key) - 1u < luaH_realasize(t))) {
-    t->alimit = cast_uint(key);  /* probably '#t' is here now */
-    return &t->array[key - 1];
+    t->alimit = cast_uint(key);  /* probably '#t' is here now *///设置alimit为key 
+    return &t->array[key - 1];//返回对应数组的元素
   }
   else {
+    // 1. 这里是哈希部分，整型直接key & nodesize得到数组索引，取出结点地址返回
     Node *n = hashint(t, key);
     for (;;) {  /* check whether 'key' is somewhere in the chain */
-      if (keyisinteger(n) && keyival(n) == key)
-        return gval(n);  /* that's it */
+      if (keyisinteger(n) && keyival(n) == key)//2. 比较该结点的key相等(同为整型且值相同)，是则返回值
+        return gval(n);  /* that's it */// 返回n的值的指针
       else {
-        int nx = gnext(n);
+        int nx = gnext(n);// 3. 如果不是，通过上面所说的next取链接的下一个结点 因为是相对偏移，所以只要n+=nx即可得到连接的结点指针，再回到2
         if (nx == 0) break;
         n += nx;
       }
     }
-    return &absentkey;
+    return &absentkey;//不存在对应的key
   }
 }
 
@@ -885,29 +892,37 @@ const TValue *luaH_getint (Table *t, lua_Integer key) {
 /*
 ** search function for short strings
 */
+
+/// @brief 从表t中查找短字符串为键的值
+/// @param t 
+/// @param key 
+/// @return 
 const TValue *luaH_getshortstr (Table *t, TString *key) {
-  Node *n = hashstr(t, key);
-  lua_assert(key->tt == LUA_VSHRSTR);
+  Node *n = hashstr(t, key);//根据短字符串的散列值对散列表大小取余去获取对应的节点
+  lua_assert(key->tt == LUA_VSHRSTR);//保证是短字符串类型
   for (;;) {  /* check whether 'key' is somewhere in the chain */
-    if (keyisshrstr(n) && eqshrstr(keystrval(n), key))
+    if (keyisshrstr(n) && eqshrstr(keystrval(n), key))//判断是否为相同字符串,比较的是地址
       return gval(n);  /* that's it */
     else {
-      int nx = gnext(n);
+      int nx = gnext(n);//获取Node n的next
       if (nx == 0)
-        return &absentkey;  /* not found */
-      n += nx;
+        return &absentkey;  /* not found *///没找到
+      n += nx;//获取下一个Node在node hash表中索引值n
     }
   }
 }
 
-
+/// @brief 如果key是string就调用luaH_getstr
+/// @param t 
+/// @param key 
+/// @return 
 const TValue *luaH_getstr (Table *t, TString *key) {
-  if (key->tt == LUA_VSHRSTR)
-    return luaH_getshortstr(t, key);
-  else {  /* for long strings, use generic case */
+  if (key->tt == LUA_VSHRSTR)//如果是短字符串
+    return luaH_getshortstr(t, key);//从表t中查找短字符串为键的值
+  else {  /* for long strings, use generic case *///如果是长字符串
     TValue ko;
     setsvalue(cast(lua_State *, NULL), &ko, key);
-    return getgeneric(t, &ko, 0);
+    return getgeneric(t, &ko, 0);//从表t的散列表部分查找键为key的值是否存在，存在则返回
   }
 }
 
@@ -915,19 +930,24 @@ const TValue *luaH_getstr (Table *t, TString *key) {
 /*
 ** main search function
 */
+
+/// @brief 主get函数
+/// @param t 
+/// @param key 
+/// @return 
 const TValue *luaH_get (Table *t, const TValue *key) {
   switch (ttypetag(key)) {
-    case LUA_VSHRSTR: return luaH_getshortstr(t, tsvalue(key));
-    case LUA_VNUMINT: return luaH_getint(t, ivalue(key));
-    case LUA_VNIL: return &absentkey;
-    case LUA_VNUMFLT: {
+    case LUA_VSHRSTR: return luaH_getshortstr(t, tsvalue(key));//短串
+    case LUA_VNUMINT: return luaH_getint(t, ivalue(key));//整型
+    case LUA_VNIL: return &absentkey;//nil
+    case LUA_VNUMFLT: {//float
       lua_Integer k;
-      if (luaV_flttointeger(fltvalue(key), &k, F2Ieq)) /* integral index? */
-        return luaH_getint(t, k);  /* use specialized version */
+      if (luaV_flttointeger(fltvalue(key), &k, F2Ieq)) /* integral index? *///如果能float能转换成int
+        return luaH_getint(t, k);  /* use specialized version *///走整型方式获取
       /* else... */
     }  /* FALLTHROUGH */
     default:
-      return getgeneric(t, key, 0);
+      return getgeneric(t, key, 0);//从表t的散列表部分查找键为key的值是否存在，存在则返回
   }
 }
 
@@ -938,6 +958,13 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 ** Beware: when using this function you probably need to check a GC
 ** barrier and invalidate the TM cache.
 */
+
+/// @brief 进行设置
+/// @param L 
+/// @param t 
+/// @param key 
+/// @param slot 
+/// @param value 
 void luaH_finishset (lua_State *L, Table *t, const TValue *key,
                                    const TValue *slot, TValue *value) {
   if (isabstkey(slot))
@@ -952,8 +979,8 @@ void luaH_finishset (lua_State *L, Table *t, const TValue *key,
 ** barrier and invalidate the TM cache.
 */
 void luaH_set (lua_State *L, Table *t, const TValue *key, TValue *value) {
-  const TValue *slot = luaH_get(t, key);
-  luaH_finishset(L, t, key, slot, value);
+  const TValue *slot = luaH_get(t, key);//获取槽位
+  luaH_finishset(L, t, key, slot, value);//进行设置
 }
 
 

@@ -12,6 +12,15 @@
 #include "lstate.h"
 
 
+// 短字符串
+//     1. 短字符串在生成时就已经计算好哈希值，因此在查找时直接用哈希值取模即可。
+//     2. 因为整个虚拟机相同内容的短字符串就一份，那么完全可以比较其地址，地址相同就表示Key相同(可查看代码中的这个宏eqshrstr)。
+
+
+//长字符串
+//     1. 一开始长字符串并不会马上计算哈希值，它将TString的extra设为0表示哈希值还未计算，对该字符串第一次调用luaS_hashlongstr才会去计算
+//     2. 计算长字符串的哈希值，为了尽量减少计算的消耗，它用采样的方式
+//     3. 长字符串的比较：先比较地址，再比较长度，最后比较内容
 /*
 ** Memory-allocation error message must be preallocated (it cannot
 ** be created after memory is exhausted)

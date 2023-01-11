@@ -41,7 +41,19 @@ typedef enum BinOpr {
 
 
 /* true if operation is foldable (that is, it is arithmetic or bitwise) */
-//是不是算术或者位运算
+//可以进行折叠的二元操作
+//就是在编译器进行语法分析的时候，将表达式计算求值，并用求得的值来替换表达式
+
+// for i=10,1*2*3,-1 do
+//     print(i)
+// end
+
+// 在进行语法分析的时候就会把上面的变成
+
+// for i=10,6,-1 do
+//     print(i)
+// end
+
 #define foldbinop(op)	((op) <= OPR_SHR)
 
 ///用于生成一条指令
