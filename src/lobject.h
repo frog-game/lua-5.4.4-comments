@@ -851,8 +851,8 @@ typedef union Node {
 typedef struct Table {
   CommonHeader;
   lu_byte flags;  /* 1<<p means tagmethod(p) is not present *///第8位为0，则表示alimit为数组的实际大小，否则需重新计算 
-  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希部分的长度对数 注意不是实际大小 大小总是是2的整数次方    1 << lsizenode 才能得到实际的size
-  unsigned int alimit;  /* "limit" of 'array' array *///记录数组部分的大小
+  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希部分的长度对数 注意不是实际大小 大小总是是2的整数次方    1 << lsizenode才能得到实际的size
+  unsigned int alimit;  /* "limit" of 'array' array *///在大部份情况下为数组的容量（2次幂数）
   TValue *array;  /* array part *///指向数组部分的首地址
   Node *node;//指向node数据块（即散列部分）首地址 哈希表存储在这
   Node *lastfree;  /* any free position is before this position *///记录上一次从node数据块（即散列部分）末尾分配空闲Node的位置
