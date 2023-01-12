@@ -312,7 +312,7 @@ typedef struct global_State {
   TString *memerrmsg;  /* message for memory-allocation errors *///初始为 "not enough memory" 该字符串永远不会被回收
   TString *tmname[TM_N];  /* array with tag-method names *///初始化为元方法字符串, 在 ltm.c luaT_init 中, 且将它们标记为不可回收对象
   struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types *////保存全局的注册表，注册表就是一个全局的table（即整个虚拟机中只有一个注册表），它只能被C代码访问，通常，它用来保存那些需要在几个模块中共享的数据。比如通过luaL_newmetatable创建的元表就是放在全局的注册表中
-  TString *strcache[STRCACHE_N][STRCACHE_M];  /* cache for strings in API *///零结尾的字符串缓存
+  TString *strcache[STRCACHE_N][STRCACHE_M];  /* cache for strings in API *///字符串缓存,这个缓存是用于提高字符串访问的命中率的
   lua_WarnFunction warnf;  /* warning function *////警告函数
   void *ud_warn;         /* auxiliary data to 'warnf' */// warnf的辅助数据
 } global_State;

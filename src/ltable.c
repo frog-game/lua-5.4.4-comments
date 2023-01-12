@@ -104,7 +104,8 @@
 //数据的地址来求hash
 #define hashpointer(t,p)	hashmod(t, point2uint(p))
 
-// 定义了一个不可改写的空哈希表：dummynode 。让空表被初始化时，node 域指向这个 dummy 节点。它虽然是一个全局变量，但因为对其访问是只读的，所以不会引起线程安全问题。
+
+// 宏定义一个虚拟节点，用于空哈希部分的元素
 #define dummynode		(&dummynode_)
 
 static const Node dummynode_ = {

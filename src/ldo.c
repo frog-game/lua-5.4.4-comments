@@ -111,7 +111,11 @@ void luaD_seterrorobj (lua_State *L, int errcode, StkId oldtop) {
   L->top = oldtop + 1;
 }
 
-
+/// @brief 在C语言中模仿exception机制
+///健壮的异常处理机制 会在 L->errorJmp 中设置错误码, 使得其调用函数知道是什么错误
+/// @param L 
+/// @param errcode 
+/// @return 
 l_noret luaD_throw (lua_State *L, int errcode) {
   if (L->errorJmp) {  /* thread has an error handler? */
     L->errorJmp->status = errcode;  /* set status */
@@ -134,7 +138,11 @@ l_noret luaD_throw (lua_State *L, int errcode) {
   }
 }
 
-
+/// @brief 执行 f 函数, 抛出异常后会跳转到 LUAI_TRY 之后继续执行代码, 并返回错误码
+/// @param L 
+/// @param f 
+/// @param ud 
+/// @return 
 int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   l_uint32 oldnCcalls = L->nCcalls;
   struct lua_longjmp lj;

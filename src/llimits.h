@@ -77,6 +77,8 @@ typedef signed char ls_byte;
 ** this is for hashing only; there is no problem if the integer
 ** cannot hold the whole pointer value
 */
+
+///指针到无符号整数的转换 使用的是长度来进行计算的
 #define point2uint(p)	((unsigned int)((size_t)(p) & UINT_MAX))
 
 
@@ -229,8 +231,8 @@ typedef l_uint32 Instruction;
 ** makes a direct cache.)
 */
 #if !defined(STRCACHE_N)
-#define STRCACHE_N		53
-#define STRCACHE_M		2
+#define STRCACHE_N		53 //N 是数组行
+#define STRCACHE_M		2//M 是数组列
 #endif
 
 

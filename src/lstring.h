@@ -25,15 +25,19 @@
 ** Memory-allocation error message must be preallocated (it cannot
 ** be created after memory is exhausted)
 */
-#define MEMERRMSG       "not enough memory"
+#define MEMERRMSG       "not enough memory"//没有足够的内存
 
 
 /*
 ** Size of a TString: Size of the header plus space for the string
 ** itself (including final '\0').
 */
+
+///字符串的总大小 
+// + 1 是因为是c语言后面还会在加个'\0'
 #define sizelstring(l)  (offsetof(TString, contents) + ((l) + 1) * sizeof(char))
 
+///目前来看是创建系统保留字的接口
 #define luaS_newliteral(L, s)	(luaS_newlstr(L, "" s, \
                                  (sizeof(s)/sizeof(char))-1))
 
@@ -41,12 +45,16 @@
 /*
 ** test whether a string is a reserved word
 */
+
+///字符串是否为保留字
 #define isreserved(s)	((s)->tt == LUA_VSHRSTR && (s)->extra > 0)
 
 
 /*
 ** equality for short strings, which are always internalized
 */
+
+///短字符串会放入字符串常量池中，因此短串在内存中总是只有一份，直接比较地址即可
 #define eqshrstr(a,b)	check_exp((a)->tt == LUA_VSHRSTR, (a) == (b))
 
 
