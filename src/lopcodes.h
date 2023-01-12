@@ -27,34 +27,42 @@ isJ                           sJ(25)                     |   Op(7)     |
   the written unsigned value minus K, where K is half the maximum for the
   corresponding unsigned argument.
 ===========================================================================*/
-
+// i:instruction 指令的意思
+// A:指令1参数 一般用作目标寄存器索引
+// B:指令2参数 既可以是寄存器索引，也可以是常量池索引
+// C:指令3参数 既可以是寄存器索引，也可以是常量池索引
+// k:一bit标志位 比如 标志位k为1表示常量池索引，否则表示寄存器索引
+// x:extended 扩展的意思
+// s:signed 符号 该参数应该被解释为有符号整数否则为无符号整数
+// sJ:表示跳转的PC偏移量
 enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组合的类型
 
 
 /*
 ** size and position of opcode arguments.
+//操作码参数的大小和位置
 */
-#define SIZE_C		8
-#define SIZE_B		8
-#define SIZE_Bx		(SIZE_C + SIZE_B + 1)
-#define SIZE_A		8
-#define SIZE_Ax		(SIZE_Bx + SIZE_A)
-#define SIZE_sJ		(SIZE_Bx + SIZE_A)
+#define SIZE_C		8 //C参数大小8位
+#define SIZE_B		8 //B参数大小8位
+#define SIZE_Bx		(SIZE_C + SIZE_B + 1) //Bx17位
+#define SIZE_A		8 //A参数大小8位
+#define SIZE_Ax		(SIZE_Bx + SIZE_A) //Ax参数大小25位
+#define SIZE_sJ		(SIZE_Bx + SIZE_A) //sJ参数大小25位
 
-#define SIZE_OP		7
+#define SIZE_OP		7 //OP参数大小7位
 
-#define POS_OP		0
+#define POS_OP		0 //初始起始位置0位
 
-#define POS_A		(POS_OP + SIZE_OP)
-#define POS_k		(POS_A + SIZE_A)
-#define POS_B		(POS_k + 1)
-#define POS_C		(POS_B + SIZE_B)
+#define POS_A		(POS_OP + SIZE_OP)//A参数起始位置7位
+#define POS_k		(POS_A + SIZE_A)//k参数起始位置15位
+#define POS_B		(POS_k + 1)//B参数起始位置16位
+#define POS_C		(POS_B + SIZE_B)//C参数起始位置7位
 
-#define POS_Bx		POS_k
+#define POS_Bx		POS_k//Bx参数起始位置15位
 
-#define POS_Ax		POS_A
+#define POS_Ax		POS_A//Ax参数起始位置7位
 
-#define POS_sJ		POS_A
+#define POS_sJ		POS_A//sJ参数起始位置7位
 
 
 /*
