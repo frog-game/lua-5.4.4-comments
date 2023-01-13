@@ -72,11 +72,12 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 */
 
 /* Check whether type 'int' has at least 'b' bits ('b' < 32) */
+///检测int类型必须有b位
 #define L_INTHASBITS(b)		((UINT_MAX >> ((b) - 1)) >= 1)
 
 
 #if L_INTHASBITS(SIZE_Bx)
-#define MAXARG_Bx	((1<<SIZE_Bx)-1)
+#define MAXARG_Bx	((1<<SIZE_Bx)-1) //iABx最大指令个数 
 #else
 #define MAXARG_Bx	MAX_INT
 #endif
