@@ -175,7 +175,7 @@ typedef struct FuncState {
   lu_byte nups;  /* number of upvalues */// 当前upvalue的数量
   lu_byte freereg;  /* first free register *///下一个可被使用的，空闲寄存器的位置
   lu_byte iwthabs;  /* instructions issued since last absolute line info *///绝对行计数
-  lu_byte needclose;  /* function needs to close upvalues when returning *///是否需要关闭上值
+  lu_byte needclose;  /* function needs to close upvalues when returning *///当返回的时候是否需要关闭上值
 } FuncState;
 
 

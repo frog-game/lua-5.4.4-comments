@@ -1825,7 +1825,7 @@ void luaK_finish (FuncState *fs) {
       }  /* FALLTHROUGH */
       case OP_RETURN: case OP_TAILCALL: {
         if (fs->needclose)
-          SETARG_k(*pc, 1);  /* signal that it needs to close */
+          SETARG_k(*pc, 1);  /* signal that it needs to close *///发信号说需要关闭
         if (p->is_vararg)
           SETARG_C(*pc, p->numparams + 1);  /* signal that it is vararg */
         break;

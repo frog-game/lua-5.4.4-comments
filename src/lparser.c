@@ -32,6 +32,8 @@
 
 /* maximum number of local variables per function (must be smaller
    than 250, due to the bytecode format) */
+
+//局部变量的最大数量200限制
 #define MAXVARS		200
 
 

@@ -35,6 +35,7 @@ isJ                           sJ(25)                     |   Op(7)     |
 // x:extended 扩展的意思
 // s:signed 符号 该参数应该被解释为有符号整数否则为无符号整数
 // sJ:表示跳转的PC偏移量
+// sBx和bx的区别是bx是一个无符号整数，而sbx表示的是一个有符号的数，也就是sbx可以是负数
 enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组合的类型
 
 
@@ -42,6 +43,7 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 ** size and position of opcode arguments.
 //操作码参数的大小和位置
 */
+//----------------------指令各部分的大小 begin-------------------//
 #define SIZE_C		8 //C参数大小8位
 #define SIZE_B		8 //B参数大小8位
 #define SIZE_Bx		(SIZE_C + SIZE_B + 1) //Bx17位
@@ -50,7 +52,9 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 #define SIZE_sJ		(SIZE_Bx + SIZE_A) //sJ参数大小25位
 
 #define SIZE_OP		7 //OP参数大小7位
+//----------------------指令各部分的大小 end-------------------//
 
+//----------------------指令部分的起始位置 begin-------------------//
 #define POS_OP		0 //初始起始位置0位
 
 #define POS_A		(POS_OP + SIZE_OP)//A参数起始位置7位
@@ -63,7 +67,7 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 #define POS_Ax		POS_A//Ax参数起始位置7位
 
 #define POS_sJ		POS_A//sJ参数起始位置7位
-
+//----------------------指令部分的起始位置 end-------------------//
 
 /*
 ** limits for opcode arguments.
@@ -75,111 +79,126 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 ///检测int类型必须有b位
 #define L_INTHASBITS(b)		((UINT_MAX >> ((b) - 1)) >= 1)
 
-
+//定义Ax、Bx、sBx、A、B、C部分所能存放的最大数值 
 #if L_INTHASBITS(SIZE_Bx)
-#define MAXARG_Bx	((1<<SIZE_Bx)-1) //iABx最大指令个数 
+#define MAXARG_Bx	((1<<SIZE_Bx)-1) //2^17-1  Bx放的最大数值
 #else
 #define MAXARG_Bx	MAX_INT
 #endif
 
-#define OFFSET_sBx	(MAXARG_Bx>>1)         /* 'sBx' is signed */
+#define OFFSET_sBx	(MAXARG_Bx>>1)         /* 'sBx' is signed *///2^16-1  sbx放的最大数值  有符号数
 
 
 #if L_INTHASBITS(SIZE_Ax)
-#define MAXARG_Ax	((1<<SIZE_Ax)-1)
+#define MAXARG_Ax	((1<<SIZE_Ax)-1) //2^25-1  Ax放的最大数值
 #else
 #define MAXARG_Ax	MAX_INT
 #endif
 
 #if L_INTHASBITS(SIZE_sJ)
-#define MAXARG_sJ	((1 << SIZE_sJ) - 1)
+#define MAXARG_sJ	((1 << SIZE_sJ) - 1)//2^25-1  sJ放的最大数值
 #else
 #define MAXARG_sJ	MAX_INT
 #endif
 
-#define OFFSET_sJ	(MAXARG_sJ >> 1)
+#define OFFSET_sJ	(MAXARG_sJ >> 1)//2^24-1  sJ放的最大数值
 
 
-#define MAXARG_A	((1<<SIZE_A)-1)
-#define MAXARG_B	((1<<SIZE_B)-1)
-#define MAXARG_C	((1<<SIZE_C)-1)
-#define OFFSET_sC	(MAXARG_C >> 1)
+#define MAXARG_A	((1<<SIZE_A)-1)//2^8-1  A放的最大数值
+#define MAXARG_B	((1<<SIZE_B)-1)//2^8-1  B放的最大数值
+#define MAXARG_C	((1<<SIZE_C)-1)//2^8-1  C放的最大数值
+#define OFFSET_sC	(MAXARG_C >> 1)//2^7-1  sC放的最大数值
 
-#define int2sC(i)	((i) + OFFSET_sC)
-#define sC2int(i)	((i) - OFFSET_sC)
+#define int2sC(i)	((i) + OFFSET_sC)//int转sC
+#define sC2int(i)	((i) - OFFSET_sC)//sc转int
 
 
 /* creates a mask with 'n' 1 bits at position 'p' */
+// ~0 32位1 1111111111111111111111111111111111111111111111111111111111111111
+// ~0<<1 最后一位变成0  1111111111111111111111111111111111111111111111111111111111111110
+// ~(~0<<1) 全0最后一位为1 0001
+// (~(~0<<1))<<1 第1位为1 其他位是0 第n位代表从后往前数 且从0开始 0010
+// 这个宏的意义就是在第p位标记n个1 其余位是0
+// 例如MASK1(2,3) 结果是11000
 #define MASK1(n,p)	((~((~(Instruction)0)<<(n)))<<(p))
 
 /* creates a mask with 'n' 0 bits at position 'p' */
+// 这个宏的意义就是在第p位标记n个0 其余位是1
+// 其实就是上面的宏取非
 #define MASK0(n,p)	(~MASK1(n,p))
 
 /*
 ** the following macros help to manipulate instructions
 */
-
-#define GET_OPCODE(i)	(cast(OpCode, ((i)>>POS_OP) & MASK1(SIZE_OP,0)))
+//---------------------------------------用于操作指令的宏 begin------------------------------------------//
+// get宏原理都是先将指令移位将要操作的值移动到最后再利用MASK1生成的结果进行与运算得到需要的值
+// set宏原理 将需要设置值的位置清空 处理需要设置值为对应值其余位为0 将两者进行或运算
+#define GET_OPCODE(i)	(cast(OpCode, ((i)>>POS_OP) & MASK1(SIZE_OP,0)))  //与上一个前7位的掩码
 #define SET_OPCODE(i,o)	((i) = (((i)&MASK0(SIZE_OP,POS_OP)) | \
-		((cast(Instruction, o)<<POS_OP)&MASK1(SIZE_OP,POS_OP))))
+		((cast(Instruction, o)<<POS_OP)&MASK1(SIZE_OP,POS_OP))))// //把opcode位置为0,然后或上新的opcode
 
-#define checkopm(i,m)	(getOpMode(GET_OPCODE(i)) == m)
+#define checkopm(i,m)	(getOpMode(GET_OPCODE(i)) == m)//检测指令的格式m是这个枚举值
 
 
+//这两个宏和上面两个类似,只是偏移和大小变成了变量
 #define getarg(i,pos,size)	(cast_int(((i)>>(pos)) & MASK1(size,0)))
 #define setarg(i,v,pos,size)	((i) = (((i)&MASK0(size,pos)) | \
                 ((cast(Instruction, v)<<pos)&MASK1(size,pos))))
+//---------------------------------------用于操作指令的宏 end------------------------------------------//
 
-#define GETARG_A(i)	getarg(i, POS_A, SIZE_A)
-#define SETARG_A(i,v)	setarg(i, v, POS_A, SIZE_A)
+//----------------------获取和设置指令各个部分的宏 begin----------------------------------//
+#define GETARG_A(i)	getarg(i, POS_A, SIZE_A)//获取A参数的值
+#define SETARG_A(i,v)	setarg(i, v, POS_A, SIZE_A)//设置A参数的值
 
-#define GETARG_B(i)	check_exp(checkopm(i, iABC), getarg(i, POS_B, SIZE_B))
-#define GETARG_sB(i)	sC2int(GETARG_B(i))
-#define SETARG_B(i,v)	setarg(i, v, POS_B, SIZE_B)
+#define GETARG_B(i)	check_exp(checkopm(i, iABC), getarg(i, POS_B, SIZE_B))//检测一下指令是不是iABC指令,并获取B参数的值
+#define GETARG_sB(i)	sC2int(GETARG_B(i))//获取sB参数的值
+#define SETARG_B(i,v)	setarg(i, v, POS_B, SIZE_B)//设置B参数的值
 
-#define GETARG_C(i)	check_exp(checkopm(i, iABC), getarg(i, POS_C, SIZE_C))
-#define GETARG_sC(i)	sC2int(GETARG_C(i))
-#define SETARG_C(i,v)	setarg(i, v, POS_C, SIZE_C)
+#define GETARG_C(i)	check_exp(checkopm(i, iABC), getarg(i, POS_C, SIZE_C))////检测一下指令是不是iABC指令,并获取C参数的值
+#define GETARG_sC(i)	sC2int(GETARG_C(i))//获取sC参数的值
+#define SETARG_C(i,v)	setarg(i, v, POS_C, SIZE_C)//设置C参数的值
 
-#define TESTARG_k(i)	check_exp(checkopm(i, iABC), (cast_int(((i) & (1u << POS_k)))))
-#define GETARG_k(i)	check_exp(checkopm(i, iABC), getarg(i, POS_k, 1))
-#define SETARG_k(i,v)	setarg(i, v, POS_k, 1)
+#define TESTARG_k(i)	check_exp(checkopm(i, iABC), (cast_int(((i) & (1u << POS_k)))))//检测一下指令是不是iABC指令,并获取k参数的值是1还是0用于条件判断
+#define GETARG_k(i)	check_exp(checkopm(i, iABC), getarg(i, POS_k, 1))//检测一下指令是不是iABC指令,并获取k参数的值
+#define SETARG_k(i,v)	setarg(i, v, POS_k, 1)//设置k参数的值
 
-#define GETARG_Bx(i)	check_exp(checkopm(i, iABx), getarg(i, POS_Bx, SIZE_Bx))
-#define SETARG_Bx(i,v)	setarg(i, v, POS_Bx, SIZE_Bx)
+#define GETARG_Bx(i)	check_exp(checkopm(i, iABx), getarg(i, POS_Bx, SIZE_Bx))//检测一下指令是不是iABx指令,获取Bx参数的值
+#define SETARG_Bx(i,v)	setarg(i, v, POS_Bx, SIZE_Bx)//设置Bx参数的值
 
-#define GETARG_Ax(i)	check_exp(checkopm(i, iAx), getarg(i, POS_Ax, SIZE_Ax))
-#define SETARG_Ax(i,v)	setarg(i, v, POS_Ax, SIZE_Ax)
+#define GETARG_Ax(i)	check_exp(checkopm(i, iAx), getarg(i, POS_Ax, SIZE_Ax))//检测一下指令是不是iAx指令,获取Ax参数的值
+#define SETARG_Ax(i,v)	setarg(i, v, POS_Ax, SIZE_Ax)//设置Ax参数的值
 
+// sBx的表示范围 -(2^17-1) 到 2^17-1 是对称分布 有一个值没有利用 GETARG_Bx最小是0 所以sBx最小是-(2^17-1)
 #define GETARG_sBx(i)  \
-	check_exp(checkopm(i, iAsBx), getarg(i, POS_Bx, SIZE_Bx) - OFFSET_sBx)
-#define SETARG_sBx(i,b)	SETARG_Bx((i),cast_uint((b)+OFFSET_sBx))
+	check_exp(checkopm(i, iAsBx), getarg(i, POS_Bx, SIZE_Bx) - OFFSET_sBx)//检测一下指令是不是iAsBx指令,获取sBx参数的值
+#define SETARG_sBx(i,b)	SETARG_Bx((i),cast_uint((b)+OFFSET_sBx))//设置sBx参数的值
 
 #define GETARG_sJ(i)  \
-	check_exp(checkopm(i, isJ), getarg(i, POS_sJ, SIZE_sJ) - OFFSET_sJ)
+	check_exp(checkopm(i, isJ), getarg(i, POS_sJ, SIZE_sJ) - OFFSET_sJ)//检测一下指令是不是isJ指令,获取sJ参数的值
 #define SETARG_sJ(i,j) \
-	setarg(i, cast_uint((j)+OFFSET_sJ), POS_sJ, SIZE_sJ)
+	setarg(i, cast_uint((j)+OFFSET_sJ), POS_sJ, SIZE_sJ)//设置sJ参数的值
+//----------------------获取和设置指令各个部分的宏 end----------------------------------//
 
-
+//----------------------指令创建 begin----------------------------------//
 #define CREATE_ABCk(o,a,b,c,k)	((cast(Instruction, o)<<POS_OP) \
 			| (cast(Instruction, a)<<POS_A) \
 			| (cast(Instruction, b)<<POS_B) \
 			| (cast(Instruction, c)<<POS_C) \
-			| (cast(Instruction, k)<<POS_k))
+			| (cast(Instruction, k)<<POS_k))//创建ABCK指令
 
 #define CREATE_ABx(o,a,bc)	((cast(Instruction, o)<<POS_OP) \
 			| (cast(Instruction, a)<<POS_A) \
-			| (cast(Instruction, bc)<<POS_Bx))
+			| (cast(Instruction, bc)<<POS_Bx))//创建ABx指令
 
 #define CREATE_Ax(o,a)		((cast(Instruction, o)<<POS_OP) \
-			| (cast(Instruction, a)<<POS_Ax))
+			| (cast(Instruction, a)<<POS_Ax))//创建Ax指令
 
 #define CREATE_sJ(o,j,k)	((cast(Instruction, o) << POS_OP) \
 			| (cast(Instruction, j) << POS_sJ) \
-			| (cast(Instruction, k) << POS_k))
+			| (cast(Instruction, k) << POS_k))//创建sJ指令
+//----------------------指令创建 end----------------------------------//
 
-
-#if !defined(MAXINDEXRK)  /* (for debugging only) */
+#if !defined(MAXINDEXRK)  /* (for debugging only) *///用于调试
 #define MAXINDEXRK	MAXARG_B
 #endif
 
@@ -187,15 +206,16 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 /*
 ** invalid register that fits in 8 bits
 */
+
+//标识是无效的8位寄存器
 #define NO_REG		MAXARG_A
 
 
 /*
-** R[x] - register
-** K[x] - constant (in constant table)
-** RK(x) == if k(i) then K[x] else R[x]
+** R(x) - register                                  一定是寄存器索引 一定要访问Lua栈
+** Kst(x) - constant (in constant table)            一定是常量 在常量表中
+** RK(x) == if ISK(x) then Kst(INDEXK(x)) else R(x) 可能是常量也可能在Lua栈中
 */
-
 
 /*
 ** Grep "ORDER OP" if you change these enums. Opcodes marked with a (*)
@@ -234,7 +254,10 @@ OP_SETTABLE,/*	A B C	R[A][R[B]] := RK(C)				*///设置寄存器值给标元素
 OP_SETI,/*	A B C	R[A][B] := RK(C)				*///向表设置整型字段值
 OP_SETFIELD,/*	A B C	R[A][K[B]:string] := RK(C)			*///向表设置字符串字段值
 
+// 在R(A)位置新建一个表 参数B代表array部分大小 参数C代表hash部分大小
+// 参数BC的表示方法查看luaO_int2fb
 OP_NEWTABLE,/*	A B C k	R[A] := {}					*///新建一个表
+
 
 OP_SELF,/*	A B C	R[A+1] := R[B]; R[A] := R[B][RK(C):string]	*///准备一个对象方法的调用
 /*表操作 end*/
@@ -314,7 +337,6 @@ OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) *///bool�
 /*函数调用 begin*/
 OP_CALL,/*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) *///函数调用 
 OP_TAILCALL,/*	A B C k	return R[A](R[A+1], ... ,R[A+B-1])		*///尾调用
-
 OP_RETURN,/*	A B C k	return R[A], ... ,R[A+B-2]	(see note)	*///从函数调用返回
 OP_RETURN0,/*		return						*///返回无结果
 OP_RETURN1,/*	A	return R[A]					*///返回一个参数
@@ -416,35 +438,40 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*///为上一条指
 ** bit 7: instruction is an MM instruction (call a metamethod)
 */
 // ** 指令属性的掩码
-// ** 位0-2：操作码类型 也就是这些 {iABC, iABx, iAsBx, iAx, isJ}
-// ** 位3：寄存器A 
-// ** 位4：运算符是测试（下一条指令必须是跳转） 
-// ** 位5：指令使用上一条指令设置的L->top（当B == 0时） 
-// ** 位6：指令集L->top用于下一条指令（当C == 0时） 
+// ** 位0-2：指令的类型 也就是这些 {iABC, iABx, iAsBx, iAx, isJ}
+// ** 位3：指令是否修改了寄存器A 
+// ** 位4：指令是否是测试指令下一条指令一定是jump指令 
+// ** 位5：使用前一条指令设置的L->top的值（当 B == 0 时） 
+// ** 位6：设置L->Top 用于下一条指令（当C == 0时） 
 // ** 位7：指令是MM指令（调用元方法）
 
 LUAI_DDEC(const lu_byte luaP_opmodes[NUM_OPCODES];)
 
-#define getOpMode(m)	(cast(enum OpMode, luaP_opmodes[m] & 7))
-#define testAMode(m)	(luaP_opmodes[m] & (1 << 3))//判断当前指令是否会修改寄存器A
-#define testTMode(m)	(luaP_opmodes[m] & (1 << 4))//用来判断当前指令是否涉及一次条件跳转
-#define testITMode(m)	(luaP_opmodes[m] & (1 << 5))
-#define testOTMode(m)	(luaP_opmodes[m] & (1 << 6))
-#define testMMMode(m)	(luaP_opmodes[m] & (1 << 7))
+#define getOpMode(m)	(cast(enum OpMode, luaP_opmodes[m] & 7))//获取指令的类型
+#define testAMode(m)	(luaP_opmodes[m] & (1 << 3))//检查指令是否修改A寄存器
+#define testTMode(m)	(luaP_opmodes[m] & (1 << 4))//检查指令是否是测试指令
+#define testITMode(m)	(luaP_opmodes[m] & (1 << 5))//检查指令是否可以使用前一条指令设置的L->top的值
+#define testOTMode(m)	(luaP_opmodes[m] & (1 << 6))//检查指令是否可以设置L->Top 用于下一条指令
+#define testMMMode(m)	(luaP_opmodes[m] & (1 << 7))//检查指令是否元方法指令
 
 /* "out top" (set top for next instruction) */
+//设置L->Top 用于下一条指令
 #define isOT(i)  \
 	((testOTMode(GET_OPCODE(i)) && GETARG_C(i) == 0) || \
           GET_OPCODE(i) == OP_TAILCALL)
 
 /* "in top" (uses top from previous instruction) */
+//使用前一条指令设置的L->top的值
 #define isIT(i)		(testITMode(GET_OPCODE(i)) && GETARG_B(i) == 0)
 
+
+//// opmode对应相应操作模式的一个映射表
 #define opmode(mm,ot,it,t,a,m)  \
     (((mm) << 7) | ((ot) << 6) | ((it) << 5) | ((t) << 4) | ((a) << 3) | (m))
 
 
 /* number of list items to accumulate before a SETLIST instruction */
+// SETLIST指令之前积累的list项的个数
 #define LFIELDS_PER_FLUSH	50
 
 #endif

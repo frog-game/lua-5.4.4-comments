@@ -910,7 +910,7 @@ int luaG_traceexec (lua_State *L, const Instruction *pc) {
   pc++;  /* reference is always next instruction */
   ci->u.l.savedpc = pc;  /* save 'pc' */
   counthook = (--L->hookcount == 0 && (mask & LUA_MASKCOUNT));
-  if (counthook)
+  if (counthook) 
     resethookcount(L);  /* reset count */
   else if (!(mask & LUA_MASKLINE))
     return 1;  /* no line hook and count != 0; nothing to be done now */
