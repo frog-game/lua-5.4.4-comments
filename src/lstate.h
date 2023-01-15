@@ -185,8 +185,8 @@ typedef struct CallInfo {
   struct CallInfo *previous, *next;  /* dynamic call link *///双向链表前驱后驱指针
   union {
     struct {  /* only for Lua functions *///针对lua函数
-      const Instruction *savedpc;//代码指令执行点, 类似 PC 寄存器 
-      volatile l_signalT trap;//信号开关,调试中断用的
+      const Instruction *savedpc;//代码指令执行点, 类似指令寄存器 
+      volatile l_signalT trap;//信号软中断开关,做跳转debug使用
       int nextraargs;  /* # of extra arguments in vararg functions *///额外参数
     } l;
     struct {  /* only for C functions *///针对c函数

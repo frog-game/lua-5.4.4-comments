@@ -35,7 +35,7 @@
 ** By default, use jump tables in the main interpreter loop on gcc
 ** and compatible compilers.
 */
-#if !defined(LUA_USE_JUMPTABLE)
+#if !defined(LUA_USE_JUMPTABLE) //是否使用跳转表
 #if defined(__GNUC__)
 #define LUA_USE_JUMPTABLE	1
 #else
@@ -1048,22 +1048,28 @@ void luaV_finishOp (lua_State *L) {
 */
 
 
-#define RA(i)	(base+GETARG_A(i))
-#define RB(i)	(base+GETARG_B(i))
-#define vRB(i)	s2v(RB(i))
-#define KB(i)	(k+GETARG_B(i))
-#define RC(i)	(base+GETARG_C(i))
-#define vRC(i)	s2v(RC(i))
-#define KC(i)	(k+GETARG_C(i))
-#define RKC(i)	((TESTARG_k(i)) ? k + GETARG_C(i) : s2v(base + GETARG_C(i)))
+// 获取二进制操作码的Opcode值和参数A、B、C
+// RA(i)表示指令i中参数ra的栈地址，RB(i)表示指令i中参数rb的栈地址。
+// GETARG_A(i)用于取出指令i中A部分的值，这部分的值是相对于函数内部的栈的基址（函数Closure对象的
+// 下一个栈单元）的偏移量，函数内部的栈的范围[ci->u.l.base, ci->top)，用于存放函数参数及函数内
+// 定义的本地变量。
+#define RA(i)	(base+GETARG_A(i))//获取寄存器A参数
+#define RB(i)	(base+GETARG_B(i))//获取寄存器B参数
+#define vRB(i)	s2v(RB(i))//获取寄存器B参数并转换成Tvalue类型
+#define KB(i)	(k+GETARG_B(i))//获取寄存器B上的常量
+#define RC(i)	(base+GETARG_C(i))//获取C参数
+#define vRC(i)	s2v(RC(i))//获取C参数并且转换成Tvalue类型
+#define KC(i)	(k+GETARG_C(i))//获取寄存器C上的常量
+#define RKC(i)	((TESTARG_k(i)) ? k + GETARG_C(i) : s2v(base + GETARG_C(i)))//如果i是常量池索引,那么就返回C寄存器上的常量,反之返回C寄存器上的值
 
 
-
+//设置信号中断开关
 #define updatetrap(ci)  (trap = ci->u.l.trap)
 
+//更新指令操作base位置,其实就是栈中func上的位置，一般指向的是参数
 #define updatebase(ci)	(base = ci->func + 1)
 
-
+//更新堆栈信息
 #define updatestack(ci)  \
 	{ if (l_unlikely(trap)) { updatebase(ci); ra = RA(i); } }
 
@@ -1072,10 +1078,13 @@ void luaV_finishOp (lua_State *L) {
 ** Execute a jump instruction. The 'updatetrap' allows signals to stop
 ** tight loops. (Without it, the local copy of 'trap' could never change.)
 */
+
+///执行跳转指令
 #define dojump(ci,i,e)	{ pc += GETARG_sJ(i) + e; updatetrap(ci); }
 
 
 /* for test instructions, execute the jump instruction that follows it */
+//进行跳转指令测试以后,就会执行跳转指令
 #define donextjump(ci)	{ Instruction ni = *pc; dojump(ci, ni, 1); }
 
 /*
@@ -1083,12 +1092,16 @@ void luaV_finishOp (lua_State *L) {
 ** was expected (parameter 'k'), else do next instruction, which must
 ** be a jump.
 */
+
+///执行条件跳转：如果cond不是预期的 参数K决定，则跳过下一条指令，否则执行下一条必须是跳转的指令
 #define docondjump()	if (cond != GETARG_k(i)) pc++; else donextjump(ci);
 
 
 /*
 ** Correct global 'pc'.
 */
+
+//纠正全局指令
 #define savepc(L)	(ci->u.l.savedpc = pc)
 
 
@@ -1096,6 +1109,8 @@ void luaV_finishOp (lua_State *L) {
 ** Whenever code can raise errors, the global 'pc' and the global
 ** 'top' must be correct to report occasional errors.
 */
+
+//纠正全局pc指令和top,好用来报告一些错误
 #define savestate(L,ci)		(savepc(L), L->top = ci->top)
 
 
@@ -1103,18 +1118,24 @@ void luaV_finishOp (lua_State *L) {
 ** Protect code that, in general, can raise errors, reallocate the
 ** stack, and change the hooks.
 */
+
+//保护模式运行code
 #define Protect(exp)  (savestate(L,ci), (exp), updatetrap(ci))
 
 /* special version that does not change the top */
+//和Protect差不多位于区别就是不修改栈顶top
 #define ProtectNT(exp)  (savepc(L), (exp), updatetrap(ci))
 
 /*
 ** Protect code that can only raise errors. (That is, it cannot change
 ** the stack or hooks.)
 */
+
+///保护只能引发错误的代码
 #define halfProtect(exp)  (savestate(L,ci), (exp))
 
 /* 'c' is the limit of live values in the stack */
+//检测GC,条件满足自动触发gc
 #define checkGC(L,c)  \
 	{ luaC_condGC(L, (savepc(L), L->top = (c)), \
                          updatetrap(ci)); \
@@ -1122,6 +1143,7 @@ void luaV_finishOp (lua_State *L) {
 
 
 /* fetch an instruction and prepare its execution */
+//指令循环，走向下一个指令
 #define vmfetch()	{ \
   if (l_unlikely(trap)) {  /* stack reallocation or hooks? */ \
     trap = luaG_traceexec(L, pc);  /* handle hooks */ \
@@ -1131,18 +1153,20 @@ void luaV_finishOp (lua_State *L) {
   ra = RA(i); /* WARNING: any stack reallocation invalidates 'ra' */ \
 }
 
-#define vmdispatch(o)	switch(o)
-#define vmcase(l)	case l:
-#define vmbreak		break
+#define vmdispatch(o)	switch(o) //switch 
+#define vmcase(l)	case l: //case 
+#define vmbreak		break //break
 
-
+/// @brief 指令执行状态机是个死循环
+/// @param L 
+/// @param ci 
 void luaV_execute (lua_State *L, CallInfo *ci) {
-  LClosure *cl;
-  TValue *k;
-  StkId base;
-  const Instruction *pc;
-  int trap;
-#if LUA_USE_JUMPTABLE
+  LClosure *cl;//lua闭包
+  TValue *k;//常量
+  StkId base;//当前正在执行的函数的第一个参数
+  const Instruction *pc;//指向下一条要执行的指令
+  int trap;//是否触发软中断
+#if LUA_USE_JUMPTABLE//是否使用跳转表
 #include "ljumptab.h"
 #endif
  startfunc:

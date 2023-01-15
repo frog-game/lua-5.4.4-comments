@@ -625,6 +625,8 @@ typedef struct AbsLineInfo {
 
 /// @brief 函数原型
 ///Proto主要存放二进制指令集Opcode
+//为什么定义全局常量变量名前面往往加上一个k 因为constant 的发音[ˈkɑ:nstənt]为了简写就使用了k而不是c
+
 typedef struct Proto {
   CommonHeader;
   lu_byte numparams;  /* number of fixed (named) parameters *///固定参数个数
@@ -744,7 +746,7 @@ typedef struct CClosure {
   // 一般就2个步骤：(1)从closure的upvals数组中按索引号取出upvalue。(2)将upvalue加到luastate的stack中
 } CClosure;
 
-/// @brief 
+/// @brief lua闭包
 typedef struct LClosure {
   ClosureHeader;//跟GC相关的结构，因为函数与是参与GC的
   struct Proto *p;//因为Closure=函数+upvalue，所以p封装的就是纯粹的函数原型

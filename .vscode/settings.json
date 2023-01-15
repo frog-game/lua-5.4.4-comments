@@ -4,6 +4,7 @@
         "{ \"*.lua.txt\": \"lua\" }": "",
         "lua.h": "c",
         "*.rh": "c",
-        "lstring.h": "c"
+        "lstring.h": "c",
+        "ljumptab.h": "c"
     }
 }

@@ -199,7 +199,7 @@ typedef unsigned int l_uint32;
 typedef unsigned long l_uint32;
 #endif
 
-typedef l_uint32 Instruction;
+typedef l_uint32 Instruction;//指令类型
 
 
 

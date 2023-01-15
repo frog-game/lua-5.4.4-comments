@@ -80,9 +80,9 @@ typedef struct expdesc {
       lu_byte ridx;  /* register holding the variable *///寄存器保存变量
       unsigned short vidx;  /* compiler index (in 'actvar.arr')  *///编译器索引
     } var;
-  } u;
-  int t;  /* patch list of 'exit when true' */// 真时退出的patch列表
-  int f;  /* patch list of 'exit when false' */// 假时退出的patch列表
+  } u;//对应类型的数据
+  int t;  /* patch list of 'exit when true' *///表示表达式为true时，待回填跳转指令的下标
+  int f;  /* patch list of 'exit when false' *///表示表达式为false时，待回填跳转指令的下标
 } expdesc;
 
 

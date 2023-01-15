@@ -668,8 +668,8 @@
 #if !defined(luai_likely)
 
 #if defined(__GNUC__) && !defined(LUA_NOBUILTIN)
-#define luai_likely(x)		(__builtin_expect(((x) != 0), 1))
-#define luai_unlikely(x)	(__builtin_expect(((x) != 0), 0))
+#define luai_likely(x)		(__builtin_expect(((x) != 0), 1))//期望(x) != 0这个条件成立
+#define luai_unlikely(x)	(__builtin_expect(((x) != 0), 0))//期望(x) != 0这个条件不成立
 #else
 #define luai_likely(x)		(x)
 #define luai_unlikely(x)	(x)

@@ -158,7 +158,7 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 #define GETARG_sC(i)	sC2int(GETARG_C(i))//获取sC参数的值
 #define SETARG_C(i,v)	setarg(i, v, POS_C, SIZE_C)//设置C参数的值
 
-#define TESTARG_k(i)	check_exp(checkopm(i, iABC), (cast_int(((i) & (1u << POS_k)))))//检测一下指令是不是iABC指令,并获取k参数的值是1还是0用于条件判断
+#define TESTARG_k(i)	check_exp(checkopm(i, iABC), (cast_int(((i) & (1u << POS_k)))))//检测一下指令是不是iABC指令,并获取k参数的值是1还是0用于条件判断是常量池索引,还是寄存器索引
 #define GETARG_k(i)	check_exp(checkopm(i, iABC), getarg(i, POS_k, 1))//检测一下指令是不是iABC指令,并获取k参数的值
 #define SETARG_k(i,v)	setarg(i, v, POS_k, 1)//设置k参数的值
 
@@ -442,7 +442,7 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*///为上一条指
 // ** 位3：指令是否修改了寄存器A 
 // ** 位4：指令是否是测试指令下一条指令一定是jump指令 
 // ** 位5：使用前一条指令设置的L->top的值（当 B == 0 时） 
-// ** 位6：设置L->Top 用于下一条指令（当C == 0时） 
+// ** 位6：设置L->Top用于下一条指令（当C == 0时） 
 // ** 位7：指令是MM指令（调用元方法）
 
 LUAI_DDEC(const lu_byte luaP_opmodes[NUM_OPCODES];)
@@ -455,7 +455,7 @@ LUAI_DDEC(const lu_byte luaP_opmodes[NUM_OPCODES];)
 #define testMMMode(m)	(luaP_opmodes[m] & (1 << 7))//检查指令是否元方法指令
 
 /* "out top" (set top for next instruction) */
-//设置L->Top 用于下一条指令
+//设置L->Top用于下一条指令
 #define isOT(i)  \
 	((testOTMode(GET_OPCODE(i)) && GETARG_C(i) == 0) || \
           GET_OPCODE(i) == OP_TAILCALL)
@@ -464,8 +464,13 @@ LUAI_DDEC(const lu_byte luaP_opmodes[NUM_OPCODES];)
 //使用前一条指令设置的L->top的值
 #define isIT(i)		(testITMode(GET_OPCODE(i)) && GETARG_B(i) == 0)
 
-
 //// opmode对应相应操作模式的一个映射表
+// mm:元方法
+// ot:设置L->Top用于下一条指令
+// it:使用前一条指令设置的L->top的值
+// t:是否是测试指令
+// a:是否修改A寄存器
+// m:指令的类型
 #define opmode(mm,ot,it,t,a,m)  \
     (((mm) << 7) | ((ot) << 6) | ((it) << 5) | ((t) << 4) | ((a) << 3) | (m))
 

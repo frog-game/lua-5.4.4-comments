@@ -15,6 +15,7 @@
 
 /* ORDER OP */
 
+/// @brief 对应相应操作模式的一个映射表
 LUAI_DDEF const lu_byte luaP_opmodes[NUM_OPCODES] = {
 /*       MM OT IT T  A  mode		   opcode  */
   opmode(0, 0, 0, 0, 1, iABC)		/* OP_MOVE */

@@ -3,7 +3,7 @@
 ** Jump Table for the Lua interpreter
 ** See Copyright Notice in lua.h
 */
-
+// Lua解释器的跳转表
 
 #undef vmdispatch
 #undef vmcase
