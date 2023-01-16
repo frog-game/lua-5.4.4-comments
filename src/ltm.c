@@ -171,7 +171,12 @@ static int callbinTM (lua_State *L, const TValue *p1, const TValue *p2,
   return 1;
 }
 
-
+/// @brief 尝试调用p1的元表中的元方法，如果调用失败，会抛出运行时异常。
+/// @param L 
+/// @param p1 
+/// @param p2 
+/// @param res 
+/// @param event 
 void luaT_trybinTM (lua_State *L, const TValue *p1, const TValue *p2,
                     StkId res, TMS event) {
   if (l_unlikely(!callbinTM(L, p1, p2, res, event))) {
@@ -198,7 +203,13 @@ void luaT_tryconcatTM (lua_State *L) {
     luaG_concaterror(L, s2v(top - 2), s2v(top - 1));
 }
 
-
+/// @brief 尝试调用元表中的元方法，与luaT_trybinTM不一样的是，这里会根据flip来指定是调用谁的元表
+/// @param L 
+/// @param p1 
+/// @param p2 
+/// @param flip 
+/// @param res 
+/// @param event 
 void luaT_trybinassocTM (lua_State *L, const TValue *p1, const TValue *p2,
                                        int flip, StkId res, TMS event) {
   if (flip)
@@ -207,7 +218,13 @@ void luaT_trybinassocTM (lua_State *L, const TValue *p1, const TValue *p2,
     luaT_trybinTM(L, p1, p2, res, event);
 }
 
-
+/// @brief 尝试调用元表中的元方法
+/// @param L 
+/// @param p1 
+/// @param i2 
+/// @param flip 
+/// @param res 
+/// @param event 
 void luaT_trybiniTM (lua_State *L, const TValue *p1, lua_Integer i2,
                                    int flip, StkId res, TMS event) {
   TValue aux;

@@ -630,7 +630,7 @@ typedef struct AbsLineInfo {
 typedef struct Proto {
   CommonHeader;
   lu_byte numparams;  /* number of fixed (named) parameters *///固定参数个数
-  lu_byte is_vararg;//是否支持变参:1 表示使用了变参作为最后一个参数
+  lu_byte is_vararg;//是否支持变参:1 表示使用了变参作为最后一个参数  三个点“...”表示这是一个可变参数的函数
   lu_byte maxstacksize;  /* number of registers needed by this function *///本函数用了多少个寄存器
   int sizeupvalues;  /* size of 'upvalues' *///上值个数
   int sizek;  /* size of 'k' *///常量个数

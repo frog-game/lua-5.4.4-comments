@@ -667,9 +667,11 @@
 */
 #if !defined(luai_likely)
 
+//在一个条件判断语句中，当这个条件被认为是非常非常有可能满足时，则使用luai_likely()宏，否则，条件非常非常不可能或很难满足时，则使用luai_unlikely宏。
+// __builtin_expect(x, 0)语句不会改变x的值，具体是否执行if或else语句只取决于x的值。__builtin_expecet()只是告诉编译器哪种情况的执行概率比较大，从而能够减少跳转指令的执行，达到优化的目的
 #if defined(__GNUC__) && !defined(LUA_NOBUILTIN)
-#define luai_likely(x)		(__builtin_expect(((x) != 0), 1))//期望(x) != 0这个条件成立
-#define luai_unlikely(x)	(__builtin_expect(((x) != 0), 0))//期望(x) != 0这个条件不成立
+#define luai_likely(x)		(__builtin_expect(((x) != 0), 1))//期望(x) != 0这个条件成立可能性更大
+#define luai_unlikely(x)	(__builtin_expect(((x) != 0), 0))//期望(x) != 0这个条件不成立可能性更大
 #else
 #define luai_likely(x)		(x)
 #define luai_unlikely(x)	(x)

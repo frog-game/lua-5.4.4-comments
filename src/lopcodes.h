@@ -225,6 +225,7 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 /// @brief Lua虚拟机采用定长指令，每条指令占4个字节
 // 在Lua 5.3里，操作码占指令低6位，因此总共能够容纳64条指令，定义了47条指令。
 // Lua 5.4将操作码扩展到了7位，因此总共能够容纳128条指令，定义了83条
+//立即数就是写在指令里的常数。用mov操作举例子，mov 12, %rax，那么这个 12 就在操作语句里。那么 12 相当于指令里的立即数。
 typedef enum {
 /*----------------------------------------------------------------------
   name		args	description
@@ -331,7 +332,7 @@ OP_GTI,/*	A sB k	if ((R[A] > sB) ~= k) then pc++			*///立即数大于测试,条
 OP_GEI,/*	A sB k	if ((R[A] >= sB) ~= k) then pc++		*///立即数大于等于测试,条件跳转
 
 OP_TEST,/*	A k	if (not R[A] == k) then pc++			*///bool测试,条件跳转
-OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) *///bool测试,条件跳转
+OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) *///bool测试,条件跳转和赋值
 /*逻辑判断和跳转 end*/
 
 /*函数调用 begin*/

@@ -447,25 +447,25 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 
 #define lua_getextraspace(L)	((void *)((char *)(L) - LUA_EXTRASPACE))
 
-#define lua_tonumber(L,i)	lua_tonumberx(L,(i),NULL)
-#define lua_tointeger(L,i)	lua_tointegerx(L,(i),NULL)
+#define lua_tonumber(L,i)	lua_tonumberx(L,(i),NULL)//
+#define lua_tointeger(L,i)	lua_tointegerx(L,(i),NULL)//转换成有符号整数类型
 
-#define lua_pop(L,n)		lua_settop(L, -(n)-1)
+#define lua_pop(L,n)		lua_settop(L, -(n)-1)//该函数表示从当前lua状态栈中弹出几个元素如 lua_pop( pLua, 2 )表示从栈顶弹出2个元素 当第二个参数填入-1时弹出所有元素即lua_pop( pLua, -1 )
 
-#define lua_newtable(L)		lua_createtable(L, 0, 0)
+#define lua_newtable(L)		lua_createtable(L, 0, 0)//lua_createtable()函数用于创建一个table，然后压入堆栈，并根据narray和nrec对新创建的table的数组部分或者hash表部分的进行大小更新。narray和nrec均为0，说明这个table是一个空table。
 
-#define lua_register(L,n,f) (lua_pushcfunction(L, (f)), lua_setglobal(L, (n)))
+#define lua_register(L,n,f) (lua_pushcfunction(L, (f)), lua_setglobal(L, (n)))//用于将C函数注册到_G这个表中，键值为函数的名字。先将函数对应的CClosure对象压入栈顶部，然后将位于栈顶部的这个CClosure对象添加到_G表中，并将其弹出栈顶。
 
-#define lua_pushcfunction(L,f)	lua_pushcclosure(L, (f), 0)
+#define lua_pushcfunction(L,f)	lua_pushcclosure(L, (f), 0)//将函数对应的CClosure对象压入栈顶部 
 
-#define lua_isfunction(L,n)	(lua_type(L, (n)) == LUA_TFUNCTION)
+#define lua_isfunction(L,n)	(lua_type(L, (n)) == LUA_TFUNCTION)//是不是函数
 #define lua_istable(L,n)	(lua_type(L, (n)) == LUA_TTABLE) /// @brief 判断index处元素是否为一个table , 如果是返回1,否则返回0
-#define lua_islightuserdata(L,n)	(lua_type(L, (n)) == LUA_TLIGHTUSERDATA)
-#define lua_isnil(L,n)		(lua_type(L, (n)) == LUA_TNIL)
-#define lua_isboolean(L,n)	(lua_type(L, (n)) == LUA_TBOOLEAN)
-#define lua_isthread(L,n)	(lua_type(L, (n)) == LUA_TTHREAD)
-#define lua_isnone(L,n)		(lua_type(L, (n)) == LUA_TNONE)
-#define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0)
+#define lua_islightuserdata(L,n)	(lua_type(L, (n)) == LUA_TLIGHTUSERDATA)//是不是lightuserdata
+#define lua_isnil(L,n)		(lua_type(L, (n)) == LUA_TNIL)//是不是nil
+#define lua_isboolean(L,n)	(lua_type(L, (n)) == LUA_TBOOLEAN)//是不是bool
+#define lua_isthread(L,n)	(lua_type(L, (n)) == LUA_TTHREAD)//是不是线程
+#define lua_isnone(L,n)		(lua_type(L, (n)) == LUA_TNONE)//是不是none
+#define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0)//是不是none或者nil
 
 ///@brief  通常在push字符串字面值时使用lua_pushliteral,在push字符串指针是使用lua_pushstring "" s这种写法是为了强制只能传递字符串
 #define lua_pushliteral(L, s)	lua_pushstring(L, "" s)

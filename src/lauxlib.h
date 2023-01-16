@@ -33,17 +33,20 @@ typedef struct luaL_Buffer luaL_Buffer;
 
 
 /* key, in the registry, for table of preloaded loaders */
+//预加载
 #define LUA_PRELOAD_TABLE	"_PRELOAD"
 
-
+/// @brief 记录了要注册的函数信息，注意，该列表以{NULL, NULL}结尾
 typedef struct luaL_Reg {
   const char *name;
   lua_CFunction func;
 } luaL_Reg;
 
 
-#define LUAL_NUMSIZES	(sizeof(lua_Integer)*16 + sizeof(lua_Number))
+#define LUAL_NUMSIZES	(sizeof(lua_Integer)*16 + sizeof(lua_Number))//版本号长度
 
+
+// 检查参数中传入的版本与当前的lua版本号是否一致，如果版本号不一致，lua进程会异常退出 
 LUALIB_API void (luaL_checkversion_) (lua_State *L, lua_Number ver, size_t sz);
 #define luaL_checkversion(L)  \
 	  luaL_checkversion_(L, LUA_VERSION_NUM, LUAL_NUMSIZES)
@@ -261,7 +264,7 @@ typedef struct luaL_Stream {
 
 /* print a string */
 #if !defined(lua_writestring)
-#define lua_writestring(s,l)   fwrite((s), sizeof(char), (l), stdout)
+#define lua_writestring(s,l)   fwrite((s), sizeof(char), (l), stdout)//把 ptr 所指向的数组中的数据写入到给定流 stream 中
 #endif
 
 /* print a newline and flush the output */

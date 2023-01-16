@@ -1450,13 +1450,13 @@ LUALIB_API lua_State *luaL_newstate (void) {
   return L;
 }
 
-/// @brief 检测版本
+/// @brief 检查参数中传入的版本与当前的lua版本号是否一致，如果版本号不一致，lua进程会异常退出 
 /// @param L 
 /// @param ver 
 /// @param sz 
 /// @return 
 LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
-  lua_Number v = lua_version(L);
+  lua_Number v = lua_version(L);//获取当前lua的版本号
   if (sz != LUAL_NUMSIZES)  /* check numeric types */
     luaL_error(L, "core and library have incompatible numeric types");
   else if (v != ver)

@@ -45,6 +45,10 @@ LClosure *luaF_newLclosure (lua_State *L, int nupvals) {
 /*
 ** fill a closure with new closed upvalues
 */
+
+/// @brief 申请用于存放闭包中将使用到的自由变量所需要的内存
+/// @param L 
+/// @param cl 
 void luaF_initupvals (lua_State *L, LClosure *cl) {
   int i;
   for (i = 0; i < cl->nupvalues; i++) {
@@ -243,7 +247,9 @@ void luaF_close (lua_State *L, StkId level, int status, int yy) {
   }
 }
 
-
+/// @brief 创建一个Proto结构体用于存放一个函数原型信息，并进行初始化 
+/// @param L 
+/// @return 
 Proto *luaF_newproto (lua_State *L) {
   GCObject *o = luaC_newobj(L, LUA_VPROTO, sizeof(Proto));
   Proto *f = gco2p(o);
@@ -270,7 +276,9 @@ Proto *luaF_newproto (lua_State *L) {
   return f;
 }
 
-
+/// @brief 释放一个proto结构体
+/// @param L 
+/// @param f 
 void luaF_freeproto (lua_State *L, Proto *f) {
   luaM_freearray(L, f->code, f->sizecode);
   luaM_freearray(L, f->p, f->sizep);

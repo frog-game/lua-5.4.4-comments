@@ -237,6 +237,8 @@ LUA_API int lua_gettop (lua_State *L) {
 /// @brief 设置栈的高度。如果开始的栈顶高于新的栈顶，顶部的值被丢弃
 /// 否则，为了得到指定的大小这个函数压入相应个数的空值（nil）到栈上。
 /// 特别的，lua_settop(L,0)清空堆栈。
+// idx >= 0时，L->top = L->ci_func + 1 + idx；
+// idx < 0时，L->top= L->top + 1 + idx 
 /// @param L 
 /// @param idx 
 /// @return 
@@ -248,7 +250,7 @@ LUA_API void lua_settop (lua_State *L, int idx) {
   ci = L->ci;
   func = ci->func;
   if (idx >= 0) {
-    api_check(L, idx <= ci->top - (func + 1), "new top too large");
+    api_check(L, idx <= ci->top - (func + 1), "new top too large");//idx >= 0时，检查上层传入的idx会不会超过整个堆栈的剩余的长度
     diff = ((func + 1) + idx) - L->top;
     for (; diff > 0; diff--)
       setnilvalue(s2v(L->top++));  /* clear new slots */
@@ -505,7 +507,7 @@ LUA_API int lua_compare (lua_State *L, int index1, int index2, int op) {
 }
 
 /// @brief 将以零结尾的字符串 s 转换为数字，将该数字压入堆栈，并返回字符串的总大小，即长度加一。
-/// 根据 Lua 的词汇约定（参见§3.1），转换可以产生整数或浮点数。字符串可能有前导和尾随空格以及一个符号。
+/// 根据 Lua 的词汇约定，转换可以产生整数或浮点数。字符串可能有前导和尾随空格以及一个符号。
 /// 如果字符串不是有效数字，则返回 0 并且不推送任何内容。（请注意，结果可以用作布尔值，如果转换成功，则为 true。）
 /// @param L 
 /// @param s 
@@ -517,7 +519,11 @@ LUA_API size_t lua_stringtonumber (lua_State *L, const char *s) {
   return sz;
 }
 
-
+/// @brief 将给定索引处的 Lua 值转换为number类型 double类型 
+/// @param L 
+/// @param idx 
+/// @param pisnum 用于返回操作是否成功
+/// @return 
 LUA_API lua_Number lua_tonumberx (lua_State *L, int idx, int *pisnum) {
   lua_Number n = 0;
   const TValue *o = index2value(L, idx);
@@ -527,12 +533,12 @@ LUA_API lua_Number lua_tonumberx (lua_State *L, int idx, int *pisnum) {
   return n;
 }
 
-/// @brief 将给定索引处的 Lua 值转换为有符号整数类型 lua_Integer 。
+/// @brief 将给定索引处的 Lua 值转换为有符号整数类型 lua_Integer 长度取决于机器。
 /// Lua 值必须是整数，或者是可转换为整数的数字或字符串；否则， lua_tointegerx 返回 0。
 /// 如果 isnum 不为 NULL ，则为其引用对象分配一个布尔值，该布尔值指示操作是否成功。
 /// @param L 
 /// @param idx 
-/// @param pisnum 
+/// @param pisnum 用于返回操作是否成功
 /// @return 
 LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx, int *pisnum) {
   lua_Integer res = 0;
@@ -1524,7 +1530,7 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
 
 /// @brief 把函数导出成二进制代码块 。函数接收栈顶的 Lua 函数做参数，然后生成它的二进制代码块。
 // 若被导出的东西被再次加载，加载的结果就相当于原来的函数。
-// 当它在产生代码块的时候，lua_dump通过调用函数 writer（参见 lua_Writer ）来写入数据，后面的 data 参数会被传入 writer 。
+// 当它在产生代码块的时候，lua_dump通过调用函数 writer来写入数据，后面的 data 参数会被传入 writer 。
 // 如果 strip 为真，二进制代码块将不包含该函数的调试信息。
 // 最后一次由 writer 的返回值将作为这个函数的返回值返回；0 表示没有错误。
 // 该函数不会把 Lua 函数弹出堆栈。
