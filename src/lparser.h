@@ -141,6 +141,11 @@ typedef struct Labellist {
 
 
 /* dynamic structures used by the parser */
+
+/// @brief 
+// 这个结构用于保存在parse一个chunk的时候所存储的gt label list和label list以及所有active变量列表，
+// 其中gt label list存储的是未匹配的goto语句和break语句的label信息，而label list存储的是已声明的label
+// 待出现一个gt label的时候就在label list中查找是否有匹配的label，若出现一个label也将在gt label list中查找是否有匹配的gt
 typedef struct Dyndata {
   struct {  /* list of all active local variables */
     Vardesc *arr;
@@ -163,7 +168,7 @@ typedef struct FuncState {
   struct LexState *ls;  /* lexical state *///词法状态
   struct BlockCnt *bl;  /* chain of current blocks *///当前块链
   int pc;  /* next position to code (equivalent to 'ncode') *///下一个指令，应当存放在Proto结构中的code列表的位置
-  int lasttarget;   /* 'label' of last 'jump label' *///最后一个跳转标签
+  int lasttarget;   /* 'label' of last 'jump label' *///最后一个跳转标记
   int previousline;  /* last line that was saved in 'lineinfo' *///保存在行信息中的最后一行
   int nk;  /* number of elements in 'k' *///当前常量的数量
   int np;  /* number of elements in 'p' *///被编译的代码，Proto的数量

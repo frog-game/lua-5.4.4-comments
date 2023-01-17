@@ -53,6 +53,11 @@ l_noret luaK_semerror (LexState *ls, const char *msg) {
 ** If expression is a numeric constant, fills 'v' with its value
 ** and returns 1. Otherwise, returns 0.
 */
+
+/// @brief 取表达式e的值到v
+/// @param e 
+/// @param v 
+/// @return 0:失败，1：成功
 static int tonumeral (const expdesc *e, TValue *v) {
   if (hasjumps(e))
     return 0;  /* not a numeral */
@@ -71,6 +76,11 @@ static int tonumeral (const expdesc *e, TValue *v) {
 /*
 ** Get the constant value from a constant expression
 */
+
+/// @brief 从常量表达式中获取常量值
+/// @param fs 
+/// @param e 
+/// @return 
 static TValue *const2val (FuncState *fs, const expdesc *e) {
   lua_assert(e->k == VCONST);
   return &fs->ls->dyd->actvar.arr[e->u.info].k;
@@ -81,6 +91,12 @@ static TValue *const2val (FuncState *fs, const expdesc *e) {
 ** If expression is a constant, fills 'v' with its value
 ** and returns 1. Otherwise, returns 0.
 */
+
+/// @brief 取常量表达式的值e到v
+/// @param fs 
+/// @param e 
+/// @param v 
+/// @return 0:失败，1：成功
 int luaK_exp2const (FuncState *fs, const expdesc *e, TValue *v) {
   if (hasjumps(e))
     return 0;  /* not a constant */
@@ -113,6 +129,10 @@ int luaK_exp2const (FuncState *fs, const expdesc *e, TValue *v) {
 ** previous one, return an invalid instruction (to avoid wrong
 ** optimizations).
 */
+
+/// @brief 返回当前代码的上一条指令 如果当前指令和前一个指令之间可能存在跳转目标，则返回无效指令
+/// @param fs 
+/// @return 
 static Instruction *previousinstruction (FuncState *fs) {
   static const Instruction invalidinstruction = ~(Instruction)0;
   if (fs->pc > fs->lasttarget)
@@ -128,14 +148,19 @@ static Instruction *previousinstruction (FuncState *fs) {
 ** range of previous instruction instead of emitting a new one. (For
 ** instance, 'local a; local b' will generate a single opcode.)
 */
+
+/// @brief 生成一条LOADNIL指令 如果前面已有LOADNIL则尝试衔接，以便减少指令数(算是一种优化吧)
+/// @param fs 
+/// @param from 
+/// @param n 
 void luaK_nil (FuncState *fs, int from, int n) {
   int l = from + n - 1;  /* last register to set nil */
   Instruction *previous = previousinstruction(fs);
-  if (GET_OPCODE(*previous) == OP_LOADNIL) {  /* previous is LOADNIL? */
+  if (GET_OPCODE(*previous) == OP_LOADNIL) {  /* previous is LOADNIL? *///如果前一个指令是loadNil，那么这里尝试将本次生成的loadNil和前面的连接起来
     int pfrom = GETARG_A(*previous);  /* get previous range */
     int pl = pfrom + GETARG_B(*previous);
     if ((pfrom <= from && from <= pl + 1) ||
-        (from <= pfrom && pfrom <= l + 1)) {  /* can connect both? */
+        (from <= pfrom && pfrom <= l + 1)) {  /* can connect both? *///两个区间能衔接则衔接
       if (pfrom < from) from = pfrom;  /* from = min(from, pfrom) */
       if (pl > l) l = pl;  /* l = max(l, pl) */
       SETARG_A(*previous, from);
@@ -151,6 +176,11 @@ void luaK_nil (FuncState *fs, int from, int n) {
 ** Gets the destination address of a jump instruction. Used to traverse
 ** a list of jumps.
 */
+
+/// @brief 获取跳转指令的目标地址
+/// @param fs 
+/// @param pc 
+/// @return 
 static int getjump (FuncState *fs, int pc) {
   int offset = GETARG_sJ(fs->f->code[pc]);
   if (offset == NO_JUMP)  /* point to itself represents end of list */
@@ -164,6 +194,11 @@ static int getjump (FuncState *fs, int pc) {
 ** Fix jump instruction at position 'pc' to jump to 'dest'.
 ** (Jump addresses are relative in Lua)
 */
+
+/// @brief 把PC处的指令（当然是 JMP 指令）改成目标为dest，当然是相对地址
+/// @param fs 
+/// @param pc 
+/// @param dest 
 static void fixjump (FuncState *fs, int pc, int dest) {
   Instruction *jmp = &fs->f->code[pc];
   int offset = dest - (pc + 1);
@@ -178,6 +213,11 @@ static void fixjump (FuncState *fs, int pc, int dest) {
 /*
 ** Concatenate jump-list 'l2' into jump-list 'l1'
 */
+
+/// @brief 将 l2链表 链接到 l1链表的后面 这是为了连续跳转 考虑的
+/// @param fs 
+/// @param l1 
+/// @param l2 
 void luaK_concat (FuncState *fs, int *l1, int l2) {
   if (l2 == NO_JUMP) return;  /* nothing to concatenate? */
   else if (*l1 == NO_JUMP)  /* no original list? */
@@ -197,7 +237,7 @@ void luaK_concat (FuncState *fs, int *l1, int l2) {
 ** can be fixed later (with 'fixjump').
 */
 
-/// @brief 用来生成一个新的跳转指令
+/// @brief 其目的是生成一个JMP指令 这是个无条件跳转指令
 /// @param fs 
 /// @return 
 int luaK_jump (FuncState *fs) {
@@ -208,6 +248,11 @@ int luaK_jump (FuncState *fs) {
 /*
 ** Code a 'return' instruction
 */
+
+/// @brief 生成一条RETURN指令
+/// @param fs 
+/// @param first 
+/// @param nret 
 void luaK_ret (FuncState *fs, int first, int nret) {
   OpCode op;
   switch (nret) {
@@ -223,6 +268,15 @@ void luaK_ret (FuncState *fs, int first, int nret) {
 ** Code a "conditional jump", that is, a test or comparison opcode
 ** followed by a jump. Return jump position.
 */
+
+/// @brief 生成条件跳转语句，lua 为了生成字节码的便利性，每个条件调转语句如LT, TEST等后面都跟着一个JMP，当条件不满足时直接指向JMP语句，否则就跳到JMP的下一条， 主要还是为了减少了编码的复杂度
+/// @param fs 
+/// @param op 
+/// @param A 
+/// @param B 
+/// @param C 
+/// @param k 
+/// @return 
 static int condjump (FuncState *fs, OpCode op, int A, int B, int C, int k) {
   luaK_codeABCk(fs, op, A, B, C, k);
   return luaK_jump(fs);
@@ -233,6 +287,10 @@ static int condjump (FuncState *fs, OpCode op, int A, int B, int C, int k) {
 ** returns current 'pc' and marks it as a jump target (to avoid wrong
 ** optimizations with consecutive instructions not in the same basic block).
 */
+
+/// @brief 标记一下，把当前的 lasttarget 改成 pc，这个 lasttarget 就是和上面的luaK_nil结合起来的，防止上面的误优化。
+/// @param fs 
+/// @return 
 int luaK_getlabel (FuncState *fs) {
   fs->lasttarget = fs->pc;
   return fs->pc;
@@ -244,6 +302,11 @@ int luaK_getlabel (FuncState *fs) {
 ** jump (that is, its condition), or the jump itself if it is
 ** unconditional.
 */
+
+/// @brief 由于JMP上一条很多情况下都是跟着条件跳转指令的，那么这条指令就是获取这条条件跳转指令的。如果是那么返回上一条，否则返回当前 pc。除了jmp之外，其他如FORLOOP, FORPREP等指令也会产生跳转
+/// @param fs 
+/// @param pc 
+/// @return 
 static Instruction *getjumpcontrol (FuncState *fs, int pc) {
   Instruction *pi = &fs->f->code[pc];
   if (pc >= 1 && testTMode(GET_OPCODE(*(pi-1))))
@@ -260,6 +323,12 @@ static Instruction *getjumpcontrol (FuncState *fs, int pc) {
 ** register. Otherwise, change instruction to a simple 'TEST' (produces
 ** no register value)
 */
+
+/// @brief 修改TESTSET指令，这个指令一般用于短路求值
+/// @param fs 
+/// @param node 
+/// @param reg 
+/// @return 
 static int patchtestreg (FuncState *fs, int node, int reg) {
   Instruction *i = getjumpcontrol(fs, node);
   if (GET_OPCODE(*i) != OP_TESTSET)
@@ -278,6 +347,10 @@ static int patchtestreg (FuncState *fs, int node, int reg) {
 /*
 ** Traverse a list of tests ensuring no one produces a value
 */
+
+/// @brief 遍历测试列表，确保都标识成无效指令
+/// @param fs 
+/// @param list 
 static void removevalues (FuncState *fs, int list) {
   for (; list != NO_JUMP; list = getjump(fs, list))
       patchtestreg(fs, list, NO_REG);
@@ -289,6 +362,13 @@ static void removevalues (FuncState *fs, int list) {
 ** registers: tests producing values jump to 'vtarget' (and put their
 ** values in 'reg'), other tests jump to 'dtarget'.
 */
+
+/// @brief  对于一个 jump list，如果是TESTSET，那么将赋值寄存器修改为 reg 并将 jump 目的地修改为 vtarget, 否则修改为 dtarget
+/// @param fs 
+/// @param list 
+/// @param vtarget 
+/// @param reg 
+/// @param dtarget 
 static void patchlistaux (FuncState *fs, int list, int vtarget, int reg,
                           int dtarget) {
   while (list != NO_JUMP) {
@@ -317,7 +397,9 @@ void luaK_patchlist (FuncState *fs, int list, int target) {
   patchlistaux(fs, list, target, NO_REG, target);
 }
 
-
+/// @brief 用来将一个链表准备回填到当前位置
+/// @param fs 
+/// @param list 
 void luaK_patchtohere (FuncState *fs, int list) {
   int hr = luaK_getlabel(fs);  /* mark "here" as a jump target */
   luaK_patchlist(fs, list, hr);
@@ -335,6 +417,11 @@ void luaK_patchtohere (FuncState *fs, int list) {
 ** in 'lineinfo' signals the existence of this absolute information.)
 ** Otherwise, store the difference from last line in 'lineinfo'.
 */
+
+/// @brief 保存新指令的行信息
+/// @param fs 
+/// @param f 
+/// @param line 
 static void savelineinfo (FuncState *fs, Proto *f, int line) {
   int linedif = line - fs->previousline;
   int pc = fs->pc - 1;  /* last instruction coded */
@@ -359,6 +446,9 @@ static void savelineinfo (FuncState *fs, Proto *f, int line) {
 ** above its max to force the new (replacing) instruction to have
 ** absolute line info, too.
 */
+
+/// @brief 从最后一条指令中删除行信息
+/// @param fs 
 static void removelastlineinfo (FuncState *fs) {
   Proto *f = fs->f;
   int pc = fs->pc - 1;  /* last instruction coded */
@@ -378,6 +468,9 @@ static void removelastlineinfo (FuncState *fs) {
 ** Remove the last instruction created, correcting line information
 ** accordingly.
 */
+
+/// @brief 删除最后创建的指令，并相应地更正行信息
+/// @param fs 
 static void removelastinstruction (FuncState *fs) {
   removelastlineinfo(fs);
   fs->pc--;
@@ -388,6 +481,11 @@ static void removelastinstruction (FuncState *fs) {
 ** Emit instruction 'i', checking for array sizes and saving also its
 ** line information. Return 'i' position.
 */
+
+/// @brief Opcode存放在Proto结构上其中f->code数组用于存放code fs->pc主要是计数器，标记code的个数及数组下标
+/// @param fs 
+/// @param i 
+/// @return 
 int luaK_code (FuncState *fs, Instruction i) {
   Proto *f = fs->f;
   /* put new instruction in code array */
@@ -403,6 +501,15 @@ int luaK_code (FuncState *fs, Instruction i) {
 ** Format and emit an 'iABC' instruction. (Assertions check consistency
 ** of parameters versus opcode.)
 */
+
+/// @brief 生成指令集iABC
+/// @param fs 
+/// @param o 
+/// @param a 
+/// @param b 
+/// @param c 
+/// @param k 
+/// @return 
 int luaK_codeABCk (FuncState *fs, OpCode o, int a, int b, int c, int k) {
   lua_assert(getOpMode(o) == iABC);
   lua_assert(a <= MAXARG_A && b <= MAXARG_B &&
@@ -414,6 +521,13 @@ int luaK_codeABCk (FuncState *fs, OpCode o, int a, int b, int c, int k) {
 /*
 ** Format and emit an 'iABx' instruction.
 */
+
+/// @brief 生成指令集iABx
+/// @param fs 
+/// @param o 
+/// @param a 
+/// @param bc 
+/// @return 
 int luaK_codeABx (FuncState *fs, OpCode o, int a, unsigned int bc) {
   lua_assert(getOpMode(o) == iABx);
   lua_assert(a <= MAXARG_A && bc <= MAXARG_Bx);
@@ -424,6 +538,13 @@ int luaK_codeABx (FuncState *fs, OpCode o, int a, unsigned int bc) {
 /*
 ** Format and emit an 'iAsBx' instruction.
 */
+
+/// @brief 生成指令集iAsBx
+/// @param fs 
+/// @param o 
+/// @param a 
+/// @param bc 
+/// @return 
 int luaK_codeAsBx (FuncState *fs, OpCode o, int a, int bc) {
   unsigned int b = bc + OFFSET_sBx;
   lua_assert(getOpMode(o) == iAsBx);
@@ -435,6 +556,13 @@ int luaK_codeAsBx (FuncState *fs, OpCode o, int a, int bc) {
 /*
 ** Format and emit an 'isJ' instruction.
 */
+
+/// @brief 生成指令集isJ
+/// @param fs 
+/// @param o 
+/// @param sj 
+/// @param k 
+/// @return 
 static int codesJ (FuncState *fs, OpCode o, int sj, int k) {
   unsigned int j = sj + OFFSET_sJ;
   lua_assert(getOpMode(o) == isJ);
@@ -446,6 +574,11 @@ static int codesJ (FuncState *fs, OpCode o, int sj, int k) {
 /*
 ** Emit an "extra argument" instruction (format 'iAx')
 */
+
+/// @brief 指令集iAx额外参数
+/// @param fs 
+/// @param a 
+/// @return 
 static int codeextraarg (FuncState *fs, int a) {
   lua_assert(a <= MAXARG_Ax);
   return luaK_code(fs, CREATE_Ax(OP_EXTRAARG, a));
@@ -457,6 +590,12 @@ static int codeextraarg (FuncState *fs, int a) {
 ** (if constant index 'k' fits in 18 bits) or an 'OP_LOADKX'
 ** instruction with "extra argument".
 */
+
+/// @brief 用OP_LOADK指令集或者OP_LOADKX指令集加载常量
+/// @param fs 
+/// @param reg 
+/// @param k 
+/// @return 
 static int luaK_codek (FuncState *fs, int reg, int k) {
   if (k <= MAXARG_Bx)
     return luaK_codeABx(fs, OP_LOADK, reg, k);
@@ -472,6 +611,10 @@ static int luaK_codek (FuncState *fs, int reg, int k) {
 ** Check register-stack level, keeping track of its maximum size
 ** in field 'maxstacksize'
 */
+
+/// @brief 调整maxstacksize以便匹配locvar的数量
+/// @param fs 
+/// @param n 
 void luaK_checkstack (FuncState *fs, int n) {
   int newstack = fs->freereg + n;
   if (newstack > fs->f->maxstacksize) {
@@ -486,6 +629,10 @@ void luaK_checkstack (FuncState *fs, int n) {
 /*
 ** Reserve 'n' registers in register stack
 */
+
+/// @brief 在寄存器空闲位置中保留n个寄存器
+/// @param fs 
+/// @param n 
 void luaK_reserveregs (FuncState *fs, int n) {
   luaK_checkstack(fs, n);
   fs->freereg += n;
@@ -497,6 +644,10 @@ void luaK_reserveregs (FuncState *fs, int n) {
 ** a local variable.
 )
 */
+
+/// @brief 如果既不是常量索引，也不是局部变量，则释放寄存器reg
+/// @param fs 
+/// @param reg 
 static void freereg (FuncState *fs, int reg) {
   if (reg >= luaY_nvarstack(fs)) {
     fs->freereg--;
@@ -508,6 +659,11 @@ static void freereg (FuncState *fs, int reg) {
 /*
 ** Free two registers in proper order
 */
+
+/// @brief 按正确顺序释放两个寄存器
+/// @param fs 
+/// @param r1 
+/// @param r2 
 static void freeregs (FuncState *fs, int r1, int r2) {
   if (r1 > r2) {
     freereg(fs, r1);
@@ -523,6 +679,11 @@ static void freeregs (FuncState *fs, int r1, int r2) {
 /*
 ** Free register used by expression 'e' (if any)
 */
+
+/// @brief 释放被临时占用的reg
+// local a = b + c + d  编译+d之前整合b+c的表达式，释放一个reg
+/// @param fs 
+/// @param e 
 static void freeexp (FuncState *fs, expdesc *e) {
   if (e->k == VNONRELOC)
     freereg(fs, e->u.info);
@@ -533,6 +694,11 @@ static void freeexp (FuncState *fs, expdesc *e) {
 ** Free registers used by expressions 'e1' and 'e2' (if any) in proper
 ** order.
 */
+
+/// @brief 释放e1，e2所占用的寄存器
+/// @param fs 
+/// @param e1 
+/// @param e2 
 static void freeexps (FuncState *fs, expdesc *e1, expdesc *e2) {
   int r1 = (e1->k == VNONRELOC) ? e1->u.info : -1;
   int r2 = (e2->k == VNONRELOC) ? e2->u.info : -1;
@@ -549,6 +715,14 @@ static void freeexps (FuncState *fs, expdesc *e1, expdesc *e2) {
 ** Note that all functions share the same table, so entering or exiting
 ** a function can make some indices wrong.
 */
+
+/// @brief 将常量加载到fs->f的常量表中
+// local var = "hello
+// 则本函数的k,v="hello
+/// @param fs 
+/// @param key 
+/// @param v 
+/// @return 
 static int addk (FuncState *fs, TValue *key, TValue *v) {
   TValue val;
   lua_State *L = fs->ls->L;
@@ -581,6 +755,11 @@ static int addk (FuncState *fs, TValue *key, TValue *v) {
 /*
 ** Add a string to list of constants and return its index.
 */
+
+/// @brief 将字符串添加到常量列表并返回其索引
+/// @param fs 
+/// @param s 
+/// @return 
 static int stringK (FuncState *fs, TString *s) {
   TValue o;
   setsvalue(fs->ls->L, &o, s);
@@ -591,6 +770,11 @@ static int stringK (FuncState *fs, TString *s) {
 /*
 ** Add an integer to list of constants and return its index.
 */
+
+/// @brief 向常量列表中添加一个整型数并返回其索引
+/// @param fs 
+/// @param n 
+/// @return 
 static int luaK_intK (FuncState *fs, lua_Integer n) {
   TValue o;
   setivalue(&o, n);
@@ -608,6 +792,11 @@ static int luaK_intK (FuncState *fs, lua_Integer n) {
 ** still an integer. At worst, this only wastes an entry with
 ** a duplicate.)
 */
+
+/// @brief 向常量列表中添加一个浮点数并返回其索引
+/// @param fs 
+/// @param r 
+/// @return 
 static int luaK_numberK (FuncState *fs, lua_Number r) {
   TValue o;
   lua_Integer ik;
@@ -631,6 +820,10 @@ static int luaK_numberK (FuncState *fs, lua_Number r) {
 /*
 ** Add a false to list of constants and return its index.
 */
+
+/// @brief 向常量列表中添加一个false并返回其索引
+/// @param fs 
+/// @return 
 static int boolF (FuncState *fs) {
   TValue o;
   setbfvalue(&o);
@@ -641,6 +834,10 @@ static int boolF (FuncState *fs) {
 /*
 ** Add a true to list of constants and return its index.
 */
+
+/// @brief 向常量列表中添加一个true并返回其索引
+/// @param fs 
+/// @return 
 static int boolT (FuncState *fs) {
   TValue o;
   setbtvalue(&o);
@@ -651,6 +848,10 @@ static int boolT (FuncState *fs) {
 /*
 ** Add nil to list of constants and return its index.
 */
+
+/// @brief 向常量列表中添加一个nil并返回其索引
+/// @param fs 
+/// @return 
 static int nilK (FuncState *fs) {
   TValue k, v;
   setnilvalue(&v);
@@ -665,6 +866,10 @@ static int nilK (FuncState *fs) {
 ** (0 <= int2sC(i) && int2sC(i) <= MAXARG_C) but without risk of
 ** overflows in the hidden addition inside 'int2sC'.
 */
+
+/// @brief 检查i是否可以存储在sC操作数中
+/// @param i 
+/// @return 
 static int fitsC (lua_Integer i) {
   return (l_castS2U(i) + OFFSET_sC <= cast_uint(MAXARG_C));
 }
@@ -673,11 +878,18 @@ static int fitsC (lua_Integer i) {
 /*
 ** Check whether 'i' can be stored in an 'sBx' operand.
 */
+
+/// @brief 检查“i”是否可以存储在sBx操作数中。
+/// @param i 
+/// @return 
 static int fitsBx (lua_Integer i) {
   return (-OFFSET_sBx <= i && i <= MAXARG_Bx - OFFSET_sBx);
 }
 
-
+/// @brief 生成常量int对应的指令集
+/// @param fs 
+/// @param reg 
+/// @param i 
 void luaK_int (FuncState *fs, int reg, lua_Integer i) {
   if (fitsBx(i))
     luaK_codeAsBx(fs, OP_LOADI, reg, cast_int(i));
@@ -685,7 +897,10 @@ void luaK_int (FuncState *fs, int reg, lua_Integer i) {
     luaK_codek(fs, reg, luaK_intK(fs, i));
 }
 
-
+/// @brief 生成常量float对应的指令集
+/// @param fs 
+/// @param reg 
+/// @param f 
 static void luaK_float (FuncState *fs, int reg, lua_Number f) {
   lua_Integer fi;
   if (luaV_flttointeger(f, &fi, F2Ieq) && fitsBx(fi))
@@ -698,6 +913,10 @@ static void luaK_float (FuncState *fs, int reg, lua_Number f) {
 /*
 ** Convert a constant in 'v' into an expression description 'e'
 */
+
+/// @brief 将v中的常量转换为表达式信息
+/// @param v 
+/// @param e 
 static void const2exp (TValue *v, expdesc *e) {
   switch (ttypetag(v)) {
     case LUA_VNUMINT:
@@ -727,6 +946,15 @@ static void const2exp (TValue *v, expdesc *e) {
 ** Fix an expression to return the number of results 'nresults'.
 ** 'e' must be a multi-ret expression (function call or vararg).
 */
+
+/// @brief 回填指令中的返回值数量
+// nresults:-1, C=0，希望返回变参
+// nresults: 0, C=1, 希望返回0个参数
+// nresults: 1, C=2, 希望返回1个参数
+// nresults: 2, C=3, 希望返回2个参数
+/// @param fs 
+/// @param e 
+/// @param nresults 
 void luaK_setreturns (FuncState *fs, expdesc *e, int nresults) {
   Instruction *pc = &getinstruction(fs, e);
   if (e->k == VCALL)  /* expression is an open function call? */
@@ -743,6 +971,10 @@ void luaK_setreturns (FuncState *fs, expdesc *e, int nresults) {
 /*
 ** Convert a VKSTR to a VK
 */
+
+/// @brief 将VKSTR转换为VK
+/// @param fs 
+/// @param e 
 static void str2K (FuncState *fs, expdesc *e) {
   lua_assert(e->k == VKSTR);
   e->u.info = stringK(fs, e->u.strval);
@@ -760,6 +992,10 @@ static void str2K (FuncState *fs, expdesc *e) {
 ** (Calls are created returning one result, so that does not need
 ** to be fixed.)
 */
+
+/// @brief 对于可能返回变参的表达式，强制其仅返回一个值 
+/// @param fs 
+/// @param e 
 void luaK_setoneret (FuncState *fs, expdesc *e) {
   if (e->k == VCALL) {  /* expression is an open function call? */
     /* already returns 1 value */
@@ -778,6 +1014,10 @@ void luaK_setoneret (FuncState *fs, expdesc *e) {
 ** Ensure that expression 'e' is not a variable (nor a <const>).
 ** (Expression still may have jump lists.)
 */
+
+/// @brief 根据变量所在的不同作用域来决定这个变量是否需要重定向
+/// @param fs 
+/// @param e 
 void luaK_dischargevars (FuncState *fs, expdesc *e) {
   switch (e->k) {
     case VCONST: {
@@ -831,6 +1071,11 @@ void luaK_dischargevars (FuncState *fs, expdesc *e) {
 ** non-relocatable expression.
 ** (Expression still may have jump lists.)
 */
+
+/// @brief 通过值的不同类型，来实现不同的操作码生成操作
+/// @param fs 
+/// @param e 
+/// @param reg 
 static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
   luaK_dischargevars(fs, e);
   switch (e->k) {
@@ -886,14 +1131,22 @@ static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
 ** non-relocatable expression.
 ** (Expression still may have jump lists.)
 */
+
+/// @brief 对 非已经CP_XXX到寄存器上的表达式(即：不是VNONRELOC表达式），生成CP_XXX指令到next.free.reg
+/// @param fs 
+/// @param e 
 static void discharge2anyreg (FuncState *fs, expdesc *e) {
-  if (e->k != VNONRELOC) {  /* no fixed register yet? */
+  if (e->k != VNONRELOC) {  /* no fixed register yet? *///表达式的结果值已经在reg上则无需重复加载到reg上
     luaK_reserveregs(fs, 1);  /* get a register */
     discharge2reg(fs, e, fs->freereg-1);  /* put value there */
   }
 }
 
-
+/// @brief 生成一条加载bool指令
+/// @param fs 
+/// @param A 
+/// @param op 
+/// @return 
 static int code_loadbool (FuncState *fs, int A, OpCode op) {
   luaK_getlabel(fs);  /* those instructions may be jump targets */
   return luaK_codeABC(fs, op, A, 0, 0);
