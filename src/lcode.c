@@ -35,7 +35,7 @@
 #define MAXREGS		255//Lua 函数中的最大寄存器数
 
 
-#define hasjumps(e)	((e)->t != (e)->f)
+#define hasjumps(e)	((e)->t != (e)->f) //是否有跳转
 
 
 static int codesJ (FuncState *fs, OpCode o, int sj, int k);
@@ -43,6 +43,11 @@ static int codesJ (FuncState *fs, OpCode o, int sj, int k);
 
 
 /* semantic error */
+
+/// @brief 语法错误
+/// @param ls 
+/// @param msg 
+/// @return 
 l_noret luaK_semerror (LexState *ls, const char *msg) {
   ls->t.token = 0;  /* remove "near <token>" from final message */
   luaX_syntaxerror(ls, msg);
@@ -1157,6 +1162,19 @@ static int code_loadbool (FuncState *fs, int A, OpCode op) {
 ** check whether list has any jump that do not produce a value
 ** or produce an inverted value
 */
+
+/// @brief 
+	// _TESTST : if (R(B) <=> C) then R(A) := R(B) else pc++
+	//     指令中的 R(A):=R(B)，已经给reg赋值了
+	//  OP_TEST(if not (R(A) <=> C) then pc++), OP_LT 等关系指令仅判断了cond，
+	//  并没有实际的赋值操作
+	
+	//  结合调用的前提(在exp2reg()函数中)，这里判断不等于OP_TESTSET即可
+	//  常用在  local a = b >c,   local a = b or c这种只生成了跳转指令没有生存赋值指令
+	//     但又需要赋值的上下文中
+/// @param fs 
+/// @param list 
+/// @return 
 static int need_value (FuncState *fs, int list) {
   for (; list != NO_JUMP; list = getjump(fs, list)) {
     Instruction i = *getjumpcontrol(fs, list);
@@ -1173,6 +1191,15 @@ static int need_value (FuncState *fs, int list) {
 ** its final position or to "load" instructions (for those tests
 ** that do not produce values).
 */
+
+/// @brief 
+// dst=src CP_XXX指令，将表达式的值拷贝给指定的寄存器reg, 参考 discharge2reg 函数注释
+// 函数内部处理了e的所有悬而未决的事务
+//   包括给VJMP生成必要的LOADBOOL指令,给OP_TESTSET回填赋值的目标寄存器或优化成OP_TEST
+// 函数处理完毕后，整个表达式就全部处理完毕了。
+/// @param fs 
+/// @param e 
+/// @param reg 
 static void exp2reg (FuncState *fs, expdesc *e, int reg) {
   discharge2reg(fs, e, reg);
   if (e->k == VJMP)  /* expression itself is a test? */
@@ -1201,6 +1228,10 @@ static void exp2reg (FuncState *fs, expdesc *e, int reg) {
 /*
 ** Ensures final expression result is in next available register.
 */
+
+/// @brief 确保最终表达式结果在下一个可用寄存器中
+/// @param fs 
+/// @param e 
 void luaK_exp2nextreg (FuncState *fs, expdesc *e) {
   luaK_dischargevars(fs, e);
   freeexp(fs, e);
@@ -1213,6 +1244,11 @@ void luaK_exp2nextreg (FuncState *fs, expdesc *e) {
 ** Ensures final expression result is in some (any) register
 ** and return that register.
 */
+
+/// @brief LOAD_XXX 加载指令 将"常量表达式"，"间接表达式", "VVARARG" 加载到next'free'reg中
+/// @param fs 
+/// @param e 
+/// @return 返回表达式info
 int luaK_exp2anyreg (FuncState *fs, expdesc *e) {
   luaK_dischargevars(fs, e);
   if (e->k == VNONRELOC) {  /* expression already has a register? */
@@ -1235,6 +1271,10 @@ int luaK_exp2anyreg (FuncState *fs, expdesc *e) {
 ** Ensures final expression result is either in a register
 ** or in an upvalue.
 */
+
+/// @brief 确保最终表达式结果位于寄存器或up值中
+/// @param fs 
+/// @param e 
 void luaK_exp2anyregup (FuncState *fs, expdesc *e) {
   if (e->k != VUPVAL || hasjumps(e))
     luaK_exp2anyreg(fs, e);
@@ -1245,11 +1285,15 @@ void luaK_exp2anyregup (FuncState *fs, expdesc *e) {
 ** Ensures final expression result is either in a register
 ** or it is a constant.
 */
+
+/// @brief 类似 LOAD_XXX 生成表达式的加载指令(！！！！不是CP_XXX拷贝一份e的值到reg的拷贝指令)
+/// @param fs 
+/// @param e 
 void luaK_exp2val (FuncState *fs, expdesc *e) {
   if (hasjumps(e))
-    luaK_exp2anyreg(fs, e);
+    luaK_exp2anyreg(fs, e);//求解表达式的src.val后，将表达式的值放到下一个free.reg中
   else
-    luaK_dischargevars(fs, e);
+    luaK_dischargevars(fs, e);//对间接表达式（原值不在reg中或不是直接值的）生成求值指令
 }
 
 
@@ -1257,6 +1301,11 @@ void luaK_exp2val (FuncState *fs, expdesc *e) {
 ** Try to make 'e' a K expression with an index in the range of R/K
 ** indices. Return true iff succeeded.
 */
+
+/// @brief 根据表达式的的类型转换成对应的索引
+/// @param fs 
+/// @param e 
+/// @return 
 static int luaK_exp2K (FuncState *fs, expdesc *e) {
   if (!hasjumps(e)) {
     int info;
@@ -1287,6 +1336,11 @@ static int luaK_exp2K (FuncState *fs, expdesc *e) {
 ** in the range of R/K indices).
 ** Returns 1 iff expression is K.
 */
+
+/// @brief 将表达式的结果索引存于寄存器或者K中
+/// @param fs 
+/// @param e 
+/// @return 
 int luaK_exp2RK (FuncState *fs, expdesc *e) {
   if (luaK_exp2K(fs, e))
     return 1;
@@ -1296,7 +1350,7 @@ int luaK_exp2RK (FuncState *fs, expdesc *e) {
   }
 }
 
-
+//处理表达式数据，并创建对应的指令集
 static void codeABRK (FuncState *fs, OpCode o, int a, int b,
                       expdesc *ec) {
   int k = luaK_exp2RK(fs, ec);
@@ -1307,6 +1361,11 @@ static void codeABRK (FuncState *fs, OpCode o, int a, int b,
 /*
 ** Generate code to store result of expression 'ex' into variable 'var'.
 */
+
+/// @brief 对变量进行设置值
+/// @param fs 
+/// @param var 
+/// @param ex 
 void luaK_storevar (FuncState *fs, expdesc *var, expdesc *ex) {
   switch (var->k) {
     case VLOCAL: {
@@ -1344,6 +1403,16 @@ void luaK_storevar (FuncState *fs, expdesc *var, expdesc *ex) {
 /*
 ** Emit SELF instruction (convert expression 'e' into 'e:key(e,').
 */
+
+/// @brief 
+
+// 这种方式创建指令
+// function tbl.sub()
+//   end
+
+/// @param fs 
+/// @param e 
+/// @param key 
 void luaK_self (FuncState *fs, expdesc *e, expdesc *key) {
   int ereg;
   luaK_exp2anyreg(fs, e);
@@ -1360,6 +1429,10 @@ void luaK_self (FuncState *fs, expdesc *e, expdesc *key) {
 /*
 ** Negate condition 'e' (where 'e' is a comparison).
 */
+
+/// @brief  否定条件处理,其实就是FALSE的时候不执行if块，直接跳转
+/// @param fs 
+/// @param e 
 static void negatecondition (FuncState *fs, expdesc *e) {
   Instruction *pc = getjumpcontrol(fs, e->u.info);
   lua_assert(testTMode(GET_OPCODE(*pc)) && GET_OPCODE(*pc) != OP_TESTSET &&
@@ -1374,6 +1447,17 @@ static void negatecondition (FuncState *fs, expdesc *e) {
 ** Optimize when 'e' is 'not' something, inverting the condition
 ** and removing the 'not'.
 */
+
+/// @brief 
+// condjump()生成了2个指令，第一条指令是判断指令：OP_TEST或者OP_TESTSET，
+// 第二条指令是OP_JUMP，也就是说，如果测试的结果是FALSE，
+// 那么，OP_TEST不做任何事情，继续执行，那么就会执行到OP_JUMP指令了，
+// 也就是FALSE的时候不执行if块，直接跳转，如果测试成功了呢，OP_TEST会执行跳过下一条指令的操作，
+// 也就是跳过了OP_JUMP，继续执行if块
+/// @param fs 
+/// @param e 
+/// @param cond 
+/// @return 
 static int jumponcond (FuncState *fs, expdesc *e, int cond) {
   if (e->k == VRELOC) {
     Instruction ie = getinstruction(fs, e);
@@ -1392,6 +1476,10 @@ static int jumponcond (FuncState *fs, expdesc *e, int cond) {
 /*
 ** Emit code to go through if 'e' is true, jump otherwise.
 */
+
+/// @brief R(B)为真则继续接着处理后面的表达式
+/// @param fs 
+/// @param e 
 void luaK_goiftrue (FuncState *fs, expdesc *e) {
   int pc;  /* pc of new jump */
   luaK_dischargevars(fs, e);
@@ -1419,6 +1507,10 @@ void luaK_goiftrue (FuncState *fs, expdesc *e) {
 /*
 ** Emit code to go through if 'e' is false, jump otherwise.
 */
+
+/// @brief R(B)为真则继续接着处理后面的表达式
+/// @param fs 
+/// @param e 
 void luaK_goiffalse (FuncState *fs, expdesc *e) {
   int pc;  /* pc of new jump */
   luaK_dischargevars(fs, e);
@@ -1445,6 +1537,12 @@ void luaK_goiffalse (FuncState *fs, expdesc *e) {
 /*
 ** Code 'not e', doing constant folding.
 */
+
+/// @brief 
+// not  A B R(A) := not R(B) 
+// not的stat的左边必须有左值,否则就是语法错误
+/// @param fs 
+/// @param e 
 static void codenot (FuncState *fs, expdesc *e) {
   switch (e->k) {
     case VNIL: case VFALSE: {
@@ -1479,6 +1577,11 @@ static void codenot (FuncState *fs, expdesc *e) {
 /*
 ** Check whether expression 'e' is a small literal string
 */
+
+/// @brief 检查表达式e是否为短字符串
+/// @param fs 
+/// @param e 
+/// @return 
 static int isKstr (FuncState *fs, expdesc *e) {
   return (e->k == VK && !hasjumps(e) && e->u.info <= MAXARG_B &&
           ttisshrstring(&fs->f->k[e->u.info]));
@@ -1487,6 +1590,10 @@ static int isKstr (FuncState *fs, expdesc *e) {
 /*
 ** Check whether expression 'e' is a literal integer.
 */
+
+/// @brief 检查表达式e是否为integer常量。
+/// @param e 
+/// @return 
 int luaK_isKint (expdesc *e) {
   return (e->k == VKINT && !hasjumps(e));
 }
@@ -1496,6 +1603,10 @@ int luaK_isKint (expdesc *e) {
 ** Check whether expression 'e' is a literal integer in
 ** proper range to fit in register C
 */
+
+/// @brief 检查表达式e是否为integer常量，并适合寄存器C
+/// @param e 
+/// @return 
 static int isCint (expdesc *e) {
   return luaK_isKint(e) && (l_castS2U(e->u.ival) <= l_castS2U(MAXARG_C));
 }
@@ -1505,6 +1616,10 @@ static int isCint (expdesc *e) {
 ** Check whether expression 'e' is a literal integer in
 ** proper range to fit in register sC
 */
+
+/// @brief 检查表达式e是否为integer常量，并适合寄存器sC
+/// @param e 
+/// @return 
 static int isSCint (expdesc *e) {
   return luaK_isKint(e) && fitsC(e->u.ival);
 }
@@ -1514,6 +1629,12 @@ static int isSCint (expdesc *e) {
 ** Check whether expression 'e' is a literal integer or float in
 ** proper range to fit in a register (sB or sC).
 */
+
+/// @brief 检查表达式e是否为integer常量或者float常量，并适合寄存器sB或者sC
+/// @param e 
+/// @param pi 
+/// @param isfloat 
+/// @return 
 static int isSCnumber (expdesc *e, int *pi, int *isfloat) {
   lua_Integer i;
   if (e->k == VKINT)
@@ -1537,6 +1658,12 @@ static int isSCnumber (expdesc *e, int *pi, int *isfloat) {
 ** Keys can be literal strings in the constant table or arbitrary
 ** values in registers.
 */
+
+/// @brief 创建表达式t[k]   t的最终结果必须已经在寄存器或upvalue中。Upvalue只能通过常量字符串进行索引。键可以是常量表中的常量字符串，也可以是寄存器中的任意值。
+
+/// @param fs 
+/// @param t 
+/// @param k 
 void luaK_indexed (FuncState *fs, expdesc *t, expdesc *k) {
   if (k->k == VKSTR)
     str2K(fs, k);
@@ -1573,6 +1700,12 @@ void luaK_indexed (FuncState *fs, expdesc *t, expdesc *k) {
 ** Bitwise operations need operands convertible to integers; division
 ** operations cannot have 0 as divisor.
 */
+
+/// @brief 如果折叠可能导致错误，则返回false。按位运算需要可转换为整数的操作数；除法运算不能将0作为除数
+/// @param op 
+/// @param v1 
+/// @param v2 
+/// @return 
 static int validop (int op, TValue *v1, TValue *v2) {
   switch (op) {
     case LUA_OPBAND: case LUA_OPBOR: case LUA_OPBXOR:
@@ -1592,6 +1725,13 @@ static int validop (int op, TValue *v1, TValue *v2) {
 ** Try to "constant-fold" an operation; return 1 iff successful.
 ** (In this case, 'e1' has the final result.)
 */
+
+/// @brief 常量折叠
+/// @param fs 
+/// @param op 
+/// @param e1 
+/// @param e2 
+/// @return 
 static int constfolding (FuncState *fs, int op, expdesc *e1,
                                         const expdesc *e2) {
   TValue v1, v2, res;
@@ -1618,6 +1758,12 @@ static int constfolding (FuncState *fs, int op, expdesc *e1,
 ** (everything but 'not').
 ** Expression to produce final result will be encoded in 'e'.
 */
+
+/// @brief 一元运算符
+/// @param fs 
+/// @param op 
+/// @param e 
+/// @param line 
 static void codeunexpval (FuncState *fs, OpCode op, expdesc *e, int line) {
   int r = luaK_exp2anyreg(fs, e);  /* opcodes operate only on registers */
   freeexp(fs, e);
@@ -1633,6 +1779,17 @@ static void codeunexpval (FuncState *fs, OpCode op, expdesc *e, int line) {
 ** operators).
 ** Expression to produce final result will be encoded in 'e1'.
 */
+
+/// @brief 二元运算最终结果
+/// @param fs 
+/// @param e1 
+/// @param e2 
+/// @param op 
+/// @param v2 
+/// @param flip 
+/// @param line 
+/// @param mmop 
+/// @param event 
 static void finishbinexpval (FuncState *fs, expdesc *e1, expdesc *e2,
                              OpCode op, int v2, int flip, int line,
                              OpCode mmop, TMS event) {
@@ -1651,6 +1808,13 @@ static void finishbinexpval (FuncState *fs, expdesc *e1, expdesc *e2,
 ** Emit code for binary expressions that "produce values" over
 ** two registers.
 */
+
+/// @brief 二元运算
+/// @param fs 
+/// @param op 
+/// @param e1 
+/// @param e2 
+/// @param line 
 static void codebinexpval (FuncState *fs, OpCode op,
                            expdesc *e1, expdesc *e2, int line) {
   int v2 = luaK_exp2anyreg(fs, e2);  /* both operands are in registers */
@@ -1663,6 +1827,15 @@ static void codebinexpval (FuncState *fs, OpCode op,
 /*
 ** Code binary operators with immediate operands.
 */
+
+/// @brief 用立即数操作数编码二元运算符。
+/// @param fs 
+/// @param op 
+/// @param e1 
+/// @param e2 
+/// @param flip 
+/// @param line 
+/// @param event 
 static void codebini (FuncState *fs, OpCode op,
                        expdesc *e1, expdesc *e2, int flip, int line,
                        TMS event) {
@@ -1675,6 +1848,15 @@ static void codebini (FuncState *fs, OpCode op,
 /* Try to code a binary operator negating its second operand.
 ** For the metamethod, 2nd operand must keep its original value.
 */
+
+/// @brief 尝试对一个二元运算符进行编码，以否定其第二个操作数。对于元方法，第二个操作数必须保持其原始值
+/// @param fs 
+/// @param e1 
+/// @param e2 
+/// @param op 
+/// @param line 
+/// @param event 
+/// @return 
 static int finishbinexpneg (FuncState *fs, expdesc *e1, expdesc *e2,
                              OpCode op, int line, TMS event) {
   if (!luaK_isKint(e2))
@@ -1693,7 +1875,9 @@ static int finishbinexpneg (FuncState *fs, expdesc *e1, expdesc *e2,
   }
 }
 
-
+/// @brief 交换表达式
+/// @param e1 
+/// @param e2 
 static void swapexps (expdesc *e1, expdesc *e2) {
   expdesc temp = *e1; *e1 = *e2; *e2 = temp;  /* swap 'e1' and 'e2' */
 }
@@ -1703,6 +1887,14 @@ static void swapexps (expdesc *e1, expdesc *e2) {
 ** Code arithmetic operators ('+', '-', ...). If second operand is a
 ** constant in the proper range, use variant opcodes with K operands.
 */
+
+/// @brief 算术运算符
+/// @param fs 
+/// @param opr 
+/// @param e1 
+/// @param e2 
+/// @param flip 
+/// @param line 
 static void codearith (FuncState *fs, BinOpr opr,
                        expdesc *e1, expdesc *e2, int flip, int line) {
   TMS event = cast(TMS, opr + TM_ADD);
@@ -1725,6 +1917,13 @@ static void codearith (FuncState *fs, BinOpr opr,
 ** numeric constant, change order of operands to try to use an
 ** immediate or K operator.
 */
+
+/// @brief 算术运算符
+/// @param fs 
+/// @param op 
+/// @param e1 
+/// @param e2 
+/// @param line 
 static void codecommutative (FuncState *fs, BinOpr op,
                              expdesc *e1, expdesc *e2, int line) {
   int flip = 0;
@@ -1743,6 +1942,13 @@ static void codecommutative (FuncState *fs, BinOpr op,
 ** Code bitwise operations; they are all associative, so the function
 ** tries to put an integer constant as the 2nd operand (a K operand).
 */
+
+/// @brief 二进制操作
+/// @param fs 
+/// @param opr 
+/// @param e1 
+/// @param e2 
+/// @param line 
 static void codebitwise (FuncState *fs, BinOpr opr,
                          expdesc *e1, expdesc *e2, int line) {
   int flip = 0;
@@ -1769,6 +1975,12 @@ static void codebitwise (FuncState *fs, BinOpr opr,
 ** Emit code for order comparisons. When using an immediate operand,
 ** 'isfloat' tells whether the original value was a float.
 */
+
+/// @brief 比较 '<' '<=' '>' '>='
+/// @param fs 
+/// @param op 
+/// @param e1 
+/// @param e2 
 static void codeorder (FuncState *fs, OpCode op, expdesc *e1, expdesc *e2) {
   int r1, r2;
   int im;
@@ -1799,6 +2011,12 @@ static void codeorder (FuncState *fs, OpCode op, expdesc *e1, expdesc *e2) {
 ** Emit code for equality comparisons ('==', '~=').
 ** 'e1' was already put as RK by 'luaK_infix'.
 */
+
+/// @brief 相等比较 '==' '~='
+/// @param fs 
+/// @param opr 
+/// @param e1 
+/// @param e2 
 static void codeeq (FuncState *fs, BinOpr opr, expdesc *e1, expdesc *e2) {
   int r1, r2;
   int im;
@@ -1830,6 +2048,16 @@ static void codeeq (FuncState *fs, BinOpr opr, expdesc *e1, expdesc *e2) {
 /*
 ** Apply prefix operation 'op' to expression 'e'.
 */
+
+/// @brief /* local a = not b 
+// 处理前缀操作符
+// OP_UNM, 	A B		R(A) := -R(B)
+// OP_NOT, 	A B		R(A) := not R(B)
+// OP_LEN, 	A B		R(A) := length of R(B)
+/// @param fs 
+/// @param op 
+/// @param e 
+/// @param line 
 void luaK_prefix (FuncState *fs, UnOpr op, expdesc *e, int line) {
   static const expdesc ef = {VKINT, {0}, NO_JUMP, NO_JUMP};
   luaK_dischargevars(fs, e);
@@ -1851,6 +2079,11 @@ void luaK_prefix (FuncState *fs, UnOpr op, expdesc *e, int line) {
 ** Process 1st operand 'v' of binary operation 'op' before reading
 ** 2nd operand.
 */
+
+/// @brief 中缀 a = exp1 + exp2 解析exp2前，根据操作符来处理exp1
+/// @param fs 
+/// @param op 
+/// @param v 
 void luaK_infix (FuncState *fs, BinOpr op, expdesc *v) {
   luaK_dischargevars(fs, v);
   switch (op) {
@@ -1899,6 +2132,12 @@ void luaK_infix (FuncState *fs, BinOpr op, expdesc *v) {
 ** For '(e1 .. e2.1 .. e2.2)' (which is '(e1 .. (e2.1 .. e2.2))',
 ** because concatenation is right associative), merge both CONCATs.
 */
+
+/// @brief 处理连接符 ...
+/// @param fs 
+/// @param e1 
+/// @param e2 
+/// @param line 
 static void codeconcat (FuncState *fs, expdesc *e1, expdesc *e2, int line) {
   Instruction *ie2 = previousinstruction(fs);
   if (GET_OPCODE(*ie2) == OP_CONCAT) {  /* is 'e2' a concatenation? */
@@ -1919,6 +2158,13 @@ static void codeconcat (FuncState *fs, expdesc *e1, expdesc *e2, int line) {
 /*
 ** Finalize code for binary operation, after reading 2nd operand.
 */
+
+/// @brief a = b + c 解析完c之后，将b+c合并作为一个exp 
+/// @param fs 
+/// @param opr 
+/// @param e1 
+/// @param e2 
+/// @param line 
 void luaK_posfix (FuncState *fs, BinOpr opr,
                   expdesc *e1, expdesc *e2, int line) {
   luaK_dischargevars(fs, e2);
@@ -2003,12 +2249,21 @@ void luaK_posfix (FuncState *fs, BinOpr opr,
 ** Change line information associated with current position, by removing
 ** previous info and adding it again with new line.
 */
+
+/// @brief /* 更新上一个生成的pc对应的行信息
+/// @param fs 
+/// @param line 
 void luaK_fixline (FuncState *fs, int line) {
   removelastlineinfo(fs);
   savelineinfo(fs, fs->f, line);
 }
 
-
+/// @brief 给table补上正确值
+/// @param fs 
+/// @param pc 
+/// @param ra 
+/// @param asize 
+/// @param hsize 
 void luaK_settablesize (FuncState *fs, int pc, int ra, int asize, int hsize) {
   Instruction *inst = &fs->f->code[pc];
   int rb = (hsize != 0) ? luaO_ceillog2(hsize) + 1 : 0;  /* hash size */
@@ -2027,6 +2282,12 @@ void luaK_settablesize (FuncState *fs, int pc, int ra, int asize, int hsize) {
 ** 'tostore' is number of values (in registers 'base + 1',...) to add to
 ** table (or LUA_MULTRET to add up to stack top).
 */
+
+/// @brief 给表设置一批数组元素
+/// @param fs 
+/// @param base 
+/// @param nelems 
+/// @param tostore 
 void luaK_setlist (FuncState *fs, int base, int nelems, int tostore) {
   lua_assert(tostore != 0 && tostore <= LFIELDS_PER_FLUSH);
   if (tostore == LUA_MULTRET)
@@ -2046,6 +2307,11 @@ void luaK_setlist (FuncState *fs, int base, int nelems, int tostore) {
 /*
 ** return the final target of a jump (skipping jumps to jumps)
 */
+
+/// @brief 返回跳转的最终目标
+/// @param code 
+/// @param i 
+/// @return 
 static int finaltarget (Instruction *code, int i) {
   int count;
   for (count = 0; count < 100; count++) {  /* avoid infinite loops */
@@ -2063,6 +2329,9 @@ static int finaltarget (Instruction *code, int i) {
 ** Do a final pass over the code of a function, doing small peephole
 ** optimizations and adjustments.
 */
+
+/// @brief 对函数的代码进行最后一次传递，进行小的优化和调整
+/// @param fs 
 void luaK_finish (FuncState *fs) {
   int i;
   Proto *p = fs->f;

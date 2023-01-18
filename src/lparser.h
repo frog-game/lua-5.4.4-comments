@@ -22,6 +22,8 @@
 */
 
 /* kinds of variables/expressions */
+
+/// @brief 表达式的类型
 typedef enum {
   VVOID,  /* when 'expdesc' describes the last expression of a list,
              this kind means an empty list (so, no expression) *///表达式是空的，也就是void
@@ -64,7 +66,7 @@ typedef enum {
 #define vkisvar(k)	(VLOCAL <= (k) && (k) <= VINDEXSTR)
 #define vkisindexed(k)	(VINDEXED <= (k) && (k) <= VINDEXSTR)
 
-
+/// @brief exp信息
 typedef struct expdesc {
   expkind k;//表达式的类型
   union {
