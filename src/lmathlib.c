@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 数学库
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:43:47
+ */
+/*
 ** $Id: lmathlib.c $
 ** Standard mathematical library
 ** See Copyright Notice in lua.h

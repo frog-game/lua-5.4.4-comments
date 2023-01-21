@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 内存管理接口【luaM_realloc / luaM_growaux_】
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:44:27
+ */
+
+/*
 ** $Id: lmem.h $
 ** Interface to Memory Manager
 ** See Copyright Notice in lua.h

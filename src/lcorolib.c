@@ -1,8 +1,16 @@
 /*
+ * @文件作用: 协程库
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:23:07
+ */
+
+/*
 ** $Id: lcorolib.c $
 ** Coroutine Library
 ** See Copyright Notice in lua.h
 */
+
 
 #define lcorolib_c
 #define LUA_LIB
@@ -29,6 +37,12 @@ static lua_State *getco (lua_State *L) {
 ** Resumes a coroutine. Returns the number of results for non-error
 ** cases or -1 for errors.
 */
+
+/// @brief 
+/// @param L 
+/// @param co 
+/// @param narg 
+/// @return 
 static int auxresume (lua_State *L, lua_State *co, int narg) {
   int status, nres;
   if (l_unlikely(!lua_checkstack(co, narg))) {

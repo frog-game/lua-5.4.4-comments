@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 动态扩展库管理
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:45:01
+ */
+/*
 ** $Id: loadlib.c $
 ** Dynamic library loader for Lua
 ** See Copyright Notice in lua.h

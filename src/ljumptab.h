@@ -1,4 +1,11 @@
 /*
+ * @文件作用: Lua解释器的跳转表
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:42:16
+ */
+
+/*
 ** $Id: ljumptab.h $
 ** Jump Table for the Lua interpreter
 ** See Copyright Notice in lua.h

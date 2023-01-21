@@ -1,4 +1,11 @@
 /*
+ * @文件作用: Debug库
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:24:46
+*/
+
+/*
 ** $Id: ldblib.c $
 ** Interface from Lua to its debug API
 ** See Copyright Notice in lua.h

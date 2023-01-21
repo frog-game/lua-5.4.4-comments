@@ -1,4 +1,12 @@
 /*
+ * @文件作用: 调试接口
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:26:53
+ */
+
+
+/*
 ** $Id: ldebug.h $
 ** Auxiliary functions from Debug Interface module
 ** See Copyright Notice in lua.h

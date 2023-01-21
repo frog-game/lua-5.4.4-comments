@@ -1,8 +1,15 @@
 /*
+ * @文件作用: lua配置相关
+ * @功能分类: 辅助文件
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 21:00:19
+ */
+/*
 ** $Id: luaconf.h $
 ** Configuration file for Lua
 ** See Copyright Notice in lua.h
 */
+
 
 
 #ifndef luaconf_h

@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 标准库中ctype相关实现
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:23:25
+*/
+
+/*
 ** $Id: lctype.c $
 ** 'ctype' functions for Lua
 ** See Copyright Notice in lua.h

@@ -1,4 +1,10 @@
 /*
+ * @文件作用: OS 库
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:47:28
+ */
+/*
 ** $Id: loslib.c $
 ** Standard Operating System library
 ** See Copyright Notice in lua.h

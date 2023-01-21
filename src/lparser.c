@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 解析器
+ * @功能分类: 源代码解析以及预编译字节码
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:47:44
+ */
+/*
 ** $Id: lparser.c $
 ** Lua Parser
 ** See Copyright Notice in lua.h

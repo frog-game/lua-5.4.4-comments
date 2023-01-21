@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 内嵌库的初始化
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:39:45
+ */
+
+/*
 ** $Id: linit.c $
 ** Initialization of libraries for lua.c and other clients
 ** See Copyright Notice in lua.h

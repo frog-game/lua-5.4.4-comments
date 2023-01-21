@@ -1,4 +1,10 @@
 /*
+ * @文件作用: Lua标准库
+ * @功能分类: 辅助文件
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 21:02:35
+ */
+/*
 ** $Id: lualib.h $
 ** Lua standard libraries
 ** See Copyright Notice in lua.h

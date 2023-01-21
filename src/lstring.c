@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 字符串池
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:52:11
+ */
+/*
 ** $Id: lstring.c $
 ** String table (keeps all strings handled by Lua)
 ** See Copyright Notice in lua.h

@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 通用的缓冲输入流接口
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 21:05:23
+ */
+
+/*
 ** $Id: lzio.c $
 ** Buffered streams
 ** See Copyright Notice in lua.h

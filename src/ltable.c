@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 表类型的相关操作。Lua表（哈希） 
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:56:44
+ */
+/*
 ** $Id: ltable.c $
 ** Lua tables (hash)
 ** See Copyright Notice in lua.h

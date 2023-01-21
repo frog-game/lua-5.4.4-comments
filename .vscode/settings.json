@@ -5,6 +5,9 @@
         "lua.h": "c",
         "*.rh": "c",
         "lstring.h": "c",
-        "ljumptab.h": "c"
+        "ljumptab.h": "c",
+        "lprefix.h": "c",
+        "limits.h": "c",
+        "ldebug.h": "c"
     }
 }

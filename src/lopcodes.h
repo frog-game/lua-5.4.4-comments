@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 虚拟机的字节码定义
+ * @功能分类: 拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:46:18
+ */
+
+/*
 ** $Id: lopcodes.h $
 ** Opcodes for Lua virtual machine
 ** See Copyright Notice in lua.h

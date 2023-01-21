@@ -1,3 +1,9 @@
+/* 
+ * @文件作用: 保存预编译的Lua块。实现luaU_dump，将功能对象转储为预编译的块字符串
+ * @功能分类: 源代码解析以及预编译字节码
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:42:43
+ */
 /*
 ** $Id: ldump.c $
 ** save precompiled Lua chunks

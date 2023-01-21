@@ -1,4 +1,11 @@
 /*
+ * @文件作用: Lua的堆栈和调用结构。处理函数调用（luaD_call / luaD_pcall），扩展堆栈，协程处理
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:28:45
+*/
+
+/*
 ** $Id: ldo.h $
 ** Stack and Call structure of Lua
 ** See Copyright Notice in lua.h

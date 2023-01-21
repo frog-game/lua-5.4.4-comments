@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 表处理库
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:57:34
+ */
+/*
 ** $Id: ltablib.c $
 ** Library for Table Manipulation
 ** See Copyright Notice in lua.h

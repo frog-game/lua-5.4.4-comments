@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 词法分析器。由lparser.c使用
+ * @功能分类: 源代码解析以及预编译字节码
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:40:13
+ */
+
+/*
 ** $Id: llex.h $
 ** Lexical Analyzer
 ** See Copyright Notice in lua.h

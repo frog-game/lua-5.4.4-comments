@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 虚拟机。执行字节码（luaV_execute）。还公开了lapi.c使用的一些功能（例如luaV_concat）
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 21:05:04
+ */
+
+/*
 ** $Id: lvm.h $
 ** Lua virtual machine
 ** See Copyright Notice in lua.h

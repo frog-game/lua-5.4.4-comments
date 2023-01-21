@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 函数原型及闭包管理
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:30:04
+ */
+/*
 ** $Id: lfunc.c $
 ** Auxiliary functions to manipulate prototypes and closures
 ** See Copyright Notice in lua.h

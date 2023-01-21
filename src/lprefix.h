@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 预先进行的设置,和平台,大文件相关
+ * @功能分类: 辅助文件
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 21:02:09
+ */
+/*
 ** $Id: lprefix.h $
 ** Definitions for Lua code that must come before any other header file
 ** See Copyright Notice in lua.h

@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换，原始相等性测试（luaO_rawequalObj）和日志基础2（luaO_log2）
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:45:54
+ */
+
+/*
 ** $Id: lobject.h $
 ** Type definitions for Lua objects
 ** See Copyright Notice in lua.h

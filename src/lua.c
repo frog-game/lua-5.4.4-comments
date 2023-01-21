@@ -1,4 +1,10 @@
 /*
+ * @文件作用: Lua独立解释器
+ * @功能分类: 可执行的解析器，字节码编译器
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:59:15
+ */
+/*
 ** $Id: lua.c $
 ** Lua stand-alone interpreter
 ** See Copyright Notice in lua.h

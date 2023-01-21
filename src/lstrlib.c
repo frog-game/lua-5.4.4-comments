@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 字符串库
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:52:39
+ */
+/*
 ** $Id: lstrlib.c $
 ** Standard library for string operations and pattern-matching
 ** See Copyright Notice in lua.h

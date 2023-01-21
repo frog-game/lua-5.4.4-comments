@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 加载预编译的Lua块
+ * @功能分类: 源代码解析以及预编译字节码
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 21:03:49
+ */
+/*
 ** $Id: lundump.h $
 ** load precompiled Lua chunks
 ** See Copyright Notice in lua.h

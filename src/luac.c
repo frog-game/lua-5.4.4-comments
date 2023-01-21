@@ -1,4 +1,10 @@
 /*
+ * @文件作用: Lua编译器（将字节码保存到文件中；还列出字节码）
+ * @功能分类: 可执行的解析器，字节码编译器
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:59:35
+ */
+/*
 ** $Id: luac.c $
 ** Lua compiler (saves bytecodes to files; also lists bytecodes)
 ** See Copyright Notice in lua.h

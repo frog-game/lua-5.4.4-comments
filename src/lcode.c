@@ -1,4 +1,10 @@
 /*
+ * @文件作用: Lua的代码生成器。由lparser.c使用
+ * @功能分类: 源代码解析以及预编译字节码
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:22:11
+ */
+/*
 ** $Id: lcode.c $
 ** Code generator for Lua
 ** See Copyright Notice in lua.h

@@ -1,4 +1,10 @@
 /*
+ * @文件作用: 各种变量类型的各种属性
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 20:42:41
+ */
+/*
 ** $Id: llimits.h $
 ** Limits, basic types, and some other 'installation-dependent' definitions
 ** See Copyright Notice in lua.h

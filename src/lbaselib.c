@@ -1,4 +1,10 @@
 /*
+ * @文件作用: c 库编写用到的辅助函数库
+ * @功能分类: 内嵌库
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:21:48
+ */
+/*
 ** $Id: lbaselib.c $
 ** Basic library
 ** See Copyright Notice in lua.h

@@ -1,4 +1,11 @@
 /*
+ * @文件作用: 垃圾回收
+ * @功能分类: 虚拟机运转的核心功能
+ * @注释者: frog-game
+ * @LastEditTime: 2023-01-21 19:31:38
+ */
+
+/*
 ** $Id: lgc.c $
 ** Garbage Collector
 ** See Copyright Notice in lua.h
