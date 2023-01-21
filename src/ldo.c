@@ -2,7 +2,7 @@
  * @文件作用: Lua的堆栈和调用结构。处理函数调用（luaD_call / luaD_pcall），扩展堆栈，协程处理
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:27:44
+ * @LastEditTime: 2023-01-21 22:43:58
 */
 
 /*
@@ -830,7 +830,12 @@ static int precover (lua_State *L, int status) {
   return status;
 }
 
-
+/// @brief 恢复启动一个协程
+/// @param L 要执行的线程
+/// @param from 原始线程栈
+/// @param nargs L栈中的参数
+/// @param nresults 返回协程压栈了多少个值
+/// @return 
 LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs,
                                       int *nresults) {
   int status;
@@ -849,7 +854,7 @@ LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs,
   L->nCcalls++;
   luai_userstateresume(L, nargs);
   api_checknelems(L, (L->status == LUA_OK) ? nargs + 1 : nargs);
-  status = luaD_rawrunprotected(L, resume, &nargs);
+  status = luaD_rawrunprotected(L, resume, &nargs);//  在保护模式中回调函数resume,入参L为协程栈
    /* continue running after recoverable errors */
   status = precover(L, status);
   if (l_likely(!errorstatus(status)))
@@ -865,12 +870,19 @@ LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs,
   return status;
 }
 
-
+/// @brief 是否可以yield
+/// @param L 
+/// @return 
 LUA_API int lua_isyieldable (lua_State *L) {
   return yieldable(L);
 }
 
-
+/// @brief 协程的让出
+/// @param L 代表协程
+/// @param nresults 表示要返回的结果数
+/// @param ctx 延续函数上下文的类型
+/// @param k 延续函数的类型
+/// @return 
 LUA_API int lua_yieldk (lua_State *L, int nresults, lua_KContext ctx,
                         lua_KFunction k) {
   CallInfo *ci;
@@ -905,6 +917,8 @@ LUA_API int lua_yieldk (lua_State *L, int nresults, lua_KContext ctx,
 /*
 ** Auxiliary structure to call 'luaF_close' in protected mode.
 */
+
+/// @brief 在保护模式下调用luaF_close的辅助结构
 struct CloseP {
   StkId level;
   int status;
@@ -914,6 +928,10 @@ struct CloseP {
 /*
 ** Auxiliary function to call 'luaF_close' in protected mode.
 */
+
+/// @brief 在保护模式下调用luaF_close的辅助函数
+/// @param L 
+/// @param ud 
 static void closepaux (lua_State *L, void *ud) {
   struct CloseP *pcl = cast(struct CloseP *, ud);
   luaF_close(L, pcl->level, pcl->status, 0);

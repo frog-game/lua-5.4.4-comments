@@ -2,7 +2,7 @@
  * @文件作用: c 库编写用到的辅助函数库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:21:40
+ * @LastEditTime: 2023-01-22 00:06:40
  */
 /*
 ** $Id: lauxlib.h $
@@ -138,7 +138,7 @@ LUALIB_API void (luaL_requiref) (lua_State *L, const char *modname,
 #define luaL_newlibtable(L,l)	\
   lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1)
 
-/// brief 创建一个新的table , 并将luaL_Reg数组中的函数注册到其中. 
+/// @brief 创建一个新的table , 并将luaL_Reg数组中的函数注册到其中. 返回时，它把这个新创建的表留在了栈中
 // 它是一个宏 (luaL_newlibtable(L,l), luaL_setfuncs(L,l,0)) 
 #define luaL_newlib(L,l)  \
   (luaL_checkversion(L), luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))

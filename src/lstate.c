@@ -2,7 +2,7 @@
  * @文件作用: 全局状态机。包括用于打开和关闭Lua状态（lua_newstate / lua_close）和线程（luaE_newthread / luaE_freethread）的函数。
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:51:55
+ * @LastEditTime: 2023-01-22 00:03:12
  */
 /*
 ** $Id: lstate.c $
@@ -329,7 +329,10 @@ void luaE_freethread (lua_State *L, lua_State *L1) {
   luaM_free(L, l);
 }
 
-
+/// @brief 关闭协程 co，并关闭它所有等待 to-be-closed 的变量
+/// @param L 
+/// @param status 
+/// @return 
 int luaE_resetthread (lua_State *L, int status) {
   CallInfo *ci = L->ci = &L->base_ci;  /* unwind CallInfo list */
   setnilvalue(s2v(L->stack));  /* 'function' entry for basic 'ci' */
@@ -337,7 +340,7 @@ int luaE_resetthread (lua_State *L, int status) {
   ci->callstatus = CIST_C;
   if (status == LUA_YIELD)
     status = LUA_OK;
-  L->status = LUA_OK;  /* so it can run __close metamethods */
+  L->status = LUA_OK;  /* so it can run __close metamethods *///运行__close元方法
   status = luaD_closeprotected(L, 1, status);
   if (status != LUA_OK)  /* errors? */
     luaD_seterrorobj(L, status, L->stack + 1);
@@ -348,7 +351,9 @@ int luaE_resetthread (lua_State *L, int status) {
   return status;
 }
 
-
+/// @brief 重置线程，清理其调用堆栈并关闭所有待关闭的变量。返回状态码： LUA_OK 表示关闭方法中没有错误，否则返回错误状态。如果发生错误，将错误对象留在堆栈顶部
+/// @param L 
+/// @return 
 LUA_API int lua_resetthread (lua_State *L) {
   int status;
   lua_lock(L);
@@ -357,7 +362,10 @@ LUA_API int lua_resetthread (lua_State *L) {
   return status;
 }
 
-
+/// @brief 创建一个lua线程栈
+/// @param f 
+/// @param ud 
+/// @return 
 LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   int i;
   lua_State *L;
@@ -413,7 +421,9 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   return L;
 }
 
-
+/// @brief 关闭主线程
+/// @param L 
+/// @return 
 LUA_API void lua_close (lua_State *L) {
   lua_lock(L);
   L = G(L)->mainthread;  /* only the main thread can be closed */

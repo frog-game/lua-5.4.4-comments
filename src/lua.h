@@ -2,7 +2,7 @@
  * @文件作用: Lua独立解释器
  * @功能分类: 可执行的解析器，字节码编译器
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:59:15
+ * @LastEditTime: 2023-01-21 23:44:47
  */
 
 /*
@@ -53,12 +53,12 @@
 
 
 /* thread status */
-#define LUA_OK		0
-#define LUA_YIELD	1
-#define LUA_ERRRUN	2
-#define LUA_ERRSYNTAX	3
-#define LUA_ERRMEM	4
-#define LUA_ERRERR	5
+#define LUA_OK		0 //没有错误
+#define LUA_YIELD	1//挂起
+#define LUA_ERRRUN	2//运行时错误
+#define LUA_ERRSYNTAX	3//语法错误
+#define LUA_ERRMEM	4//内存错误
+#define LUA_ERRERR	5 //在错误处理函数中出错
 
 
 typedef struct lua_State lua_State;
@@ -397,6 +397,8 @@ LUA_API int  (lua_resume)     (lua_State *L, lua_State *from, int narg,
 LUA_API int  (lua_status)     (lua_State *L);
 LUA_API int (lua_isyieldable) (lua_State *L);
 
+
+///协程的让出
 #define lua_yield(L,n)		lua_yieldk(L, (n), 0, NULL)
 
 

@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换，原始相等性测试（luaO_rawequalObj）和日志基础2（luaO_log2）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:45:54
+ * @LastEditTime: 2023-01-21 22:50:51
  */
 
 /*
@@ -638,12 +638,12 @@ typedef struct Proto {
   CommonHeader;
   lu_byte numparams;  /* number of fixed (named) parameters *///固定参数个数
   lu_byte is_vararg;//是否支持变参:1 表示使用了变参作为最后一个参数  三个点“...”表示这是一个可变参数的函数
-  lu_byte maxstacksize;  /* number of registers needed by this function *///本函数用了多少个寄存器
-  int sizeupvalues;  /* size of 'upvalues' *///上值个数
-  int sizek;  /* size of 'k' *///常量个数
-  int sizecode;//本函数的指令个数
-  int sizelineinfo;//相对行号lineinfo长度
-  int sizep;  /* size of 'p' *///子函数大小
+  lu_byte maxstacksize;  /* number of registers needed by this function *///该函数需要的栈大小
+  int sizeupvalues;  /* size of 'upvalues' *///upvalues数量
+  int sizek;  /* size of 'k' *///常量数量
+  int sizecode;//指令数量
+  int sizelineinfo;//相对行号信息数量
+  int sizep;  /* size of 'p' *///子函数数量
   int sizelocvars;//局部变量调试信息大小
   int sizeabslineinfo;  /* size of 'abslineinfo' *///绝对行号abslineinfo长度
   int linedefined;  /* debug information  *///函数定义开始处的行号
@@ -654,9 +654,9 @@ typedef struct Proto {
   Upvaldesc *upvalues;  /* upvalue information *///是个数组指针
   ls_byte *lineinfo;  /* information about source lines (debug information) *///相对行号信息
   AbsLineInfo *abslineinfo;  /* idem *///绝对行号信息
-  LocVar *locvars;  /* information about local variables (debug information) *///局部变量调试信息
-  TString  *source;  /* used for debug information *///二进制块的源文件名
-  GCObject *gclist;//gc对象链表
+  LocVar *locvars;  /* information about local variables (debug information) *///本地变量调试信息
+  TString  *source;  /* used for debug information *///源代码文件
+  GCObject *gclist;//灰对象列表，最后由g->gray串连起来
 } Proto;
 
 /* }================================================================== */

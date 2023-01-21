@@ -2,7 +2,7 @@
  * @文件作用: 函数原型及闭包管理
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:30:04
+ * @LastEditTime: 2023-01-21 22:45:48
  */
 /*
 ** $Id: lfunc.c $
@@ -238,6 +238,7 @@ static void poptbclist (lua_State *L) {
 */
 
 /// @brief 关闭不需要的upvalues以及to-be-closed的元素，对于to-be-closed的元素，还会调用其元方法。
+///关闭栈中的upvalues，从level往后的upvalue，如果引用计数为0释放之，否则拷贝到UpVal自己身上
 /// @param L 
 /// @param level 
 /// @param status 

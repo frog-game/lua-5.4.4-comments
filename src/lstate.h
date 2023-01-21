@@ -2,7 +2,7 @@
  * @文件作用: 全局状态机。包括用于打开和关闭Lua状态（lua_newstate / lua_close）和线程（luaE_newthread / luaE_freethread）的函数。
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:52:03
+ * @LastEditTime: 2023-01-21 23:56:27
  */
 /*
 ** $Id: lstate.h $
@@ -328,7 +328,7 @@ typedef struct global_State {
 ** 'per thread' state
 */
 
-/// @brief Lua 主线程 栈 数据结构
+/// @brief Lua 主线程栈 数据结构
 ///作用：管理整个栈和当前函数使用的栈的情况，最主要的功能就是函数调用以及和c的通信
 struct lua_State {
   CommonHeader;
