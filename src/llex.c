@@ -567,7 +567,8 @@ static int llex (LexState *ls, SemInfo *seminfo) {
   }
 }
 
-/// @brief 逐个读取字符流字符，直到切割出一个完整的Token
+/// @brief 读下一个token 
+// 逐个读取字符流字符，直到切割出一个完整的Token
 /// @param ls 
 void luaX_next (LexState *ls) {
   ls->lastline = ls->linenumber;

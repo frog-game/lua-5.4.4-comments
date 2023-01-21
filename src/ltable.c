@@ -125,6 +125,7 @@ static const TValue absentkey = {ABSTKEYCONSTANT};
 */
 
 /// @brief 返回对应整数值对散列表大小取余的key对应的节点 
+/// 经过测试在 MacBook Air 芯片位APPLE M1 内存16G下面跑SDIV指令确实比UDIV指令快很多
 /// @param t 
 /// @param i key
 /// @return 

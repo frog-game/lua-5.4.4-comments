@@ -26,17 +26,17 @@
 /// @brief 表达式的类型
 typedef enum {
   VVOID,  /* when 'expdesc' describes the last expression of a list,
-             this kind means an empty list (so, no expression) *///表达式是空的，也就是void
+             this kind means an empty list (so, no expression) *///表示表达式尚未进行评估，也可能表达式就是空
   VNIL,  /* constant nil *///表达式是nil类型
   VTRUE,  /* constant true *///表达式是true
   VFALSE,  /* constant false *///表达式是false
-  VK,  /* constant in 'k'; info = index of constant in 'k' *///表达式是常量类型，expdesc的info字段表示，这个常量是常量表k中的哪个值
+  VK,  /* constant in 'k'; info = index of constant in 'k' *///常量表达式
   VKFLT,  /* floating constant; nval = numerical float value *////表达式是float常量，expdesc的nval字段表示
   VKINT,  /* integer constant; ival = numerical integer value *///表达式是integer常量，expdesc的ival字段表示
   VKSTR,  /* string constant; strval = TString address;
              (string is fixed by the lexer) *///表达式是string常量，expdesc的strval字段表示
   VNONRELOC,  /* expression has its value in a fixed register;
-                 info = result register *///表达式已经在某个寄存器上，expdesc的info字段，表示该寄存器的位置
+                 info = result register *///表达式已经在某个寄存器上，expdesc的info字段，表示该寄存器对应的idx
   VLOCAL,  /* local variable; var.ridx = register index;
               var.vidx = relative index in 'actvar.arr'  *///表达式是local变量，expdesc的info字段表示，var.ridx:寄存器保存变量 var.vidx:actvar.arr中保存变量,使用的相对索引
   VUPVAL,  /* upvalue variable; info = index of upvalue in 'upvalues' *///表达式是Upvalue，expdesc的info字段表示，表示Upvalue数组的索引
@@ -44,22 +44,22 @@ typedef enum {
               info = absolute index in 'actvar.arr'  *///编译时常量 expdesc的info字段表示 actvar.arr中保存变量,使用的绝对索引
   VINDEXED,  /* indexed variable;
                 ind.t = table register;
-                ind.idx = key's R index *///表示变量索引类型，expdesc的ind字段表示
+                ind.idx = key's R index */// 索引表达式 例如: tbl(info).aux(aux)
   VINDEXUP,  /* indexed upvalue;
                 ind.t = table upvalue;
                 ind.idx = key's K index *///表示上值索引类型，expdesc的ind字段表示
   VINDEXI, /* indexed variable with constant integer;//具有常量整数的索引变量类型 expdesc的ind字段表示
-                ind.t = table register;
+                ind.t = table register; 
                 ind.idx = key's value */
   VINDEXSTR, /* indexed variable with literal string;
                 ind.t = table register;
                 ind.idx = key's K index *////表示字符串字母常量索引类型 expdesc的ind字段表示
   VJMP,  /* expression is a test/comparison; 
-            info = pc of corresponding jump instruction *///表达式是跳转类型 expdesc的info字段表示 info指向跳转指令
+            info = pc of corresponding jump instruction *///跳转表达式，用于关系表达式 expdesc的info字段表示 info指向跳转指令
   VRELOC,  /* expression can put result in any register;
               info = instruction pc *///表达式是返回类型 expdesc的info字段表示 info指向指令
-  VCALL,  /* expression is a function call; info = instruction pc *///表达式是函数调用，expdesc中的info字段，info指向指令
-  VVARARG  /* vararg expression; info = instruction pc *///表达式是 参数 expdesc中的info字段，info指向指令
+  VCALL,  /* expression is a function call; info = instruction pc *///info表示exp对应的指令在指令f的指令数组中的下标
+  VVARARG  /* vararg expression; info = instruction pc *///变参操作符 ...
 } expkind;
 
 
@@ -111,24 +111,33 @@ typedef struct expdesc {
 
 
 /* description of an active local variable */
+
+/// @brief 活动局部变量的描述
 typedef union Vardesc {
   struct {
     TValuefields;  /* constant value (if it is a compile-time constant) */
-    lu_byte kind;
-    lu_byte ridx;  /* register holding the variable */
-    short pidx;  /* index of the variable in the Proto's 'locvars' array */
-    TString *name;  /* variable name */
+    lu_byte kind;//变量的类型 VDKREG,RDKCONST,RDKTOCLOSE,RDKCTC四种类型
+    lu_byte ridx;  /* register holding the variable *///保存变量的寄存器
+    short pidx;  /* index of the variable in the Proto's 'locvars' array *////Proto.locvars数组中变量的索引
+    TString *name;  /* variable name *////变量的名字
   } vd;
-  TValue k;  /* constant value (if any) */
+  TValue k;  /* constant value (if any) *///变量值
 } Vardesc;
 
 
 
 /* description of pending goto statements and label statements */
+
+/// @brief label描述
+/// label 等价于 goto 语句允许将控制流程无条件地转到被标记的语句处
+// 语法格式如下所示:
+// goto Label
+//Label 的格式为:
+// :: Label ::
 typedef struct Labeldesc {
-  TString *name;  /* label identifier */
-  int pc;  /* position in code */
-  int line;  /* line where it appeared */
+  TString *name;  /* label identifier *///标识名字
+  int pc;  /* position in code *///指令位置
+  int line;  /* line where it appeared *///在哪一行
   lu_byte nactvar;  /* number of active variables in that position */
   lu_byte close;  /* goto that escapes upvalues */
 } Labeldesc;
@@ -153,7 +162,7 @@ typedef struct Dyndata {
     Vardesc *arr;
     int n;
     int size;
-  } actvar;
+  } actvar; //当前激活的var的idx到f.locvars的映射 
   Labellist gt;  /* list of pending gotos */
   Labellist label;   /* list of active labels */
 } Dyndata;

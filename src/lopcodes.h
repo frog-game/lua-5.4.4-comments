@@ -363,7 +363,7 @@ OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*///根据函数原型新建一
 OP_VARARG,/*	A C	R[A], R[A+1], ..., R[A+C-2] = vararg		*///将函数的可变参数拷贝给寄存器
 
 OP_VARARGPREP,/*A	(adjust vararg parameters)			*///跳转可变函数的调用信息
-/*函数调用 end*/
+/*函数调用 end*/ 
 
 /*附件参数 begin*/
 OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*///为上一条指令提供额外参数
