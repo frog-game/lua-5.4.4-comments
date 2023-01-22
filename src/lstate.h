@@ -1,8 +1,8 @@
 /*
- * @文件作用: 全局状态机。包括用于打开和关闭Lua状态（lua_newstate / lua_close）和线程（luaE_newthread / luaE_freethread）的函数。
+ * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 23:56:27
+ * @LastEditTime: 2023-01-22 18:17:51
  */
 /*
 ** $Id: lstate.h $

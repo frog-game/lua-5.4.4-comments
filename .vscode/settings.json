@@ -8,6 +8,9 @@
         "ljumptab.h": "c",
         "lprefix.h": "c",
         "limits.h": "c",
-        "ldebug.h": "c"
+        "ldebug.h": "c",
+        "ldo.h": "c",
+        "stddef.h": "c",
+        "ltm.h": "c"
     }
 }

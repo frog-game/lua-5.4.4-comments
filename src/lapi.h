@@ -1,8 +1,8 @@
 /*
- * @文件作用: Lua API。实现大量的Lua C API（lua_ *函数）
+ * @文件作用: Lua API头文件。实现大量的Lua C API（lua_ *函数）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:21:11
+ * @LastEditTime: 2023-01-22 18:13:02
  */
 
 

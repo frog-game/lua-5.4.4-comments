@@ -1,8 +1,8 @@
 /*
  * @文件作用: lua utf8库
- * @功能分类: 辅助文件
+ * @功能分类: 周边
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 21:04:12
+ * @LastEditTime: 2023-01-22 17:19:37
  */
 /*
 ** $Id: lutf8lib.c $

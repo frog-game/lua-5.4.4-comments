@@ -2,7 +2,7 @@
  * @文件作用: 调试接口
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:27:13
+ * @LastEditTime: 2023-01-22 16:24:12
 */
 
 /*
@@ -44,7 +44,9 @@
 static const char *funcnamefromcall (lua_State *L, CallInfo *ci,
                                                    const char **name);
 
-
+/// @brief 计算存档的savedpc在code数组中的索引
+/// @param ci 
+/// @return 
 static int currentpc (CallInfo *ci) {
   lua_assert(isLua(ci));
   return pcRel(ci->u.l.savedpc, ci_func(ci)->p);

@@ -1,8 +1,8 @@
 /*
- * @文件作用: OS 库
+ * @文件作用: OS库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:47:28
+ * @LastEditTime: 2023-01-22 19:54:04
  */
 /*
 ** $Id: loslib.c $

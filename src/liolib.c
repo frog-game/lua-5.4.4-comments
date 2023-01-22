@@ -1,8 +1,8 @@
 /*
- * @文件作用: IO 库
+ * @文件作用: IO库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:40:05
+ * @LastEditTime: 2023-01-22 19:53:32
  */
 /*
 ** $Id: liolib.c $
