@@ -2,7 +2,7 @@
  * @文件作用: 标准库中ctype相关实现
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:23:25
+ * @LastEditTime: 2023-01-22 11:45:17
 */
 
 /*
@@ -44,11 +44,11 @@
 #include "llimits.h"
 
 
-#define ALPHABIT	0
-#define DIGITBIT	1
-#define PRINTBIT	2
-#define SPACEBIT	3
-#define XDIGITBIT	4
+#define ALPHABIT	0//字母
+#define DIGITBIT	1//数字
+#define PRINTBIT	2//打印字符
+#define SPACEBIT	3//空格
+#define XDIGITBIT	4//16进制数字
 
 
 #define MASK(B)		(1 << (B))
@@ -62,12 +62,12 @@
 /*
 ** 'lalpha' (Lua alphabetic) and 'lalnum' (Lua alphanumeric) both include '_'
 */
-#define lislalpha(c)	testprop(c, MASK(ALPHABIT))
-#define lislalnum(c)	testprop(c, (MASK(ALPHABIT) | MASK(DIGITBIT)))
-#define lisdigit(c)	testprop(c, MASK(DIGITBIT))
-#define lisspace(c)	testprop(c, MASK(SPACEBIT))
-#define lisprint(c)	testprop(c, MASK(PRINTBIT))
-#define lisxdigit(c)	testprop(c, MASK(XDIGITBIT))
+#define lislalpha(c)	testprop(c, MASK(ALPHABIT))//判断是否是字母
+#define lislalnum(c)	testprop(c, (MASK(ALPHABIT) | MASK(DIGITBIT)))//判断是否是字母或数字
+#define lisdigit(c)	testprop(c, MASK(DIGITBIT))//判断是否是数字
+#define lisspace(c)	testprop(c, MASK(SPACEBIT))//判断是否是空格
+#define lisprint(c)	testprop(c, MASK(PRINTBIT))//判断是否可打印字符
+#define lisxdigit(c)	testprop(c, MASK(XDIGITBIT))//是否为16进制数字
 
 
 /*
@@ -76,12 +76,20 @@
 ** the character either is an upper-case letter or is unchanged by
 ** the transformation, which holds for lower-case letters and '.'.)
 */
+
+///将大写字母转换为小写字符
+// 'A'的二进制表示是：01000001
+// 'a'的二进制表示是：01100001
+// 'A' ^ 'a'是100000
+// 可以看出大写字母和小写字母是第5位不同,从0开始数
+// 所以((c) | ('A' ^ 'a'))就可以大写字母变小写字母
+
 #define ltolower(c)  \
   check_exp(('A' <= (c) && (c) <= 'Z') || (c) == ((c) | ('A' ^ 'a')),  \
             (c) | ('A' ^ 'a'))
 
 
-/* one entry for each character and for -1 (EOZ) */
+/* one entry for each character and for -1 (EOZ) */ 
 LUAI_DDEC(const lu_byte luai_ctype_[UCHAR_MAX + 2];)
 
 
