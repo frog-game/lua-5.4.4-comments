@@ -2,7 +2,7 @@
  * @文件作用: 字符串池
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:52:11
+ * @LastEditTime: 2023-01-23 16:30:15
  */
 /*
 ** $Id: lstring.c $
@@ -321,6 +321,8 @@ TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
 */
 
 /// @brief 创建字符串对外接口
+// 创建或重用一个以'0'结尾的字符串，首先查找 global_state 的 strcache 缓存是否已存在该字符串，
+// 若存在则直接返回，否则创建一个新的，并加入到缓存中
 /// @param L 
 /// @param str 
 /// @return 
@@ -334,7 +336,8 @@ TString *luaS_new (lua_State *L, const char *str) {
   }
   /* normal route */
 
-  //如果没有找到这个数组就会新创建
+  //如果没有找到创建新的Tstring,并放到第一个位置
+  //同时也意味着最后一个元素会被移除strcache
   for (j = STRCACHE_M - 1; j > 0; j--) //将i行对应链表的最后一个元素设为前一个的值
     p[j] = p[j - 1];  /* move out last element */
   /* new element is first in the list */

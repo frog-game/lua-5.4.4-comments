@@ -2,7 +2,7 @@
  * @文件作用: 解析器
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:47:44
+ * @LastEditTime: 2023-01-23 11:18:23
  */
 /*
 ** $Id: lparser.h $
@@ -77,7 +77,7 @@ typedef struct expdesc {
   expkind k;//表达式的类型
   union {
     lua_Integer ival;    /* for VKINT *///表达式是integer常量
-    lua_Number nval;  /* for VKFLT *///表达式是float常量
+    lua_Number nval;  /* for VKFLT *///表达式是double常量
     TString *strval;  /* for VKSTR *///表达式是string常量
     int info;  /* for generic use *///通用
     struct {  /* for indexed variables *///变量索引

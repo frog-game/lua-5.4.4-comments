@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 18:17:51
+ * @LastEditTime: 2023-01-23 18:28:47
  */
 /*
 ** $Id: lstate.h $
@@ -332,7 +332,7 @@ typedef struct global_State {
 ///作用：管理整个栈和当前函数使用的栈的情况，最主要的功能就是函数调用以及和c的通信
 struct lua_State {
   CommonHeader;
-  lu_byte status;//线程脚本的状态
+  lu_byte status;//当前状态机的状态,LUA_YIELD和LUA_OK为lua_State状态机的状态,这两个状态和协程有这对应关系,详见auxstatus函数
   lu_byte allowhook;//是否允许hook
   unsigned short nci;  /* number of items in 'ci' list *///ci列表中的条目数，存储一共多少个CallInfo
   StkId top;  /* first free slot in the stack *///指向栈的顶部，压入数据，都通过移动栈顶指针来实现
@@ -373,6 +373,8 @@ struct lua_State {
 ** part of any of them anywhere that a declaration of the complete type
 ** of the union is visible."
 */
+
+/// @brief gc对象
 union GCUnion {
   GCObject gc;  /* common header */
   struct TString ts;//字符串

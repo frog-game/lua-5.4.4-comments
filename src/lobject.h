@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 18:16:55
+ * @LastEditTime: 2023-01-23 17:36:37
  */
 
 /*
@@ -69,8 +69,8 @@ typedef union Value {
   /*下面都是不可回收类型*/
   void *p;         /* light userdata *///轻量级userdata
   lua_CFunction f; /* light C functions *///函数指针 例如（typedef int (*lua_CFunction)(lua_State *L)）
-  lua_Integer i;   /* integer numbers *///int整型值 
-  lua_Number n;    /* float numbers *///n是float类型的值 
+  lua_Integer i;   /* integer numbers *///整型  c中的longlong，占用8个字节
+  lua_Number n;    /* float numbers *///浮点类型 c中的double，占用8个字节 
 } Value;
 
 
@@ -369,19 +369,19 @@ typedef struct GCObject {
 
 /* Variant tags for numbers */
 #define LUA_VNUMINT	makevariant(LUA_TNUMBER, 0)  /* integer numbers *///整数类型
-#define LUA_VNUMFLT	makevariant(LUA_TNUMBER, 1)  /* float numbers *///float类型
+#define LUA_VNUMFLT	makevariant(LUA_TNUMBER, 1)  /* float numbers *///浮点类型
 
 #define ttisnumber(o)		checktype((o), LUA_TNUMBER)//是不是number类型
-#define ttisfloat(o)		checktag((o), LUA_VNUMFLT)//是不是float类型
-#define ttisinteger(o)		checktag((o), LUA_VNUMINT)//是不是int类型
+#define ttisfloat(o)		checktag((o), LUA_VNUMFLT)//是不是浮点类型
+#define ttisinteger(o)		checktag((o), LUA_VNUMINT)//是不是整数类型
 
 #define nvalue(o)	check_exp(ttisnumber(o), \
-	(ttisinteger(o) ? cast_num(ivalue(o)) : fltvalue(o)))//获取number的值,如果是int 那么就返回int 如果是float 那么就返回float
-#define fltvalue(o)	check_exp(ttisfloat(o), val_(o).n) //获取float
-#define ivalue(o)	check_exp(ttisinteger(o), val_(o).i)//获取int
+	(ttisinteger(o) ? cast_num(ivalue(o)) : fltvalue(o)))//获取number的值,如果是整数类型 那么就返回整数类型 如果是浮点类型 那么就返回浮点类型
+#define fltvalue(o)	check_exp(ttisfloat(o), val_(o).n) //获取浮点
+#define ivalue(o)	check_exp(ttisinteger(o), val_(o).i)//获取整数
 
-#define fltvalueraw(v)	((v).n) //获取原生float值
-#define ivalueraw(v)	((v).i)//获取原生int值
+#define fltvalueraw(v)	((v).n) //获取原生浮点类型值
+#define ivalueraw(v)	((v).i)//获取原生整数类型值
 
 // 将obj指向的对象 Value 的 union 元素设为(lua_Number *)类型, 并指向 x 指向的对象;
 // Tvalue->tt_ 设为 LUA_VNUMFLT类型
@@ -565,7 +565,7 @@ typedef struct Udata0 {
 /* compute the offset of the memory area of a userdata */
 
 ///计算用户数据的内存区域的偏移量
-// offsetof 是结构成员相对于结构开头的字节偏移量
+// offsetof是结构成员相对于结构开头的字节偏移量
 #define udatamemoffset(nuv) \
 	((nuv) == 0 ? offsetof(Udata0, bindata)  \
                     : offsetof(Udata, uv) + (sizeof(UValue) * (nuv)))
@@ -810,7 +810,7 @@ typedef union Closure {
 /// 假如是这样的lua代码
 // local t = {}
 // t["xxx"] = 2222;
-// 那么 上面例子中NodeKey的部分位"xxx"
+// 那么 上面例子中NodeKey的部分为"xxx"
 // key_tt是短字符串类型
 // key_val是"xxx"
 // i_val里面的tt_为整型
@@ -823,7 +823,7 @@ typedef union Node {
     int next;  /* for chaining *///用于哈希冲突的时候链接向下一个位置
     Value key_val;  /* key value *///代表key的具体数值
   } u;
-  TValue i_val;  /* direct access to node's value as a proper 'TValue' *///TValue存储了数据的类型与数据值，就是上面的i_val里面的tt_为整型,i_val里面的value_为2222 其实这里的数据和TValuefields里面的数据一样的，这么写只是为了提供一个快捷访问
+  TValue i_val;  /* direct access to node's value as a proper 'TValue' *///TValue存储了数据值 的类型与数据值，就是上面的i_val里面的tt_为整型,i_val里面的value_为2222 其实这里的数据和TValuefields里面的数据一样的，这么写只是为了提供一个快捷访问
 } Node;
 
 

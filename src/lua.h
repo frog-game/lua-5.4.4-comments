@@ -2,7 +2,7 @@
  * @文件作用: Lua独立解释器
  * @功能分类: 可执行的解析器，字节码编译器
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 23:44:47
+ * @LastEditTime: 2023-01-23 00:25:42
  */
 
 /*
@@ -72,7 +72,7 @@ typedef struct lua_State lua_State;
 #define LUA_TNIL		0 //空类型
 #define LUA_TBOOLEAN		1 //bool
 #define LUA_TLIGHTUSERDATA	2 // light userdata(需要关注内存释放)
-#define LUA_TNUMBER		3 //双精度浮点数
+#define LUA_TNUMBER		3 //数值类型 分为 lua_Integer i[c中的longlong]占8个字节 和 lua_Number n[c中的double]占8个字节类型
 #define LUA_TSTRING		4 //字符串
 #define LUA_TTABLE		5 //表
 #define LUA_TFUNCTION		6 //函数
