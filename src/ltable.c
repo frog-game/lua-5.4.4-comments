@@ -2,7 +2,7 @@
  * @文件作用: 表类型的相关操作。Lua表（哈希） 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:56:44
+ * @LastEditTime: 2023-01-24 14:31:12
  */
 /*
 ** $Id: ltable.c $
@@ -131,7 +131,16 @@ static const TValue absentkey = {ABSTKEYCONSTANT};
 */
 
 /// @brief 返回对应整数值对散列表大小取余的key对应的节点 
-/// 经过测试在 MacBook Air 芯片位APPLE M1 内存16G下面跑SDIV指令确实比UDIV指令快很多
+/// 为什么hashmod(t, cast_int(ui))地方要使用cast_int(ui)强制,主要原因是lua作者认为32位的除法运算比64位的除法运算要快,原话如下
+/* Roberto Ierusalimschy   星期一, 23 一月 07:20
+
+  ...
+  So the reason for writing this is because signed is faster than
+  unsigned ~~
+
+  Not as much as 32-bit division is faster than 64-bit division. ///重点这句话
+
+-- Roberto */
 /// @param t 
 /// @param i key
 /// @return 

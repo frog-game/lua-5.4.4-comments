@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-24 22:45:46
+ * @LastEditTime: 2023-01-24 23:42:52
  */
 
 /*
@@ -860,7 +860,7 @@ typedef union Node {
 typedef struct Table {
   CommonHeader;
   lu_byte flags;  /* 1<<p means tagmethod(p) is not present *///第8位为0，则表示alimit为数组的实际大小，否则需重新计算 
-  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希部分的长度对数 注意不是实际大小 大小总是是2的整数次方    1 << lsizenode才能得到实际的size
+  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希部分的长度对数 注意不是实际大小 大小总是是2的整数次方，结果为当前内存分配node数量(包括空的或使用的)  1 << lsizenode才能得到实际的size  比如2^3  那么这个3就是他里面使用的节点数量, 2^3=8 这个8就是他扩容的大小
   unsigned int alimit;  /* "limit" of 'array' array *///在大部份情况下为数组的容量（2次幂数）
   TValue *array;  /* array part *///指向数组部分的首地址
   Node *node;//指向node数据块（即散列部分）首地址 哈希表存储在这
