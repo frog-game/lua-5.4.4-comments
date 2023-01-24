@@ -2,7 +2,7 @@
  * @文件作用: 各种变量类型的各种属性
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:42:41
+ * @LastEditTime: 2023-01-24 20:07:51
  */
 /*
 ** $Id: llimits.h $
@@ -216,7 +216,7 @@ typedef l_uint32 Instruction;//指令类型
 ** #("function") = 8, #("__newindex") = 10.)
 */
 #if !defined(LUAI_MAXSHORTLEN)
-#define LUAI_MAXSHORTLEN	40
+#define LUAI_MAXSHORTLEN	40 //长短字符串分界线
 #endif
 
 

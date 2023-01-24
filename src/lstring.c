@@ -2,7 +2,7 @@
  * @文件作用: 字符串池
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-23 16:30:15
+ * @LastEditTime: 2023-01-24 22:18:28
  */
 /*
 ** $Id: lstring.c $
@@ -47,7 +47,7 @@ int luaS_eqlngstr (TString *a, TString *b) {
   lua_assert(a->tt == LUA_VLNGSTR && b->tt == LUA_VLNGSTR);//assert同类型
   return (a == b) ||  /* same instance or... */
     ((len == b->u.lnglen) &&  /* equal length and ... */
-     (memcmp(getstr(a), getstr(b), len) == 0));  /* equal contents *///先看是否指向同一对象, 在比较长度是否相等, 最后利用字符串长度, 用memcmp比较内存内容
+     (memcmp(getstr(a), getstr(b), len) == 0));  /* equal contents *///先看是否指向同一对象, 在比较长度是否相等并且利用字符串长度, 用memcmp比较内存内容
 }
 
 /// @brief 计算字符串的hash值
@@ -100,7 +100,7 @@ unsigned int luaS_hashlongstr (TString *ts) {
   return ts->hash;//返回hash
 }
 
-/// @brief 对字符串散列表重新散列 
+/// @brief 对短字符串散列表重新计算哈希
 /// @param vect 
 /// @param osize 旧的散列表大小
 /// @param nsize 新的大小
@@ -220,12 +220,12 @@ static TString *createstrobj (lua_State *L, size_t l, int tag, unsigned int h) {
 /// @param l 
 /// @return 
 TString *luaS_createlngstrobj (lua_State *L, size_t l) {
-  TString *ts = createstrobj(L, l, LUA_VLNGSTR, G(L)->seed);
+  TString *ts = createstrobj(L, l, LUA_VLNGSTR, G(L)->seed);//这个createstrobj是直接创建一份malloc指定大小的内存空间
   ts->u.lnglen = l;
   return ts;
 }
 
-/// @brief  将指定的短字符串从字符串表里移除
+/// @brief 将指定的短字符串从字符串表里移除
 /// @param L 
 /// @param ts 
 void luaS_remove (lua_State *L, TString *ts) {
@@ -237,7 +237,7 @@ void luaS_remove (lua_State *L, TString *ts) {
   tb->nuse--;
 }
 
-/// @brief 字符串表扩容
+/// @brief 字符串哈希表生长
 /// @param L 
 /// @param tb 
 static void growstrtab (lua_State *L, stringtable *tb) {
@@ -294,7 +294,7 @@ static TString *internshrstr (lua_State *L, const char *str, size_t l) {
 ** new string (with explicit length)
 */
 
-/// @brief 长度小于等于LUAI_MAXSHORTLEN的字符串，调用 internshrstr。对于长度大于LUAI_MAXSHORTLEN的则一定创建一个 TString对象
+/// @brief 长度小于等于LUAI_MAXSHORTLEN的字符串，调用 internshrstr。对于长度大于LUAI_MAXSHORTLEN的则一定创建一个TString对象
 /// @param L 
 /// @param str 
 /// @param l 长度

@@ -2,7 +2,7 @@
  * @文件作用: 内存管理接口【luaM_realloc / luaM_growaux_】
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:44:11
+ * @LastEditTime: 2023-01-24 19:42:31
  */
 /*
 ** $Id: lmem.c $
@@ -173,6 +173,13 @@ static void *tryagain (lua_State *L, void *block,
 /*
 ** Generic allocation routine.
 */
+
+/// @brief 重新分配顺序表内存
+/// @param L 
+/// @param block 
+/// @param osize 
+/// @param nsize 
+/// @return 
 void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
   void *newblock;
   global_State *g = G(L);

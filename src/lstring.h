@@ -2,7 +2,7 @@
  * @文件作用: 字符串池
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:52:27
+ * @LastEditTime: 2023-01-24 23:02:47
  */
 /*
 ** $Id: lstring.h $
@@ -39,8 +39,10 @@
 ** itself (including final '\0').
 */
 
-///字符串的总大小 
-// + 1 是因为是c语言后面还会在加个'\0'
+///字符串的总大小:|TString|有效内容|
+// offsetof(TString, contents) 相对于TString开始到contents的字节偏移量,其实也就是公共头的字节大小
+// (l) 内容大小
+// + 1 是因为屁股后面要添加一个'\0'
 #define sizelstring(l)  (offsetof(TString, contents) + ((l) + 1) * sizeof(char))
 
 ///目前来看是创建系统保留字的接口

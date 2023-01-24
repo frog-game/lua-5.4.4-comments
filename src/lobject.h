@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-23 17:36:37
+ * @LastEditTime: 2023-01-24 22:45:46
  */
 
 /*
@@ -447,8 +447,8 @@ typedef struct GCObject {
 /// @brief lua字符串的数据结构
 typedef struct TString {
   CommonHeader;//代表需要GC
-  lu_byte extra;  /* reserved words for short strings; "has hash" for longs */// 用于标记是否是虚拟机保留的字符串，如果这个值为1，那么不会GC（保留字符串即是lua中的关键字）
-  lu_byte shrlen;  /* length for short strings *///shrlen保留字符串的长度(因为lua并不以\0结尾来识别字符串的长度，故需要一个len域来记录其长度)
+  lu_byte extra;  /* reserved words for short strings; "has hash" for longs */// 用于标记是否是虚拟机保留的字符串，如果这个值为1，那么不会GC（保留字符串即是lua中的关键字） 长字符串用于判断hash值是否已经创建,0为未创建，如果是1那么就说明设置了
+  lu_byte shrlen;  /* length for short strings *///短字符串的长度(因为lua并不以\0结尾来识别字符串的长度，故需要一个len域来记录其长度)
   unsigned int hash;//字符串的hash值。
   // 短串：该hash值是在创建时就计算出来的
  	// 长串：只有真正需要它的hash值时，才会手动调用luaS_hashlongstr函数生成该值,lua内部现在只有在把长串作为table的key时，才会去计算它。

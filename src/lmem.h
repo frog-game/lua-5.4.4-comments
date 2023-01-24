@@ -2,7 +2,7 @@
  * @文件作用: 内存管理接口【luaM_realloc / luaM_growaux_】
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:44:27
+ * @LastEditTime: 2023-01-24 19:42:42
  */
 
 /*
@@ -74,10 +74,11 @@
 	((v)=cast(t *, luaM_growaux_(L,v,nelems,&(size),sizeof(t), \
                          luaM_limitN(limit,t),e)))
 
+///重新分配顺序表内存
 #define luaM_reallocvector(L, v,oldn,n,t) \
    (cast(t *, luaM_realloc_(L, v, cast_sizet(oldn) * sizeof(t), \
                                   cast_sizet(n) * sizeof(t))))
-
+                                  
 #define luaM_shrinkvector(L,v,size,fs,t) \
    ((v)=cast(t *, luaM_shrinkvector_(L, v, &(size), fs, sizeof(t))))
 

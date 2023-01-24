@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-23 18:28:47
+ * @LastEditTime: 2023-01-24 20:23:25
  */
 /*
 ** $Id: lstate.h $
@@ -162,7 +162,7 @@ struct lua_longjmp;  /* defined in ldo.c */
 #define KGC_INC		0	/* incremental gc *///增量gc
 #define KGC_GEN		1	/* generational gc *///分代gc
 
-/// @brief Lua用一张hash table来管理所有的字符串资源
+/// @brief Lua用一张hash table来管理所有的短字符串资源
 typedef struct stringtable {
   TString **hash;//指向字符串的hash表
   int nuse;  /* number of elements *///元素个数
