@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:45:28
+ * @LastEditTime: 2023-01-25 21:46:31
  */
 /*
 ** $Id: lobject.c $
@@ -38,6 +38,10 @@
 /*
 ** Computes ceil(log2(x))
 */
+
+/// @brief 为了速度,直接把对数求出来
+/// @param x 
+/// @return 
 int luaO_ceillog2 (unsigned int x) {
   static const lu_byte log_2[256] = {  /* log_2[i] = ceil(log2(i - 1)) */
     0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,

@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-24 23:42:52
+ * @LastEditTime: 2023-01-25 22:44:20
  */
 
 /*
@@ -813,12 +813,14 @@ typedef union Closure {
 // 那么 上面例子中NodeKey的部分为"xxx"
 // key_tt是短字符串类型
 // key_val是"xxx"
-// i_val里面的tt_为整型
-// i_val里面的value_为2222
+// TValuefields->tt_是整型
+// TValuefields->value_是2222
+// TValue i_val里面的tt_为整型
+// TValue i_val里面的value_为2222
 typedef union Node {
   /// @brief key的部分
   struct NodeKey {
-    TValuefields;  /* fields for value *///Value 联合体 + 类型标签
+    TValuefields;  /* fields for value *///Value 联合体 + 类型标签 存储的是key的值
     lu_byte key_tt;  /* key type *///代表key的类型标记
     int next;  /* for chaining *///用于哈希冲突的时候链接向下一个位置
     Value key_val;  /* key value *///代表key的具体数值
@@ -859,12 +861,13 @@ typedef union Node {
 // 数组部分用于存储key值在数组大小范围内的键值对，其余数组部分不能存储的键值对则存储在散列表部分
 typedef struct Table {
   CommonHeader;
-  lu_byte flags;  /* 1<<p means tagmethod(p) is not present *///第8位为0，则表示alimit为数组的实际大小，否则需重新计算 
-  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希部分的长度对数 注意不是实际大小 大小总是是2的整数次方，结果为当前内存分配node数量(包括空的或使用的)  1 << lsizenode才能得到实际的size  比如2^3  那么这个3就是他里面使用的节点数量, 2^3=8 这个8就是他扩容的大小
+  lu_byte flags;  /* 1<<p means tagmethod(p) is not present *///用于缓存该表中实现了哪些元方法
+  lu_byte lsizenode;  /* log2 of size of 'node' array *///  哈希部分的长度对数 注意不是实际大小 1 << lsizenode才能得到实际的size(结果为当前内存分配node数量(包括空的或使用的))
+  
   unsigned int alimit;  /* "limit" of 'array' array *///在大部份情况下为数组的容量（2次幂数）
   TValue *array;  /* array part *///指向数组部分的首地址
-  Node *node;//指向node数据块（即散列部分）首地址 哈希表存储在这
-  Node *lastfree;  /* any free position is before this position *///记录上一次从node数据块（即散列部分）末尾分配空闲Node的位置
+  Node *node;//为Node组成的数组 闭散列 哈希表存储在这
+  Node *lastfree;  /* any free position is before this position *///记录上一次从node数据块（即散列部分）末尾分配空闲Node的最后位置
   struct Table *metatable;//存放该表的元表
   GCObject *gclist;//GC相关的 
 } Table;

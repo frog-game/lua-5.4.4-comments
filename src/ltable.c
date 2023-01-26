@@ -2,7 +2,7 @@
  * @文件作用: 表类型的相关操作。Lua表（哈希） 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-24 14:31:12
+ * @LastEditTime: 2023-01-26 20:07:02
  */
 /*
 ** $Id: ltable.c $
@@ -98,8 +98,8 @@
 ** they can have many 2 factors.
 */
 
-//对lsizenode2次幂减1取模（最后按位或1，是为了保持要用来取模的数字((sizenode(t)-1)|1)这段是不为0，是大于等于1的数）
-//返回值是 0 ~ (size - 1) 下标下的hash node桶
+//对lsizenode2次幂减1取模（最后按位或1，是为了保持要用来取模的数字((sizenode(t)-1)|1)这段保证不为0，是大于等于1的数）
+//返回值是 0 ~ (size - 1) 下标下的hash值
 #define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
 
 //字符串hash
@@ -141,6 +141,7 @@ static const TValue absentkey = {ABSTKEYCONSTANT};
   Not as much as 32-bit division is faster than 64-bit division. ///重点这句话
 
 -- Roberto */
+// 这是lua mail list上原话地址:http://lua-users.org/lists/lua-l/2023-01/msg00100.html
 /// @param t 
 /// @param i key
 /// @return 
@@ -210,7 +211,7 @@ static int l_hashfloat (lua_Number n) {
 ** the index of its hash value).
 */
 
-/// @brief mainposition函数通过key找到主位置的node桶
+/// @brief mainposition函数通过key找到主位置的node
 /// @param t 
 /// @param key 
 /// @return 
@@ -222,15 +223,15 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
     }
     case LUA_VNUMFLT: {//key为浮点类型
       lua_Number n = fltvalue(key);
-      return hashmod(t, l_hashfloat(n));//返回值是 0 ~ (size - 1) 下标下的hash node桶
+      return hashmod(t, l_hashfloat(n));//返回值是 0 ~ (size - 1) 下标下的hash node
     }
     case LUA_VSHRSTR: {//key为短字符串类型
       TString *ts = tsvalue(key);
-      return hashstr(t, ts);//字符串对应的hash桶
+      return hashstr(t, ts);//字符串对应的hash
     }
     case LUA_VLNGSTR: {//key为长字符串类型
       TString *ts = tsvalue(key);
-      return hashpow2(t, luaS_hashlongstr(ts));//如果长串没有计算过hash，则调用luaS_hashlongstr来计算，然后再使用hash & (2^t->lsizenode - 1)来获取hash node桶
+      return hashpow2(t, luaS_hashlongstr(ts));//如果长串没有计算过hash，则调用luaS_hashlongstr来计算，然后再使用hash & (2^t->lsizenode - 1)来获取hash node
     }
     case LUA_VFALSE://bool false
       return hashboolean(t, 0);
@@ -251,7 +252,7 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
   }
 }
 
-/// @brief 函数通过key找到主位置的node桶
+/// @brief 函数通过key找到主位置
 /// @param t 
 /// @param nd 
 /// @return 
@@ -389,15 +390,15 @@ static unsigned int setlimittosize (Table *t) {
 /// @param deadok 检查搜到的点是否被释放
 /// @return 
 static const TValue *getgeneric (Table *t, const TValue *key, int deadok) {
-  Node *n = mainpositionTV(t, key);
+  Node *n = mainpositionTV(t, key);//初始的n就是主位置结点
   for (;;) {  /* check whether 'key' is somewhere in the chain */
-    if (equalkey(key, n, deadok))
-      return gval(n);  /* that's it *///检查n的key值和传入的key是否相等 */
+    if (equalkey(key, n, deadok))//检查n的key值和传入的key是否相等 */
+      return gval(n);  /* that's it */
     else {//散列值冲突的解决 
-      int nx = gnext(n);
-      if (nx == 0)
+      int nx = gnext(n);//否则取链接的下一个结点的偏移
+      if (nx == 0)//无偏移，说明没有下一个结点，直接返回nil对象
         return &absentkey;  /* not found */
-      n += nx;
+      n += nx;//取下一个结点给n
     }
   }
 }
@@ -514,25 +515,25 @@ static void freehash (lua_State *L, Table *t) {
 //     nums[n] = 0（其中n > 5 且 n <= MAXBITS）
 
 //     pna = 4
-//     i = 0，twotoi = 1，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 1，满足a > twotoi/2，也就是满足这个范围内数组利用率大于50%的原则，此时记录下这个范围，也就是 optimal = twotoi = 1，到目前为止的数据数量 na = a = 1
-//     i = 1，twotoi = 2，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 2，满足a > twotoi/2，记录下这个范围，也就是 optimal = twotoi = 2，到目前为止的数据数量 na = a = 2
-//     i = 2，twotoi = 4，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 3，此时满足a > twotoi/2，记录下这个范围，也就是 optimal = twotoi = 4，到目前为止的数据数量 na = a = 3
-//     i = 3，twotoi = 8，不满足（twotoi > 0 && *pna > twotoi / 2），结束，返回 optimal 为4。
-/// @param nums 前面已经计算好的计数数组
+//   遍历第一个切片时  i = 0，twotoi = 1，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 1，满足a > twotoi/2，也就是满足这个范围内数组利用率大于50%的原则，此时记录下这个范围，也就是 optimal = twotoi = 1，到目前为止的数据数量 na = a = 1
+//   遍历第二个切片时  i = 1，twotoi = 2，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 2，满足a > twotoi/2，记录下这个范围，也就是 optimal = twotoi = 2，到目前为止的数据数量 na = a = 2
+//   遍历第三个切片时  i = 2，twotoi = 4，满足（twotoi > 0 && *pna > twotoi / 2），nums[i] = 1 > 0成立，a += nums[i], a = 3，此时满足a > twotoi/2，记录下这个范围，也就是 optimal = twotoi = 4，到目前为止的数据数量 na = a = 3
+//   遍历第四个切片时  i = 3，twotoi = 8，不满足（twotoi > 0 && *pna > twotoi / 2），结束，返回 optimal 为4。
+/// @param nums 这些整数key的分布情况
 /// @param pna  就是已经使用的数组部分元素个数+hash部分元素个数
 /// @return 
 static unsigned int computesizes (unsigned int nums[], unsigned int *pna) {
-  int i;
-  unsigned int twotoi;  /* 2^i (candidate for optimal size) *///最佳尺寸
-  unsigned int a = 0;  /* number of elements smaller than 2^i *///小于 2^i 的元素数
-  unsigned int na = 0;  /* number of elements to go to array part *///要转到数组部分的元素数
-  unsigned int optimal = 0;  /* optimal size for array part *///数组部分最优尺寸
+  int i;//扩大的次数,对应numusearry中的lg
+  unsigned int twotoi;  /* 2^i (candidate for optimal size) *///第i次扩大后数组的长度,对应numusearray中的ttlg
+  unsigned int a = 0;  /* number of elements smaller than 2^i *////累计计数，记录第i次扩大后，能够被数组装下的有效整数key的总数量
+  unsigned int na = 0;  /* number of elements to go to array part *///累计计数，记录实际被放到数组部分内的有效整数key的总数量（value不为空）
+  unsigned int optimal = 0;  /* optimal size for array part *///数组部分最优长度
   /* loop while keys can fill more than half of total size *///一直循环,直到键可以填充总大小的一半以上
   for (i = 0, twotoi = 1;
        twotoi > 0 && *pna > twotoi / 2;
        i++, twotoi *= 2) {
     a += nums[i];//加上当前数量
-    if (a > twotoi/2) {  /* more than half elements present? *///经过本次扩大之后，如果放到数组中的整数key超过数组容呈的一半，认为此时数组部分的利用率是可以接受的
+    if (a > twotoi/2) {  /* more than half elements present? *///经过本次扩大之后，如果放到数组中的整数key超过数组容量的一半，认为此时数组部分的利用率是可以接受的
       optimal = twotoi;  /* optimal size (till now) *///此时更新应该分配给数组的长度，
       na = a;  /* all elements up to 'optimal' will go to array part *///并记录实际放到数组部分的数量
     }
@@ -563,7 +564,7 @@ static int countint (lua_Integer key, unsigned int *nums) {
 ** total number of non-nil keys.
 */
 
-/// @brief a:统计数组部分总数  b:数组中key在[2^0,2^1),[2^1,2^2),[2^2,2^3),[2^3,2^4)...等区间内的元素个数
+/// @brief a:统计数组部分总数  b:数组中key在(2^0,2^1],(2^1,2^2],(2^2,2^3],(2^3,2^4]...等区间内的元素个数
 /// @param t 
 /// @param nums 
 /// @return 
@@ -607,14 +608,14 @@ static int numusehash (const Table *t, unsigned int *nums, unsigned int *pna) {
   int i = sizenode(t);
   while (i--) {
     Node *n = &t->node[i];
-    if (!isempty(gval(n))) {//遍历所有节点，对于整数key，通过countint函数检查，如果是有效的整数key，则统计到nums数组对应的位置，并累加到lause变量
+    if (!isempty(gval(n))) {//遍历所有节点，对于整数key，通过countint函数检查，如果是有效的整数key，则统计到nums数组对应的位置，并累加到totaluse变量
       if (keyisinteger(n))
         ause += countint(keyival(n), nums);
       totaluse++;//所有非空值都会索计到totaluse
     }
   }
   *pna += ause;//记录hash表部分的有效整数锥数量
-  return totaluse;//返回的是所有键总数量
+  return totaluse;//返回的是hash中所有键总数量
 }
 
 
@@ -626,7 +627,9 @@ static int numusehash (const Table *t, unsigned int *nums, unsigned int *pna) {
 ** overflow.
 */
 
-/// @brief 申请全新的Node,大小为size 如果要保留table的旧node则应该在本函数被调用前保存
+/// @brief 创建新的Node数组,lastfree会在这里重新指向数组尾
+// node数组的大小为size向上取整为2的幂
+// 如果要保留table的旧node则应该在本函数被调用前保存
 /// @param L 
 /// @param t 
 /// @param size 
@@ -649,8 +652,8 @@ static void setnodevector (lua_State *L, Table *t, unsigned int size) {
       setnilkey(n);
       setempty(gval(n));
     }
-    t->lsizenode = cast_byte(lsize);
-    t->lastfree = gnode(t, size);  /* all positions are free */
+    t->lsizenode = cast_byte(lsize);//设置lsizenode大小
+    t->lastfree = gnode(t, size);  /* all positions are free *///设置lastfree位置
   }
 }
 
@@ -781,18 +784,18 @@ static void rehash (lua_State *L, Table *t, const TValue *ek) {
   unsigned int na;  /* number of keys in the array part *///记录数组部分存的元素个数
   unsigned int nums[MAXABITS + 1];
   int i;
-  int totaluse;//记录表中元素的总数 
+  int totaluse;//记录表中key元素的总数 
   for (i = 0; i <= MAXABITS; i++) nums[i] = 0;  /* reset counts */
   setlimittosize(t);//设置alimit为表数组部分的实际大小，并设置对应的flags，返回表数组部分的实际大小
   na = numusearray(t, nums);  /* count keys in array part *///统计数组部分已经使用的元素数量
   totaluse = na;  /* all those keys are integer keys */
-  totaluse += numusehash(t, nums, &na);  /* count keys in hash part *///统计散列表部分已经使用的节点数量，并将key为整型的元素记录到nums对应的位置和na
+  totaluse += numusehash(t, nums, &na);  /* count keys in hash part *///统计散列表部分已经使用的节点数量
   /* count extra key */
-  if (ttisinteger(ek))//需要插入的ek如果是整型，则将其记录到nums对应的位置和na
-    na += countint(ivalue(ek), nums);
+  if (ttisinteger(ek))//需要插入的ek如果是整型
+    na += countint(ivalue(ek), nums);//新增的key也要考虑进去
   totaluse++;
   /* compute new size for array part */
-  asize = computesizes(nums, &na);//计算数组部分新的大小
+  asize = computesizes(nums, &na);//计算当前应该分配给数组部分的长度,以及放到数组部分中整数key的数量
   /* resize the table to new computed sizes */
   luaH_resize(L, t, asize, totaluse - na);//根据新的数组大小和散列表部分存入的元素个数调整数组大小和散列表大小
 }
@@ -809,7 +812,7 @@ static void rehash (lua_State *L, Table *t, const TValue *ek) {
 Table *luaH_new (lua_State *L) {
   GCObject *o = luaC_newobj(L, LUA_VTABLE, sizeof(Table));
   Table *t = gco2t(o);
-  t->metatable = NULL;
+  t->metatable = NULL;//元表相关
   t->flags = cast_byte(maskflags);  /* table has no metamethod fields */
   t->array = NULL;//处理数组部分
   t->alimit = 0;
@@ -826,7 +829,7 @@ void luaH_free (lua_State *L, Table *t) {
   luaM_free(L, t);
 }
 
-/// @brief 从这里可以看到freepos是倒序来的
+/// @brief 从这里可以看到freepos是倒序来的,主要是从后往前找,找到第一个free位置
 /// @param t 
 /// @return 
 static Node *getfreepos (Table *t) {
@@ -872,45 +875,51 @@ void luaH_newkey (lua_State *L, Table *t, const TValue *key, TValue *value) {
   }
   if (ttisnil(value))//值是nil类型
     return;  /* do not insert nil values */
-  mp = mainpositionTV(t, key);//函数通过key找到主位置的node桶
-  if (!isempty(gval(mp)) || isdummy(t)) {  /* main position is taken? *///主位置桶被占，或者哈希表部分为空
+  mp = mainpositionTV(t, key);//mp位根据哈希值得到的应该插入位置的节点
+  if (!isempty(gval(mp)) || isdummy(t)) {  /* main position is taken? */
+    // mp节点已经有值
+    // 此时存在两种情况
+    //   1.本次要新加的对象和现在存在这里的对象出现了碰撞,这个时候需要吧新的对象放到后面的第一个空位中,并从逻辑上将其链接到该位置的链表上
+    //   2.现在存放在这里的对象的hash值不在这里,是因为跟其他位置发送的碰撞后存放在这里的,这时需要将现在存放在这里的对象放到后面第一个空位上
+    //     新加的对象存放在这里
+
     Node *othern;
-    Node *f = getfreepos(t);  /* get a free place *///// 找空闲位置，这里还涉及到没空闲位置会重建哈希表的操作
+    Node *f = getfreepos(t);  /* get a free place *///无论以上那种情况,都需要寻找下一个空的位置
     if (f == NULL) {  /* cannot find a free place? *///slot全满，则只能重新rehash扩容了
       rehash(L, t, key);  /* grow table */// 扩容
       /* whatever called 'newkey' takes care of TM cache */
-      luaH_set(L, t, key, value);  /* insert key into grown table *///设置值
+      luaH_set(L, t, key, value);  /* insert key into grown table *///将value添加到表里
       return;
     }
     lua_assert(!isdummy(t));//hash表不空
-    othern = mainpositionfromnode(t, mp);//当前占领我的mainPos的元素，计算下它原本的mainPos
-    if (othern != mp) {  /* is colliding node out of its main position? *///它和我不是亲戚，那么我的mainPos优先给我用，它必须腾出来 上面的优先原则就是node部分的核心原则，理解这一点，即一个pos优先被属于它的mainPos的元素占用,就理解了下面的代码
+    othern = mainpositionfromnode(t, mp);//计算现在存放在这里的对象mp本来应该放在那个位置
+    if (othern != mp) {  /* is colliding node out of its main position? *///对象本来不应该放在这里,说明在别处碰撞后放在了这里
       /* yes; move colliding node into free position */
-      while (othern + gnext(othern) != mp)  /* find previous *///在它的亲戚链表中找到他的上一级
+      while (othern + gnext(othern) != mp)  /* find previous *///顺着othern的一路找到mp的前置节点
         othern += gnext(othern);
-      gnext(othern) = cast_int(f - othern);  /* rechain to point to 'f' *///调整上面的他的上一个的元素使其指向新的free
-      *f = *mp;  /* copy colliding node into free pos. (mp->next also goes) */// 把冲突结点移到空闲位置
-      if (gnext(mp) != 0) {    // 处理下他们一家族的链表 
+      gnext(othern) = cast_int(f - othern);  /* rechain to point to 'f' *///本来前置节点指向的是mp的位置,现在改为指向新找的空位f
+      *f = *mp;  /* copy colliding node into free pos. (mp->next also goes) *///将mp存到f
+      if (gnext(mp) != 0) {    //处理mp的后继节点
         gnext(f) += cast_int(mp - f);  /* correct 'next' */
         gnext(mp) = 0;  /* now 'mp' is free */
       }
       setempty(gval(mp));//将它腾出来的，原本属于我的位置的value域填入nil值(擦除残留的值) 
     }
-    else {  /* colliding node is in its own main position */
+    else {  /* colliding node is in its own main position *///对象本来就应该放在这里,说明跟本次要新加的对象发生了碰撞
       /* new node will go into free position */
-      if (gnext(mp) != 0)// 设置新free的next域，value不用设置，因为是全新的
+      if (gnext(mp) != 0)// 这里从逻辑上,新加的对象插到mp和后继链表的中间,避免遍历链表的消耗,f的下一个位置指向mp的下一个位置
         gnext(f) = cast_int((mp + gnext(mp)) - f);  /* chain new position */
       else lua_assert(gnext(f) == 0);//链表的要求，这里必须gnext(f) == 0
-      gnext(mp) = cast_int(f - mp);
-      mp = f;//方面下面setnodekey调用中mp的统一含义
+      gnext(mp) = cast_int(f - mp);//mp的下一个位置指向f
+      mp = f;
     }
   }
 
-  // 把key的值复制给节点,并返回节点的指针
+  // 把key的值复制给mp节点,并返回节点的指针
   setnodekey(L, mp, key);
   luaC_barrierback(L, obj2gco(t), key);//进行GC的barrierback操作，确保black不会指向white 
   lua_assert(isempty(gval(mp)));//函数名为newkey，所以这里判断下val==nil，确保上面将对应的pos的val置空了
-  setobj2t(L, gval(mp), value);
+  setobj2t(L, gval(mp), value);//最后将新value赋值给mp
 }
 
 
@@ -925,7 +934,7 @@ void luaH_newkey (lua_State *L, Table *t, const TValue *key, TValue *value) {
 
 /// @brief 
 // 如果key的大小在数组大小范围内，那么就直接在数组中查找值并返回。
-// 否则，获取int的hash值对应的 hash node 桶，然后在slot-link上找到key对应的值并返回。（和链地址法的查找是一样的）
+// 否则，获取int的hash值对应的 hash node，然后在slot-link上找到key对应的值并返回。（和链地址法的查找是一样的）
 // 如果找不到，则返回nil。
 
 // key在[1, sizearray)时在数组部分
@@ -1049,7 +1058,7 @@ void luaH_finishset (lua_State *L, Table *t, const TValue *key,
 ** barrier and invalidate the TM cache.
 */
 
-/// @brief hash插入值
+/// @brief hash插入值,这里可能会重组table的内存,也就是数组和hash部分会进行重建
 /// @param L 
 /// @param t 
 /// @param key 
@@ -1059,7 +1068,7 @@ void luaH_set (lua_State *L, Table *t, const TValue *key, TValue *value) {
   luaH_finishset(L, t, key, slot, value);//进行设置
 }
 
-/// @brief 在Table上设置key为数字类型的节点
+/// @brief 在Table上设置key为数字类型的节点,主要是处理数组部分
 /// @param L 
 /// @param t 
 /// @param key 
