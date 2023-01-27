@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-24 20:23:25
+ * @LastEditTime: 2023-01-28 01:07:48
  */
 /*
 ** $Id: lstate.h $
@@ -341,7 +341,7 @@ struct lua_State {
   StkId stack_last;  /* end of stack (last element + 1) *///执行lua stack最后一个空闲的slot
   StkId stack;  /* stack base *///stack基地址
   UpVal *openupval;  /* list of open upvalues in this stack */// upvalues open状态时候的的链表
-  StkId tbclist;  /* list of to-be-closed variables *///此堆栈中所有活动的将要关闭的变量的列表
+  StkId tbclist;  /* list of to-be-closed variables *///记录着最后一个 tbc 节点，栈缩容时会判断节点是否在缩容空间内，如果在，那么就根据这个节点调用缩容空间内所有 tbc 变量的 __close() 元方法
   GCObject *gclist;//GC列表
   struct lua_State *twups;  /* list of threads with open upvalues *///twups 链表  所有带有 open upvalue 的 thread 都会放到这个链表中，这样提供了一个方便的遍历 thread 的途径，并且排除掉了没有 open upvalue 的 thread
   struct lua_longjmp *errorJmp;  /* current error recover point *///发生错误的长跳转位置，用于记录当函数发生错误时跳转出去的位置

@@ -2,7 +2,7 @@
  * @文件作用: 函数原型及闭包管理
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 22:45:48
+ * @LastEditTime: 2023-01-28 01:28:47
  */
 /*
 ** $Id: lfunc.c $
@@ -29,7 +29,10 @@
 #include "lstate.h"
 
 
-
+/// @brief new一个c闭包
+/// @param L 
+/// @param nupvals 上值数量
+/// @return 
 CClosure *luaF_newCclosure (lua_State *L, int nupvals) {
   GCObject *o = luaC_newobj(L, LUA_VCCL, sizeCclosure(nupvals));
   CClosure *c = gco2ccl(o);
@@ -37,7 +40,10 @@ CClosure *luaF_newCclosure (lua_State *L, int nupvals) {
   return c;
 }
 
-
+/// @brief new一个lua闭包
+/// @param L 
+/// @param nupvals 上值数量
+/// @return 
 LClosure *luaF_newLclosure (lua_State *L, int nupvals) {
   GCObject *o = luaC_newobj(L, LUA_VLCL, sizeLclosure(nupvals));
   LClosure *c = gco2lcl(o);
@@ -52,7 +58,7 @@ LClosure *luaF_newLclosure (lua_State *L, int nupvals) {
 ** fill a closure with new closed upvalues
 */
 
-/// @brief 申请用于存放闭包中将使用到的自由变量所需要的内存
+/// @brief 设置闭包里的upvalue，默认为close，且值为nil
 /// @param L 
 /// @param cl 
 void luaF_initupvals (lua_State *L, LClosure *cl) {
@@ -60,7 +66,7 @@ void luaF_initupvals (lua_State *L, LClosure *cl) {
   for (i = 0; i < cl->nupvalues; i++) {
     GCObject *o = luaC_newobj(L, LUA_VUPVAL, sizeof(UpVal));
     UpVal *uv = gco2upv(o);
-    uv->v = &uv->u.value;  /* make it closed */
+    uv->v = &uv->u.value;  /* make it closed *///设置close状态
     setnilvalue(uv->v);
     cl->upvals[i] = uv;
     luaC_objbarrier(L, cl, uv);
@@ -72,6 +78,13 @@ void luaF_initupvals (lua_State *L, LClosure *cl) {
 ** Create a new upvalue at the given level, and link it to the list of
 ** open upvalues of 'L' after entry 'prev'.
 **/
+
+/// @brief 新建一个UpVal的函数
+/// @param L 
+/// @param tbc 是不是tbc变量
+/// @param level upvalue深度
+/// @param prev openupval链表的链头
+/// @return 
 static UpVal *newupval (lua_State *L, int tbc, StkId level, UpVal **prev) {
   GCObject *o = luaC_newobj(L, LUA_VUPVAL, sizeof(UpVal));
   UpVal *uv = gco2upv(o);
@@ -83,8 +96,8 @@ static UpVal *newupval (lua_State *L, int tbc, StkId level, UpVal **prev) {
   if (next)
     next->u.open.previous = &uv->u.open.next;
   *prev = uv;
-  if (!isintwups(L)) {  /* thread not in list of threads with upvalues? */
-    L->twups = G(L)->twups;  /* link it to the list */
+  if (!isintwups(L)) {  /* thread not in list of threads with upvalues? *///如果没有在twups链表
+    L->twups = G(L)->twups;  /* link it to the list *///链接到twups链表
     G(L)->twups = L;
   }
   return uv;
@@ -95,17 +108,22 @@ static UpVal *newupval (lua_State *L, int tbc, StkId level, UpVal **prev) {
 ** Find and reuse, or create if it does not exist, an upvalue
 ** at the given level.
 */
+
+/// @brief 寻找open地址为level的upvalue，若找不到则新建一个
+/// @param L 
+/// @param level 
+/// @return 
 UpVal *luaF_findupval (lua_State *L, StkId level) {
   UpVal **pp = &L->openupval;
   UpVal *p;
   lua_assert(isintwups(L) || L->openupval == NULL);
-  while ((p = *pp) != NULL && uplevel(p) >= level) {  /* search for it */
+  while ((p = *pp) != NULL && uplevel(p) >= level) {  /* search for it *///查找open的uv, open的uv由L->openupval串起来一个链表
     lua_assert(!isdead(G(L), p));
     if (uplevel(p) == level)  /* corresponding upvalue? */
       return p;  /* return it */
     pp = &p->u.open.next;
   }
-  /* not found: create a new upvalue after 'pp' */
+  /* not found: create a new upvalue after 'pp' *///如果未找到，创建一个新的加入链表
   return newupval(L, 0, level, pp);
 }
 
@@ -133,6 +151,10 @@ static void callclosemethod (lua_State *L, TValue *obj, TValue *err, int yy) {
 ** Check whether object at given level has a close metamethod and raise
 ** an error if not.
 */
+
+/// @brief 检测值是否有__closed元方法,没有就报错
+/// @param L 
+/// @param level 
 static void checkclosemth (lua_State *L, StkId level) {
   const TValue *tm = luaT_gettmbyobj(L, s2v(level), TM_CLOSE);
   if (ttisnil(tm)) {  /* no metamethod? */
@@ -169,6 +191,8 @@ static void prepcallclosemth (lua_State *L, StkId level, int status, int yy) {
 ** of delta. (This macro assumes that an 'L' is in scope where it
 ** is used.)
 */
+
+//最大增量
 #define MAXDELTA  \
 	((256ul << ((sizeof(L->stack->tbclist.delta) - 1) * 8)) - 1)
 
@@ -176,6 +200,10 @@ static void prepcallclosemth (lua_State *L, StkId level, int status, int yy) {
 /*
 ** Insert a variable in the list of to-be-closed variables.
 */
+
+/// @brief 在要关闭的变量列表中插入一个变量
+/// @param L 
+/// @param level 
 void luaF_newtbcupval (lua_State *L, StkId level) {
   lua_assert(level > L->tbclist);
   if (l_isfalse(s2v(level)))
@@ -202,18 +230,25 @@ void luaF_unlinkupval (UpVal *uv) {
 /*
 ** Close all upvalues up to the given stack level.
 */
+
+/// @brief 
+// UpValue 被特殊处理。因为 Lua 的 GC 可以分步扫描。别的类型被新创建时，
+// 都可以直接作为一个白色节点（新节点）挂接在整个系统中。但 upvalue 却是对已有的对象的间接引用，不是新数据。
+// 一旦 GC 在 mark 的过程中(gc 状态为 GCSpropagate)，则需增加屏障 luaC_barrier
+/// @param L 
+/// @param level 
 void luaF_closeupval (lua_State *L, StkId level) {
   UpVal *uv;
   StkId upl;  /* stack index pointed by 'uv' */
   while ((uv = L->openupval) != NULL && (upl = uplevel(uv)) >= level) {
     TValue *slot = &uv->u.value;  /* new position for value */
     lua_assert(uplevel(uv) < L->top);
-    luaF_unlinkupval(uv);  /* remove upvalue from 'openupval' list */
-    setobj(L, slot, uv->v);  /* move value to upvalue slot */
-    uv->v = slot;  /* now current value lives here */
-    if (!iswhite(uv)) {  /* neither white nor dead? */
-      nw2black(uv);  /* closed upvalues cannot be gray */
-      luaC_barrier(L, uv, slot);
+    luaF_unlinkupval(uv);  /* remove upvalue from 'openupval' list *///当前UpVal从 L->openupval链表移除
+    setobj(L, slot, uv->v);  /* move value to upvalue slot *///把当前的值付给uv->u.value
+    uv->v = slot;  /* now current value lives here *///uv->v指向close值
+    if (!iswhite(uv)) {  /* neither white nor dead? *///如果不是白色
+      nw2black(uv);  /* closed upvalues cannot be gray *///把它置成黑色
+      luaC_barrier(L, uv, slot);//设置屏障
     }
   }
 }
@@ -237,8 +272,9 @@ static void poptbclist (lua_State *L) {
 ** level.
 */
 
-/// @brief 关闭不需要的upvalues以及to-be-closed的元素，对于to-be-closed的元素，还会调用其元方法。
-///关闭栈中的upvalues，从level往后的upvalue，如果引用计数为0释放之，否则拷贝到UpVal自己身上
+/// @brief 
+// 1. 根据level关闭移除对应的上值
+// 2. 关闭不需要的upvalues以及to-be-closed的元素，对于to-be-closed的元素，还会调用其元方法。
 /// @param L 
 /// @param level 
 /// @param status 
@@ -248,8 +284,8 @@ void luaF_close (lua_State *L, StkId level, int status, int yy) {
   luaF_closeupval(L, level);  /* first, close the upvalues */
   while (L->tbclist >= level) {  /* traverse tbc's down to that level */
     StkId tbc = L->tbclist;  /* get variable index */
-    poptbclist(L);  /* remove it from list */
-    prepcallclosemth(L, tbc, status, yy);  /* close variable */
+    poptbclist(L);  /* remove it from list *///移除tbclist链表
+    prepcallclosemth(L, tbc, status, yy);  /* close variable *///调用其元方法
     level = restorestack(L, levelrel);
   }
 }

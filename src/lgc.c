@@ -2,7 +2,7 @@
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:31:38
+ * @LastEditTime: 2023-01-27 15:48:09
  */
 
 /*
@@ -307,8 +307,8 @@ void luaC_fix (lua_State *L, GCObject *o) {
 
 /// @brief 创建一个GCObject实例
 /// @param L 
-/// @param tt 
-/// @param sz 
+/// @param tt 数据类型
+/// @param sz 大小
 /// @return 
 GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
   global_State *g = G(L);

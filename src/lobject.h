@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-25 22:44:20
+ * @LastEditTime: 2023-01-28 01:09:33
  */
 
 /*
@@ -182,12 +182,11 @@ typedef struct TValue {
 */
 
 /// @brief 数据栈
-、、
 typedef union StackValue {
   TValue val;
   struct {
     TValuefields;
-    unsigned short delta;//当两个tbc变量之间的距离不适合无符号短型时，将使用虚拟条目 它们用delta == 0表示，其实际delta始终是该字段中适合的最大值
+    unsigned short delta;//相邻 tbc 变量在栈中的距离
   } tbclist;//此堆栈中所有活动的将要关闭的变量的列表
 } StackValue;
 
@@ -685,7 +684,7 @@ typedef struct Proto {
 
 #define isLfunction(o)	ttisLclosure(o)//检测是不是lua闭包,并且是回收属性
 
-#define clvalue(o)	check_exp(ttisclosure(o), gco2cl(val_(o).gc))//GCobject转换成函数
+#define clvalue(o)	c heck_exp(ttisclosure(o), gco2cl(val_(o).gc))//GCobject转换成函数
 #define clLvalue(o)	check_exp(ttisLclosure(o), gco2lcl(val_(o).gc))//GCobject转换成lua闭包
 #define fvalue(o)	check_exp(ttislcf(o), val_(o).f)//获取c函数指针
 #define clCvalue(o)	check_exp(ttisCclosure(o), gco2ccl(val_(o).gc))//GCobject转换成c闭包
@@ -725,16 +724,19 @@ typedef struct Proto {
 // 或者Lua运行堆栈发生改变
 // 函数已经不处于合理堆栈下标的时候，
 // 该函数所包含的UpVal即会切换到close状态
+
+// open状态 在这种情况下，其字段v指向的是栈中的值，换句话说它的外层函数还在活动中，因此那些外部的局部变量仍然活在栈上。
+// close状态 当外层函数返回时，就像上面代码那样，add2函数中的UpVal会变成关闭状态，即v字段指向自己的TValue，这样v就不依赖于外层局部变量了。
 typedef struct UpVal {
   CommonHeader;
   lu_byte tbc;  /* true if it represents a to-be-closed variable */// to-be-closed类型变量时候他为true
-  TValue *v;  /* points to stack or to its own value *///指向堆栈或指向其自身值
+  TValue *v;  /* points to stack or to its own value *///当函数在闭包还没关闭前（即函数返回前）打开时是指向对应stack位置值(open)，当关闭后则指向TValue(close)
   union {
-    struct {  /* (when open) */ //open状态时候
+    struct {  /* (when open) */ //当v指向栈上时，open有用，next指向下一个，挂在L->openupval上
       struct UpVal *next;  /* linked list */
       struct UpVal **previous;
-    } open;//和lua_State结构体中的UpVal *openupval字段一一对应
-    TValue value;  /* the value (when closed) *///close状态时候生效
+    } open;
+    TValue value;  /* the value (when closed) *///close状态时候生效 函数关闭后保存的值 当v指向自己时，这个值就在这里，为什么在函数返回的时候还需要保留在这里,不直接销毁呢主要因为这些返回值可能会被外部变量引用,所以还需要保留着这个UpVal对象
   } u;
 } UpVal;
 
@@ -747,19 +749,15 @@ typedef struct UpVal {
 /// @brief 使用Lua提供的lua_pushcclosure这个C Api加入到虚拟栈中的C函数闭包，它是对LClosure的一种C模拟
 typedef struct CClosure {
   ClosureHeader;
-  lua_CFunction f;//c函数指针
-  TValue upvalue[1];  /* list of upvalues *///函数的upvalue指针列表，记录了该函数引用的所有upvals。
-  // 正是由于该字段的存在，导致函数对upvalue的访问要快于从全局表_G中向下查找。函数对upvalue的访问，
-  // 一般就2个步骤：(1)从closure的upvals数组中按索引号取出upvalue。(2)将upvalue加到luastate的stack中
+  lua_CFunction f;//c函数指针 指向自定义的C函数
+  TValue upvalue[1];  /* list of upvalues *///C的闭包中，用户绑定的任意数量个upvalue
 } CClosure;
 
 /// @brief lua闭包
 typedef struct LClosure {
   ClosureHeader;//跟GC相关的结构，因为函数与是参与GC的
   struct Proto *p;//因为Closure=函数+upvalue，所以p封装的就是纯粹的函数原型
-  UpVal *upvals[1];  /* list of upvalues *///函数的upvalue指针列表，记录了该函数引用的所有upvals。
-  // 正是由于该字段的存在，导致函数对upvalue的访问要快于从全局表_G中向下查找。函数对upvalue的访问，
-  // 一般就2个步骤：(1)从closure的upvals数组中按索引号取出upvalue。(2)将upvalue加到luastate的stack中
+  UpVal *upvals[1];  /* list of upvalues *///Lua的函数upvalue，这里的类型是UpVal，这里之所以不直接用TValue是因为具体实现需要一些额外数据
 } LClosure;
 
 /// @brief 闭包,注意这里是个联合体

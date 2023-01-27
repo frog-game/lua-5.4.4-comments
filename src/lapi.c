@@ -2,7 +2,7 @@
  * @文件作用: Lua API。实现大量的Lua C API（lua_ *函数）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:21:05
+ * @LastEditTime: 2023-01-28 01:02:49
  */
 
 
@@ -1767,7 +1767,7 @@ LUA_API int lua_next (lua_State *L, int idx) {
   return more;
 }
 
-/// @brief 将堆栈中的给定索引标记为要关闭的“变量”
+/// @brief 将堆栈中的给定索引标记为要关闭的变量
 /// @param L 
 /// @param idx 
 /// @return 

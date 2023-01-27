@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 16:38:17
+ * @LastEditTime: 2023-01-28 01:26:38
 */
 
 /*
@@ -172,6 +172,11 @@ int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
 ** Stack reallocation
 ** ===================================================================
 */
+
+/// @brief 矫正堆栈
+/// @param L 
+/// @param oldstack 
+/// @param newstack 
 static void correctstack (lua_State *L, StkId oldstack, StkId newstack) {
   CallInfo *ci;
   UpVal *up;
