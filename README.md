@@ -5,6 +5,7 @@
 - 第二章 类型
   - [数据类型 ](https://frog-game.github.io/posts/read/lua5.4.4shujuleixing/)
   - [字符串](https://frog-game.github.io/posts/read/lua5.4.4zifuchuan/)
+  - [表](https://frog-game.github.io/posts/read/lua5.4.4table/)
 
 > 如果发现错误请联系我,qq:505384662
 >
