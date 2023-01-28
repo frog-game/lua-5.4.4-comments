@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 01:09:33
+ * @LastEditTime: 2023-01-28 23:12:30
  */
 
 /*
@@ -181,7 +181,7 @@ typedef struct TValue {
 ** that field.
 */
 
-/// @brief 数据栈
+/// @brief 数据栈指针结构
 typedef union StackValue {
   TValue val;
   struct {
@@ -192,10 +192,11 @@ typedef union StackValue {
 
 
 /* index to stack elements */
-//第一个自由索引堆栈中的元素槽
+//栈指针
 typedef StackValue *StkId;
 
 /* convert a 'StackValue' to a 'TValue' */
+//StackValue本质是一个TValue类型(可以使用s2v这个宏转为TValue,也就是说这个栈可以存在lua的所有类型的数据)
 //StackValue转Tvalue类型
 #define s2v(o)	(&(o)->val)
 
@@ -632,29 +633,29 @@ typedef struct AbsLineInfo {
 /// @brief 函数原型
 ///Proto主要存放二进制指令集Opcode
 //为什么定义全局常量变量名前面往往加上一个k 因为constant 的发音[ˈkɑ:nstənt]为了简写就使用了k而不是c
-
+// 这里的localvars和upvalues是函数原型中包含局部变量和upvalue的原始信息。在运行时，局部变量是存储在Lua栈上，upvalue索引是存储在LClosure的upvals字段中的
 typedef struct Proto {
   CommonHeader;
   lu_byte numparams;  /* number of fixed (named) parameters *///固定参数个数
   lu_byte is_vararg;//是否支持变参:1 表示使用了变参作为最后一个参数  三个点“...”表示这是一个可变参数的函数
-  lu_byte maxstacksize;  /* number of registers needed by this function *///该函数需要的栈大小
-  int sizeupvalues;  /* size of 'upvalues' *///upvalues数量
-  int sizek;  /* size of 'k' *///常量数量
-  int sizecode;//指令数量
-  int sizelineinfo;//相对行号信息数量
-  int sizep;  /* size of 'p' *///子函数数量
-  int sizelocvars;//局部变量调试信息大小
-  int sizeabslineinfo;  /* size of 'abslineinfo' *///绝对行号abslineinfo长度
-  int linedefined;  /* debug information  *///函数定义开始处的行号
-  int lastlinedefined;  /* debug information  *///函数定义结束处的行号
+  lu_byte maxstacksize;  /* number of registers needed by this function *///函数所需的寄存器数目
+  int sizeupvalues;  /* size of 'upvalues' *///upvalues数量 Upvaldesc *upvalues个数
+  int sizek;  /* size of 'k' *///常量数量 TValue *k个数
+  int sizecode;//指令数量 Instruction *code个数
+  int sizelineinfo;//指令int *lineinfo行号个数(debug版字节码才有该信息）
+  int sizep;  /* size of 'p' *///子函数原型个数
+  int sizelocvars;//局部变量个数
+  int sizeabslineinfo;  /* size of 'abslineinfo' *///绝对行号abslineinfo个数
+  int linedefined;  /* debug information  *///函数定义开始处的行号(debug版字节码才有该信息）
+  int lastlinedefined;  /* debug information  *///函数定义结束处的行号(debug版字节码才有该信息）
   TValue *k;  /* constants used by the function *///常量表
-  Instruction *code;  /* opcodes *///存储的指令集数组, 起始位置
-  struct Proto **p;  /* functions defined inside the function *///子函数表
-  Upvaldesc *upvalues;  /* upvalue information *///是个数组指针
-  ls_byte *lineinfo;  /* information about source lines (debug information) *///相对行号信息
-  AbsLineInfo *abslineinfo;  /* idem *///绝对行号信息
-  LocVar *locvars;  /* information about local variables (debug information) *///本地变量调试信息
-  TString  *source;  /* used for debug information *///源代码文件
+  Instruction *code;  /* opcodes *///指令表
+  struct Proto **p;  /* functions defined inside the function *///子函数原型表
+  Upvaldesc *upvalues;  /* upvalue information *///upvalue表
+  ls_byte *lineinfo;  /* information about source lines (debug information) *///相对行号信息(debug版字节码才有该信息）
+  AbsLineInfo *abslineinfo;  /* idem *///绝对行号信息debug版字节码才有该信息）
+  LocVar *locvars;  /* information about local variables (debug information) *///局部变量表(debug版字节码才有该信息）
+  TString  *source;  /* used for debug information *///源代码文件名(debug版字节码才有该信息）
   GCObject *gclist;//灰对象列表，最后由g->gray串连起来
 } Proto;
 

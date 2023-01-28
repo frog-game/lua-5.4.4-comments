@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 01:07:48
+ * @LastEditTime: 2023-01-28 22:42:44
  */
 /*
 ** $Id: lstate.h $
@@ -106,7 +106,7 @@
 #define yieldable(L)		(((L)->nCcalls & 0xffff0000) == 0)
 
 /* real number of C calls */
-/// @brief 利用nCcalls 低16位 来作为c函数调用数量
+/// @brief 利用nCcalls 低16位 来作为c函数嵌套深度
 #define getCcalls(L)	((L)->nCcalls & 0xffff)
 
 
@@ -149,12 +149,13 @@ struct lua_longjmp;  /* defined in ldo.c */
 */
 
 /// @brief 额外的堆栈空间 ,别没事使用这块空间
-/// 会留空EXTRA_STACK=5个BUF，用于元表调用或错误处理的栈操作
+/// 会留空EXTRA_STACK=5个BUF，用于元表调用或错误处理的栈操作,这些扩展槽位可以让某些操作不用考虑栈空间是否足够，而导致要重分配栈空间的行为
 #define EXTRA_STACK   5
 
 /// @brief 2倍的最小栈空间
 #define BASIC_STACK_SIZE        (2*LUA_MINSTACK)
 
+//数据栈大小
 #define stacksize(th)	cast_int((th)->stack_last - (th)->stack)
 
 
@@ -190,6 +191,7 @@ typedef struct CallInfo {
   StkId	top;  /* top for this function *///该函数的栈顶引用，[func, top]就是这个函数栈范围
   struct CallInfo *previous, *next;  /* dynamic call link *///双向链表前驱后驱指针
   union {
+    
     struct {  /* only for Lua functions *///针对lua函数
       const Instruction *savedpc;//代码指令执行点, 类似指令寄存器 
       volatile l_signalT trap;//信号软中断开关,做跳转debug使用
@@ -338,13 +340,13 @@ struct lua_State {
   StkId top;  /* first free slot in the stack *///指向栈的顶部，压入数据，都通过移动栈顶指针来实现
   global_State *l_G;//全局状态机，维护全局字符串表、内存管理函数、gc等信息
   CallInfo *ci;  /* call info for current function *///当前运行函数信息
-  StkId stack_last;  /* end of stack (last element + 1) *///执行lua stack最后一个空闲的slot
-  StkId stack;  /* stack base *///stack基地址
+  StkId stack_last;  /* end of stack (last element + 1) *///最后可用的位置数据栈 正常的栈操作在[stack, stack_last]之间
+  StkId stack;  /* stack base *///栈的起始地址
   UpVal *openupval;  /* list of open upvalues in this stack */// upvalues open状态时候的的链表
-  StkId tbclist;  /* list of to-be-closed variables *///记录着最后一个 tbc 节点，栈缩容时会判断节点是否在缩容空间内，如果在，那么就根据这个节点调用缩容空间内所有 tbc 变量的 __close() 元方法
+  StkId tbclist;  /* list of to-be-closed variables *///记录着最后一个tbc节点,栈缩容时会判断节点是否在缩容空间内,如果在那么就根据这个节点调用缩容空间内所有tbc变量的 __close() 元方法
   GCObject *gclist;//GC列表
   struct lua_State *twups;  /* list of threads with open upvalues *///twups 链表  所有带有 open upvalue 的 thread 都会放到这个链表中，这样提供了一个方便的遍历 thread 的途径，并且排除掉了没有 open upvalue 的 thread
-  struct lua_longjmp *errorJmp;  /* current error recover point *///发生错误的长跳转位置，用于记录当函数发生错误时跳转出去的位置
+  struct lua_longjmp *errorJmp; /* current error recover point */   // 错误处理链表:当前的恢复点,主要处理函数是luaD_rawrunprotected
   CallInfo base_ci;  /* CallInfo for first level (C calling Lua) *///指向函数调用栈的栈底
   volatile lua_Hook hook;//用户注册的hook回调函数
   ptrdiff_t errfunc;  /* current error handling function (stack index) *///发生错误的回调函数

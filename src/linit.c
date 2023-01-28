@@ -2,7 +2,7 @@
  * @文件作用: 内嵌库的初始化
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 19:39:45
+ * @LastEditTime: 2023-01-28 12:29:55
  */
 
 /*
@@ -60,7 +60,9 @@ static const luaL_Reg loadedlibs[] = {
   {NULL, NULL}
 };
 
-
+/// @brief 打开标准库
+/// @param L 
+/// @return 
 LUALIB_API void luaL_openlibs (lua_State *L) {
   const luaL_Reg *lib;
   /* "require" functions from 'loadedlibs' and set results to global table */

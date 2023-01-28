@@ -2,7 +2,7 @@
  * @文件作用: 各种变量类型的各种属性
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-24 20:07:51
+ * @LastEditTime: 2023-01-28 22:42:01
  */
 /*
 ** $Id: llimits.h $
@@ -255,7 +255,7 @@ typedef l_uint32 Instruction;//指令类型
 ** the size of the C stack.)
 */
 #if !defined(LUAI_MAXCCALLS)
-#define LUAI_MAXCCALLS		200
+#define LUAI_MAXCCALLS		200//函数的嵌套深度
 #endif
 
 

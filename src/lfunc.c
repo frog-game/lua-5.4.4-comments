@@ -2,7 +2,7 @@
  * @文件作用: 函数原型及闭包管理
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 01:28:47
+ * @LastEditTime: 2023-01-28 18:18:30
  */
 /*
 ** $Id: lfunc.c $
@@ -133,6 +133,12 @@ UpVal *luaF_findupval (lua_State *L, StkId level) {
 ** boolean 'yy' controls whether the call is yieldable.
 ** (This function assumes EXTRA_STACK.)
 */
+
+/// @brief 调用__closed元方法
+/// @param L 
+/// @param obj 
+/// @param err 
+/// @param yy 
 static void callclosemethod (lua_State *L, TValue *obj, TValue *err, int yy) {
   StkId top = L->top;
   const TValue *tm = luaT_gettmbyobj(L, obj, TM_CLOSE);
@@ -173,6 +179,12 @@ static void checkclosemth (lua_State *L, StkId level) {
 ** the 'level' of the upvalue being closed, as everything after that
 ** won't be used again.
 */
+
+/// @brief 调用__closed元方法前的一些预处理
+/// @param L 
+/// @param level 
+/// @param status 
+/// @param yy 
 static void prepcallclosemth (lua_State *L, StkId level, int status, int yy) {
   TValue *uv = s2v(level);  /* value being closed */
   TValue *errobj;
@@ -257,6 +269,9 @@ void luaF_closeupval (lua_State *L, StkId level) {
 /*
 ** Remove firt element from the tbclist plus its dummy nodes.
 */
+
+/// @brief 从tbclist删除一个元素
+/// @param L 
 static void poptbclist (lua_State *L) {
   StkId tbc = L->tbclist;
   lua_assert(tbc->tbclist.delta > 0);  /* first element cannot be dummy */
@@ -338,6 +353,12 @@ void luaF_freeproto (lua_State *L, Proto *f) {
 ** Look for n-th local variable at line 'line' in function 'func'.
 ** Returns NULL if not found.
 */
+
+/// @brief 获取局部变量的名字
+/// @param f 
+/// @param local_number 
+/// @param pc 
+/// @return 
 const char *luaF_getlocalname (const Proto *f, int local_number, int pc) {
   int i;
   for (i = 0; i<f->sizelocvars && f->locvars[i].startpc <= pc; i++) {

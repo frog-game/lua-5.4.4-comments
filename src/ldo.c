@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 01:26:38
+ * @LastEditTime: 2023-01-28 23:04:57
 */
 
 /*
@@ -173,18 +173,18 @@ int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
 ** ===================================================================
 */
 
-/// @brief 矫正堆栈
+/// @brief 重新分配栈之后，可能L->stack和oldstack为不同的地址，所以要矫正依赖于栈地址的其他数据
 /// @param L 
 /// @param oldstack 
 /// @param newstack 
 static void correctstack (lua_State *L, StkId oldstack, StkId newstack) {
   CallInfo *ci;
   UpVal *up;
-  L->top = (L->top - oldstack) + newstack;
-  L->tbclist = (L->tbclist - oldstack) + newstack;
-  for (up = L->openupval; up != NULL; up = up->u.open.next)
+  L->top = (L->top - oldstack) + newstack;// // 矫正栈顶
+  L->tbclist = (L->tbclist - oldstack) + newstack;//矫正tbclist
+  for (up = L->openupval; up != NULL; up = up->u.open.next)//矫正open upvalue
     up->v = s2v((uplevel(up) - oldstack) + newstack);
-  for (ci = L->ci; ci != NULL; ci = ci->previous) {
+  for (ci = L->ci; ci != NULL; ci = ci->previous) {//矫正CallInfo链表
     ci->top = (ci->top - oldstack) + newstack;
     ci->func = (ci->func - oldstack) + newstack;
     if (isLua(ci))
@@ -208,6 +208,12 @@ static void correctstack (lua_State *L, StkId oldstack, StkId newstack) {
 ** In case of allocation error, raise an error or return false according
 ** to 'raiseerror'.
 */
+
+/// @brief 重新分配一块statck内容，并且进行拷贝
+/// @param L 
+/// @param newsize 
+/// @param raiseerror 
+/// @return 
 int luaD_reallocstack (lua_State *L, int newsize, int raiseerror) {
   int oldsize = stacksize(L);
   int i;
@@ -236,6 +242,12 @@ int luaD_reallocstack (lua_State *L, int newsize, int raiseerror) {
 ** Try to grow the stack by at least 'n' elements. when 'raiseerror'
 ** is true, raises any error; otherwise, return 0 in case of errors.
 */
+
+/// @brief 对lua_State栈空间进行扩容
+/// @param L 
+/// @param n 
+/// @param raiseerror 
+/// @return 
 int luaD_growstack (lua_State *L, int n, int raiseerror) {
   int size = stacksize(L);
   if (l_unlikely(size > LUAI_MAXSTACK)) {
@@ -525,6 +537,13 @@ l_sinline CallInfo *prepCallInfo (lua_State *L, StkId func, int nret,
 /*
 ** precall for C functions
 */
+
+/// @brief 调用c函数
+/// @param L 
+/// @param func 
+/// @param nresults 
+/// @param f 
+/// @return 
 l_sinline int precallC (lua_State *L, StkId func, int nresults,
                                             lua_CFunction f) {
   int n;  /* number of returns */
@@ -597,21 +616,28 @@ int luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func,
 ** returns NULL, with all the results on the stack, starting at the
 ** original function position.
 */
+
+/// @brief 对c或者lua函数调用前的预处理
+// 只有调用的是lua函数,或者元方法__call里面调用的是lua函数,这个时候才返回ci,其余的都返回NULL
+/// @param L 
+/// @param func 
+/// @param nresults 
+/// @return 
 CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
  retry:
   switch (ttypetag(s2v(func))) {
-    case LUA_VCCL:  /* C closure */
+    case LUA_VCCL:  /* C closure *///调用c函数
       precallC(L, func, nresults, clCvalue(s2v(func))->f);
       return NULL;
-    case LUA_VLCF:  /* light C function */
+    case LUA_VLCF:  /* light C function *///调用c函数指针
       precallC(L, func, nresults, fvalue(s2v(func)));
       return NULL;
-    case LUA_VLCL: {  /* Lua function */
+    case LUA_VLCL: {  /* Lua function *///调用lua函数
       CallInfo *ci;
-      Proto *p = clLvalue(s2v(func))->p;
-      int narg = cast_int(L->top - func) - 1;  /* number of real arguments */
-      int nfixparams = p->numparams;
-      int fsize = p->maxstacksize;  /* frame size */
+      Proto *p = clLvalue(s2v(func))->p;//获取lua函数里面的函数原型
+      int narg = cast_int(L->top - func) - 1;  /* number of real arguments *///参数个数
+      int nfixparams = p->numparams;//固定参数数量
+      int fsize = p->maxstacksize;  /* frame size *///函数所需要的寄存器数量
       checkstackGCp(L, fsize, func);
       L->ci = ci = prepCallInfo(L, func, nresults, 0, func + 1 + fsize);
       ci->u.l.savedpc = p->code;  /* starting point */
@@ -637,9 +663,9 @@ CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
 l_sinline void ccall (lua_State *L, StkId func, int nResults, int inc) {
   CallInfo *ci;
   L->nCcalls += inc;
-  if (l_unlikely(getCcalls(L) >= LUAI_MAXCCALLS))
+  if (l_unlikely(getCcalls(L) >= LUAI_MAXCCALLS))//检测函数嵌套深度是不是大于最大值
     luaE_checkcstack(L);
-  if ((ci = luaD_precall(L, func, nResults)) != NULL) {  /* Lua function? */
+  if ((ci = luaD_precall(L, func, nResults)) != NULL) {  /* Lua function? *///ci不为空就是lua函数
     ci->callstatus = CIST_FRESH;  /* mark that it is a "fresh" execute */
     luaV_execute(L, ci);  /* call it */
   }
@@ -650,6 +676,12 @@ l_sinline void ccall (lua_State *L, StkId func, int nResults, int inc) {
 /*
 ** External interface for 'ccall'
 */
+
+/// @brief 调用一个函数(C或Lua)，函数在func这个栈地址上，再往上就是参数
+// 当函数调用完，func和参数都会出栈，返回参数都压在栈上
+/// @param L 
+/// @param func 
+/// @param nResults 
 void luaD_call (lua_State *L, StkId func, int nResults) {
   ccall(L, func, nResults, 1);
 }
@@ -1010,16 +1042,18 @@ static void checkmode (lua_State *L, const char *mode, const char *x) {
   }
 }
 
-
+/// @brief 解析Lua代码块
+/// @param L 
+/// @param ud 
 static void f_parser (lua_State *L, void *ud) {
   LClosure *cl;
   struct SParser *p = cast(struct SParser *, ud);
   int c = zgetc(p->z);  /* read first character */
-  if (c == LUA_SIGNATURE[0]) {
+  if (c == LUA_SIGNATURE[0]) {.//判断是二进制
     checkmode(L, p->mode, "binary");
     cl = luaU_undump(L, p->z, p->name);
   }
-  else {
+  else {//判断是文本
     checkmode(L, p->mode, "text");
     cl = luaY_parser(L, p->z, &p->buff, &p->dyd, p->name, c);
   }
@@ -1027,7 +1061,12 @@ static void f_parser (lua_State *L, void *ud) {
   luaF_initupvals(L, cl);
 }
 
-
+/// @brief 保护模式下加载代码
+/// @param L 
+/// @param z 
+/// @param name 
+/// @param mode 
+/// @return 
 int luaD_protectedparser (lua_State *L, ZIO *z, const char *name,
                                         const char *mode) {
   struct SParser p;

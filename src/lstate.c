@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 18:17:17
+ * @LastEditTime: 2023-01-28 14:57:22
  */
 /*
 ** $Id: lstate.c $
@@ -182,7 +182,9 @@ LUAI_FUNC void luaE_incCstack (lua_State *L) {
     luaE_checkcstack(L);
 }
 
-
+/// @brief 初始化数据栈,调用栈
+/// @param L1 
+/// @param L 
 static void stack_init (lua_State *L1, lua_State *L) {
   int i; CallInfo *ci;
   /* initialize stack array */
@@ -196,12 +198,12 @@ static void stack_init (lua_State *L1, lua_State *L) {
   ci = &L1->base_ci;
   ci->next = ci->previous = NULL;
   ci->callstatus = CIST_C;
-  ci->func = L1->top;
+  ci->func = L1->top;//指向当前栈顶
   ci->u.c.k = NULL;
   ci->nresults = 0;
   setnilvalue(s2v(L1->top));  /* 'function' entry for this 'ci' */
   L1->top++;
-  ci->top = L1->top + LUA_MINSTACK;
+  ci->top = L1->top + LUA_MINSTACK;//指向到L1->top +20的位置
   L1->ci = ci;
 }
 
@@ -288,7 +290,9 @@ static void close_state (lua_State *L) {
   (*g->frealloc)(g->ud, fromstate(L), sizeof(LG), 0);  /* free main block */
 }
 
-
+/// @brief 新建一个调用栈
+/// @param L 
+/// @return 
 LUA_API lua_State *lua_newthread (lua_State *L) {
   global_State *g;
   lua_State *L1;

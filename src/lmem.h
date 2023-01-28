@@ -2,7 +2,7 @@
  * @文件作用: 内存管理接口【luaM_realloc / luaM_growaux_】
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-24 19:42:42
+ * @LastEditTime: 2023-01-28 15:00:33
  */
 
 /*
@@ -64,10 +64,12 @@
 #define luaM_freearray(L, b, n)   luaM_free_(L, (b), (n)*sizeof(*(b)))
 
 #define luaM_new(L,t)		cast(t*, luaM_malloc_(L, sizeof(t), 0))
+
 #define luaM_newvector(L,n,t)	cast(t*, luaM_malloc_(L, (n)*sizeof(t), 0))
 #define luaM_newvectorchecked(L,n,t) \
   (luaM_checksize(L,n,sizeof(t)), luaM_newvector(L,n,t))
 
+//分配一块大小为s的内存块空间，其将要容纳的Lua数据类型为tag表示的类型
 #define luaM_newobject(L,tag,s)	luaM_malloc_(L, (s), tag)
 
 #define luaM_growvector(L,v,nelems,size,t,limit,e) \

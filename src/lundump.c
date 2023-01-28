@@ -2,7 +2,7 @@
  * @文件作用: 还原预编译的字节码
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 16:36:43
+ * @LastEditTime: 2023-01-28 20:24:46
  */
 /*
 ** $Id: lundump.c $
@@ -193,7 +193,9 @@ static void loadConstants (LoadState *S, Proto *f) {
   }
 }
 
-
+/// @brief 创建内嵌函数的原型对象
+/// @param S 
+/// @param f 
 static void loadProtos (LoadState *S, Proto *f) {
   int i;
   int n = loadInt(S);
@@ -258,7 +260,10 @@ static void loadDebug (LoadState *S, Proto *f) {
     f->upvalues[i].name = loadStringN(S, f);
 }
 
-
+/// @brief 填充函数原型的值
+/// @param S 
+/// @param f 
+/// @param psource 
 static void loadFunction (LoadState *S, Proto *f, TString *psource) {
   f->source = loadStringN(S, f);
   if (f->source == NULL)  /* no source in dump? */
@@ -314,6 +319,12 @@ static void checkHeader (LoadState *S) {
 /*
 ** Load precompiled chunk.
 */
+
+/// @brief 加载二进制代码块
+/// @param L 
+/// @param Z 
+/// @param name 
+/// @return 
 LClosure *luaU_undump(lua_State *L, ZIO *Z, const char *name) {
   LoadState S;
   LClosure *cl;
@@ -325,13 +336,13 @@ LClosure *luaU_undump(lua_State *L, ZIO *Z, const char *name) {
     S.name = name;
   S.L = L;
   S.Z = Z;
-  checkHeader(&S);
-  cl = luaF_newLclosure(L, loadByte(&S));
+  checkHeader(&S);//检查代码块的头
+  cl = luaF_newLclosure(L, loadByte(&S));//创建Lua闭包，并放到栈顶
   setclLvalue2s(L, L->top, cl);
   luaD_inctop(L);
-  cl->p = luaF_newproto(L);
+  cl->p = luaF_newproto(L);//创建函数原型
   luaC_objbarrier(L, cl, cl->p);
-  loadFunction(&S, cl->p, NULL);
+  loadFunction(&S, cl->p, NULL);//加载函数原型
   lua_assert(cl->nupvalues == cl->p->sizeupvalues);
   luai_verifycode(L, cl->p);
   return cl;
