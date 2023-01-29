@@ -2,7 +2,7 @@
  * @文件作用: 解析器
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:47:44
+ * @LastEditTime: 2023-01-29 17:32:38
  */
 /*
 ** $Id: lparser.c $
@@ -566,26 +566,26 @@ static void marktobeclosed (FuncState *fs) {
 /// @param fs 
 /// @param n 
 /// @param var 
-/// @param base 
+/// @param base 是不是函数第一层frame
 static void singlevaraux (FuncState *fs, TString *n, expdesc *var, int base) {
   if (fs == NULL)  /* no more levels? */
     init_exp(var, VVOID, 0);  /* default is global */
   else {
-    int v = searchvar(fs, n, var);  /* look up locals at current level *///在激活的locvar中找到了，则是本地变量 
+    int v = searchvar(fs, n, var);  /* look up locals at current level *///查询局部变量的数组表，找到对应的数组下标，找到则认为是局部变量 
     if (v >= 0) {  /* found? */
       if (v == VLOCAL && !base)
-        markupval(fs, var->u.var.vidx);  /* local will be used as an upval */
+        markupval(fs, var->u.var.vidx);  /* local will be used as an upval *///如果是在上层函数中找到的就都定义为上值
     }
     else {  /* not found as local at current level; try upvalues */
-      int idx = searchupvalue(fs, n);  /* try existing upvalues */
+      int idx = searchupvalue(fs, n);  /* try existing upvalues *///在上值表查找
       if (idx < 0) {  /* not found? */
-        singlevaraux(fs->prev, n, var, 0);  /* try upper levels */
+        singlevaraux(fs->prev, n, var, 0);  /* try upper levels *///上层函数中找
         if (var->k == VLOCAL || var->k == VUPVAL)  /* local or upvalue? */
-          idx  = newupvalue(fs, n, var);  /* will be a new upvalue */
+          idx  = newupvalue(fs, n, var);  /* will be a new upvalue *///把这个索引存起来, 并标识它是上层函数的局部变量(在栈中)还是上值(不在栈中)
         else  /* it is a global or a constant */
           return;  /* don't need to do anything at this level */
       }
-      init_exp(var, VUPVAL, idx);  /* new or old upvalue */
+      init_exp(var, VUPVAL, idx);  /* new or old upvalue *///置为上值并返回
     }
   }
 }
@@ -597,18 +597,20 @@ static void singlevaraux (FuncState *fs, TString *n, expdesc *var, int base) {
 */
 
 /// @brief 通过varname查找变量的类型，如果返回的VVOID那么就从全局的env查找
+// 比如定义 a= 1
+// 那么他就会在内部生成_ENV.a = 1,存入_ENV表中
 /// @param ls 
 /// @param var 
 static void singlevar (LexState *ls, expdesc *var) {
-  TString *varname = str_checkname(ls);
-  FuncState *fs = ls->fs;
+  TString *varname = str_checkname(ls);//得到当前变量的名字
+  FuncState *fs = ls->fs;//得到当前函数状态机
   singlevaraux(fs, varname, var, 1);
-  if (var->k == VVOID) {  /* global name? */
+  if (var->k == VVOID) {  /* global name? *///如果查找后得到的类型是VVOID那么就认为是全局变量
     expdesc key;
-    singlevaraux(fs, ls->envn, var, 1);  /* get environment variable */
+    singlevaraux(fs, ls->envn, var, 1);  /* get environment variable */// 传入了 ls->envn ls->envn 的值为 "_ENV"
     lua_assert(var->k != VVOID);  /* this one must exist */
-    codestring(&key, varname);  /* key is variable name */
-    luaK_indexed(fs, var, &key);  /* env[varname] */
+    codestring(&key, varname);  /* key is variable name *///将变量名作为字符串存储在常量区
+    luaK_indexed(fs, var, &key);  /* env[varname] *///生成了一个表查找指令, 在变量 _ENV 中查找键为该变量名的值
   }
 }
 

@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 23:04:57
+ * @LastEditTime: 2023-01-29 08:55:12
 */
 
 /*
@@ -525,9 +525,11 @@ void luaD_poscall (lua_State *L, CallInfo *ci, int nres) {
 
 l_sinline CallInfo *prepCallInfo (lua_State *L, StkId func, int nret,
                                                 int mask, StkId top) {
+  // L->ci是调用的函数的CallInfo，当它存在next时，next_ci并不是“完全”使用该ci，
+  // 只是用它已分配的sizeof(CallInfo)字节内存块，免得再次分配而已。
   CallInfo *ci = L->ci = next_ci(L);  /* new frame */
   ci->func = func;
-  ci->nresults = nret;
+  ci->nresults = nret; // next_ci已从内存分配出sizeof(CallInfo)字节的内存块，接下填写此次的调用信息。
   ci->callstatus = mask;
   ci->top = top;
   return ci;
@@ -557,7 +559,9 @@ l_sinline int precallC (lua_State *L, StkId func, int nresults,
     luaD_hook(L, LUA_HOOKCALL, -1, 1, narg);
   }
   lua_unlock(L);
+  // 不论C闭包函数，还是轻量C函数，函数原型都是lua_CFunction，执行这个f
   n = (*f)(L);  /* do the actual call */
+  // 到此已执行完被调函数。
   lua_lock(L);
   api_checknelems(L, n);
   luaD_poscall(L, ci, n);
@@ -629,7 +633,7 @@ CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
     case LUA_VCCL:  /* C closure *///调用c函数
       precallC(L, func, nresults, clCvalue(s2v(func))->f);
       return NULL;
-    case LUA_VLCF:  /* light C function *///调用c函数指针
+    case LUA_VLCF:  /* light C function *///调用轻量C函数
       precallC(L, func, nresults, fvalue(s2v(func)));
       return NULL;
     case LUA_VLCL: {  /* Lua function *///调用lua函数
@@ -640,7 +644,7 @@ CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
       int fsize = p->maxstacksize;  /* frame size *///函数所需要的寄存器数量
       checkstackGCp(L, fsize, func);
       L->ci = ci = prepCallInfo(L, func, nresults, 0, func + 1 + fsize);
-      ci->u.l.savedpc = p->code;  /* starting point */
+      ci->u.l.savedpc = p->code;  /* starting point *///调用函数的第一条指令保存到savedpc，后绪startfunc将用此个savedpc更新VM pc
       for (; narg < nfixparams; narg++)
         setnilvalue(s2v(L->top++));  /* complete missing arguments */
       lua_assert(ci->top <= L->stack_last);

@@ -2,7 +2,7 @@
  * @文件作用: 虚拟机。执行字节码（luaV_execute）。还公开了lapi.c使用的一些功能（例如luaV_concat）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 21:04:45
+ * @LastEditTime: 2023-01-29 08:48:37
  */
 /*
 ** $Id: lvm.c $
@@ -1107,7 +1107,7 @@ void luaV_finishOp (lua_State *L) {
 ** Correct global 'pc'.
 */
 
-//纠正全局指令
+//savepc的目的是把pc存储在ci->u.l.savedpc
 #define savepc(L)	(ci->u.l.savedpc = pc)
 
 
@@ -1152,6 +1152,9 @@ void luaV_finishOp (lua_State *L) {
 // 从当前函数调用栈中取出一条指令，并做一些准备工作。
 // 如果注册了LUA_MASKCOUNT或者LUA_MASKLINE事件，那么就执行luaG_traceexec()
 // 来触发执行相应事件的钩子函数。
+// vmfetch执行两个操作，1）让i指示当前要执行的指令，2）让ra指向此次指令受影响的栈单元
+// i = *(pc++); 
+// ra = base+GETARG_A(i)
 #define vmfetch()	{ \
   if (l_unlikely(trap)) {  /* stack reallocation or hooks? */ \
     trap = luaG_traceexec(L, pc);  /* handle hooks */ \
@@ -1171,18 +1174,22 @@ void luaV_finishOp (lua_State *L) {
 void luaV_execute (lua_State *L, CallInfo *ci) {
   LClosure *cl;//lua闭包
   TValue *k;//常量表
-  StkId base;//如果有参数指向函数的第一个参数
+  StkId base;//base总是指向ci->func+1
   const Instruction *pc;//指向下一条要执行的指令
   int trap;//是否触发软中断或者hook调用
 #if LUA_USE_JUMPTABLE//是否使用跳转表
 #include "ljumptab.h"
 #endif
+ // 执行一些指令后，像OP_CALL、OP_TAILCALL，不是继续for内继续循环，而是跳到startfunc。
+ // 跳到startfunc一个目的是要让更新pc不是简单的+1，而是获取自ci->u.l.savedpc。
  startfunc:
   trap = L->hookmask;//获取hookmask
  returning:  /* trap already set */
   cl = clLvalue(s2v(ci->func));//将函数转换成lua闭包
   k = cl->p->k;//获取常量表
-  pc = ci->u.l.savedpc;//获取指令
+  // 此处是给VM-pc赋初值。这里分两种情况，1）startfunc时，ci指的是被调函数，pc会是被调函数Proto的第一条指令。   
+  // 2）returning时，ci指的是调用函数，pc会是调用函数Proto中OP_CALL后的那条指令。
+  pc = ci->u.l.savedpc;
   if (l_unlikely(trap)) {//如果trap!=0
     if (pc == cl->p->code) {  /* first instruction (not resuming)? *///第一条指令
       if (cl->p->is_vararg)//是否支持变参
@@ -1192,12 +1199,15 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
     }
     ci->u.l.trap = 1;  /* assume trap is on, for now *///开启中断 
   }
-  base = ci->func + 1;//如果有参数指向函数的第一个参数
+  base = ci->func + 1;//base总是指向ci->func+1
   /* main loop of interpreter */
   for (;;) {
     Instruction i;  /* instruction being executed *///当前正在执行的指令
     StkId ra;  /* instruction's A register *///所有的指令都会操作寄存器A 
-    vmfetch();//指令循环，走向下一个指令,并获取当前要执行的指令付给i,获取A寄存器上的数据付给ra
+    // vmfetch执行两个操作，1）让i指示当前要执行的指令，2）让ra指向此次指令受影响的栈单元
+    // i = *(pc++); 
+    // ra = base+GETARG_A(i)
+    vmfetch();
     #if 0
       /* low-level line tracing for debugging Lua */
       printf("line: %d\n", luaG_getfuncline(cl->p, pcRel(pc, cl->p)));
@@ -1664,11 +1674,17 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         if (b != 0)  /* fixed number of arguments? */
           L->top = ra + b;  /* top signals number of arguments */
         /* else previous instruction set top */
+        // savepc的目的是把pc存储在ci->u.l.savedpc。通过vmfetch，此时pc指向OP_CALL后的那条指令。
+        // ci->u.l.savedpc = pc
         savepc(L);  /* in case of errors */
         if ((newci = luaD_precall(L, ra, nresults)) == NULL)
+          // 返回值NULL，意味被调函数是轻量C函数、或C闭包函数。
+          // 对这两类函数，能执行到这里意味着已执行完被调函数，
+          // VM应该执行的下一条指令是OP_CALL后的下一条指令，因而不必改pc
           updatetrap(ci);  /* C call; nothing else to be done */
         else {  /* Lua call: run function in this same C frame */
           ci = newci;
+          // 被调函数是lua脚本函数，跳到startfunc，让VM pc会是被调函数Proto的第一条指令。
           goto startfunc;
         }
         vmbreak;
@@ -1693,6 +1709,9 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
           goto startfunc;  /* execute the callee */
         else {  /* C function? */
           ci->func -= delta;  /* restore 'func' (if vararg) */
+          // luaD_poscall有两个任务。
+          // 1)L->ci = ci->previous。
+          // 2)moveresults(L, ci->func, nres, ci->nresults)。在栈中移动被调函数的n个返回值。
           luaD_poscall(L, ci, n);  /* finish caller */
           updatetrap(ci);  /* 'luaD_poscall' can change hooks */
           goto ret;  /* caller returns after the tail call */
@@ -1756,9 +1775,13 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         }
        ret:  /* return from a Lua function */
         if (ci->callstatus & CIST_FRESH)
+          // 进入此处，意味着是C调用lua脚本函数。参考ldo.c中的ccall(...)。
           return;  /* end this frame */
         else {
+          // luaD_poscall改的是L->ci，此处改ci。
           ci = ci->previous;
+          // OP_CALL已经把调用函数ci的savedpc指向OP_CALL的下一条指令。
+          // returning时，ci指的是调用函数，pc会是调用函数Proto中OP_CALL后的那条指令
           goto returning;  /* continue running caller in this frame */
         }
       }

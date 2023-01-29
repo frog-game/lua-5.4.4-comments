@@ -242,7 +242,7 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
       return hashpointer(t, p);//获取p指针指向的地址值对表t的散列表Node大小的余,对应的节点
     }
     case LUA_VLCF: {// key为c函数类型
-      lua_CFunction f = fvalue(key);//获取c函数指针 
+      lua_CFunction f = fvalue(key);//获取轻量C函数 
       return hashpointer(t, f);// 获取f函数指针指向的地址值对表t的散列表Node大小的余,对应的节点 
     }
     default: {
@@ -302,7 +302,7 @@ static int equalkey (const TValue *k1, const Node *n2, int deadok) {
       return luai_numeq(fltvalue(k1), fltvalueraw(keyval(n2)));
     case LUA_VLIGHTUSERDATA://light userdata
       return pvalue(k1) == pvalueraw(keyval(n2));
-    case LUA_VLCF://c函数指针
+    case LUA_VLCF://轻量C函数
       return fvalue(k1) == fvalueraw(keyval(n2));
     case ctb(LUA_VLNGSTR)://是长字符串,并且标记回收类型
       return luaS_eqlngstr(tsvalue(k1), keystrval(n2));

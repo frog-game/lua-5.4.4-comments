@@ -2,7 +2,7 @@
  * @文件作用: 解析器
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-01-23 11:18:23
+ * @LastEditTime: 2023-01-29 20:10:40
  */
 /*
 ** $Id: lparser.h $
@@ -177,14 +177,17 @@ typedef struct Dyndata {
 /* control of blocks */
 struct BlockCnt;  /* defined in lparser.c */
 
-
 /* state needed to generate code for a given function */
+
+/// @brief 存储函数编译状态
+
+//一个function对应一个FuncState
 typedef struct FuncState {
   Proto *f;  /* current function header */// 主要存放虚拟机指令，常量表
   struct FuncState *prev;  /* enclosing function *///父函数体指针
   struct LexState *ls;  /* lexical state *///词法状态
   struct BlockCnt *bl;  /* chain of current blocks *///当前块链
-  int pc;  /* next position to code (equivalent to 'ncode') *///下一个指令，应当存放在Proto结构中的code列表的位置
+  int pc;  /* next position to code (equivalent to 'ncode') *///指向当前需要执行的字节码，类似于指令寄存器 ip，每执行一条+1
   int lasttarget;   /* 'label' of last 'jump label' *///最后一个跳转标记
   int previousline;  /* last line that was saved in 'lineinfo' *///保存在行信息中的最后一行
   int nk;  /* number of elements in 'k' *///当前常量的数量
@@ -195,7 +198,7 @@ typedef struct FuncState {
   short ndebugvars;  /* number of elements in 'f->locvars' *///局部变量调试信息数量
   lu_byte nactvar;  /* number of active local variables *///当前活跃变量的数量
   lu_byte nups;  /* number of upvalues */// 当前upvalue的数量
-  lu_byte freereg;  /* first free register *///下一个可被使用的，空闲寄存器的位置
+  lu_byte freereg;  /* first free register *///当前空闲的栈序号，从0开始，每入栈一个常量变量等，freereg+1，出栈-1
   lu_byte iwthabs;  /* instructions issued since last absolute line info *///绝对行计数
   lu_byte needclose;  /* function needs to close upvalues when returning *///当返回的时候是否需要关闭上值
 } FuncState;

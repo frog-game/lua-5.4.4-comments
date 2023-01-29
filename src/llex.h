@@ -2,7 +2,7 @@
  * @文件作用: 词法分析器。由lparser.c使用
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:40:13
+ * @LastEditTime: 2023-01-29 20:10:35
  */
 
 /*
@@ -81,7 +81,7 @@ typedef struct LexState {
   int lastline;  /* line of last token 'consumed' *///上一个行
   Token t;  /* current token *///当前对比token
   Token lookahead;  /* look ahead token *///提前获取的token
-  struct FuncState *fs;  /* current function (parser) *///uncState 解析器私有值
+  struct FuncState *fs;  /* current function (parser) *///当前解析的方法
   struct lua_State *L;//lua_State虚拟机全局状态机，这里不做深入介绍
   ZIO *z;  /* input stream *///这里可以通过lzio.h看出，这里是字符流，通过这里读取输入的字符流
   Mbuffer *buff;  /* buffer for tokens *///tokens的流存储器

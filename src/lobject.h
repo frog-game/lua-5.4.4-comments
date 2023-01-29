@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 23:12:30
+ * @LastEditTime: 2023-01-29 20:32:13
  */
 
 /*
@@ -592,11 +592,21 @@ typedef struct Udata0 {
 ** Description of an upvalue for function prototypes
 */
 
-/// @brief 函数原型的上值描述
+/// @brief 函数原型的上值描述信息
+// instack指明这个upvalue会存在哪里，有两种情况要考虑：
+// uv如果是上一层函数的局部变量，且这个上层函数还在活动中，那么该局部变量一定还在上层函数的栈中。此时，instack为1，表明它在栈中，idx指定在栈中的索引，相对于上层函数的栈基址。
+// uv如果是上一层函数之外的局部变量，就像下面代码这样：
+// local x = 1
+// local function func()
+//     local function innerfunc()
+//         return x + 1
+//     end
+// end
+// x在上两层函数之外声明，Lua是这样解决这个问题的：首先func会把x当成upvalue记录下来，然后innerfunc再从func的upvalue数组寻找。所以这种情况下，instack为0，则idx表示上层函数uv列表的索引。
 typedef struct Upvaldesc {
   TString *name;  /* upvalue name (for debug information) *///上值的名字
-  lu_byte instack;  /* whether it is in stack (register) */// 是否是在函数栈中local变量（函数中的local变量存在寄存器中；instack 为0时代表的是闭包中的upvalue, instack 为1时 代表引用的是栈上的寄存器 
-  lu_byte idx;  /* index of upvalue (in stack or in outer function's list) *///instack 为0时 如果是闭包中的upvalue idx 是upvalue列表的索引值；instack 为1时 如果是函数栈中的local变量，idx 是寄存器的索引
+  lu_byte instack;  /* whether it is in stack (register) *///指明这个上值存在哪里
+  lu_byte idx;  /* index of upvalue (in stack or in outer function's list) *///根据上面的instack表示是什么类型的索引
   lu_byte kind;  /* kind of corresponding variable *///变量类型 VDKREG,VDKREG,RDKCONST,RDKTOCLOSE,RDKCTC这几个类型
 } Upvaldesc;
 
@@ -638,7 +648,7 @@ typedef struct Proto {
   CommonHeader;
   lu_byte numparams;  /* number of fixed (named) parameters *///固定参数个数
   lu_byte is_vararg;//是否支持变参:1 表示使用了变参作为最后一个参数  三个点“...”表示这是一个可变参数的函数
-  lu_byte maxstacksize;  /* number of registers needed by this function *///函数所需的寄存器数目
+  lu_byte maxstacksize;  /* number of registers needed by this function *///编译过程计算得到：本proto需用到的局部变量数量的最大值,(从第一个型参开始计算(不包含不定参数...因为哪个没法知道确切的数量),实际调用时传给不定参数...的实参在L->func---->L->base之间,数量在OP_VARARG指令中已给出计算公式
   int sizeupvalues;  /* size of 'upvalues' *///upvalues数量 Upvaldesc *upvalues个数
   int sizek;  /* size of 'k' *///常量数量 TValue *k个数
   int sizecode;//指令数量 Instruction *code个数
@@ -673,7 +683,7 @@ typedef struct Proto {
 
 /* Variant tags for functions */
 #define LUA_VLCL	makevariant(LUA_TFUNCTION, 0)  /* Lua closure *///Lua闭包
-#define LUA_VLCF	makevariant(LUA_TFUNCTION, 1)  /* light C function *///C函数指针
+#define LUA_VLCF	makevariant(LUA_TFUNCTION, 1)  /* light C function *///轻量C函数
 #define LUA_VCCL	makevariant(LUA_TFUNCTION, 2)  /* C closure *///C语言闭包
 
 #define ttisfunction(o)		checktype(o, LUA_TFUNCTION) //检测是不是函数
@@ -687,10 +697,10 @@ typedef struct Proto {
 
 #define clvalue(o)	c heck_exp(ttisclosure(o), gco2cl(val_(o).gc))//GCobject转换成函数
 #define clLvalue(o)	check_exp(ttisLclosure(o), gco2lcl(val_(o).gc))//GCobject转换成lua闭包
-#define fvalue(o)	check_exp(ttislcf(o), val_(o).f)//获取c函数指针
+#define fvalue(o)	check_exp(ttislcf(o), val_(o).f)//获取轻量C函数
 #define clCvalue(o)	check_exp(ttisCclosure(o), gco2ccl(val_(o).gc))//GCobject转换成c闭包
 
-#define fvalueraw(v)	((v).f)//获取原生的c函数指针
+#define fvalueraw(v)	((v).f)//获取原生的轻量C函数
 
 // 将obj指向的对象 Value 的 union 元素设为(GCobject *)类型, 并指向 x 指向的对象;
 // Tvalue->tt_ 设为LUA_VLCL类型,并设置回收属性
@@ -748,13 +758,15 @@ typedef struct UpVal {
 	CommonHeader; lu_byte nupvalues; GCObject *gclist
 
 /// @brief 使用Lua提供的lua_pushcclosure这个C Api加入到虚拟栈中的C函数闭包，它是对LClosure的一种C模拟
+// | CClosure | TValue[0] | .. | TValue[nupvalues-1] |
 typedef struct CClosure {
   ClosureHeader;
-  lua_CFunction f;//c函数指针 指向自定义的C函数
+  lua_CFunction f;//轻量C函数 指向自定义的C函数
   TValue upvalue[1];  /* list of upvalues *///C的闭包中，用户绑定的任意数量个upvalue
 } CClosure;
 
 /// @brief lua闭包
+// | LClosure | UpVal* | .. | UpVal* |
 typedef struct LClosure {
   ClosureHeader;//跟GC相关的结构，因为函数与是参与GC的
   struct Proto *p;//因为Closure=函数+upvalue，所以p封装的就是纯粹的函数原型

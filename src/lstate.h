@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 22:42:44
+ * @LastEditTime: 2023-01-29 08:32:15
  */
 /*
 ** $Id: lstate.h $
@@ -193,7 +193,7 @@ typedef struct CallInfo {
   union {
     
     struct {  /* only for Lua functions *///针对lua函数
-      const Instruction *savedpc;//代码指令执行点, 类似指令寄存器 
+      const Instruction *savedpc;//如果这个调用被中断，则用于记录当前闭包执行到的pc位置
       volatile l_signalT trap;//信号软中断开关,做跳转debug使用
       int nextraargs;  /* # of extra arguments in vararg functions *///额外参数
     } l;
@@ -212,7 +212,7 @@ typedef struct CallInfo {
       unsigned short ntransfer;  /* number of values transferred *///转移的数量
     } transferinfo;
   } u2;
-  short nresults;  /* expected number of results from this function *///目标函数返回值个数
+  short nresults;  /* expected number of results from this function *///目标函数返回值个数 -1为任意返回个数
   unsigned short callstatus;//调用状态
 } CallInfo;
 
