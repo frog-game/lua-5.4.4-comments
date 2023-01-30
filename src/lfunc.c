@@ -2,7 +2,7 @@
  * @文件作用: 函数原型及闭包管理
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 18:18:30
+ * @LastEditTime: 2023-01-30 10:16:49
  */
 /*
 ** $Id: lfunc.c $
@@ -247,6 +247,9 @@ void luaF_unlinkupval (UpVal *uv) {
 // UpValue 被特殊处理。因为 Lua 的 GC 可以分步扫描。别的类型被新创建时，
 // 都可以直接作为一个白色节点（新节点）挂接在整个系统中。但 upvalue 却是对已有的对象的间接引用，不是新数据。
 // 一旦 GC 在 mark 的过程中(gc 状态为 GCSpropagate)，则需增加屏障 luaC_barrier
+
+// 其实这里可以发现函数没有关闭时，引用的内存还是openupval上，关闭后就重新赋值了一份，这个时候upval就不是共享的了，每个闭包一份了。
+// 因为有upval的存在这个也是因为lua比较难正确性热更新的原因
 /// @param L 
 /// @param level 
 void luaF_closeupval (lua_State *L, StkId level) {
@@ -255,8 +258,11 @@ void luaF_closeupval (lua_State *L, StkId level) {
   while ((uv = L->openupval) != NULL && (upl = uplevel(uv)) >= level) {
     TValue *slot = &uv->u.value;  /* new position for value */
     lua_assert(uplevel(uv) < L->top);
-    luaF_unlinkupval(uv);  /* remove upvalue from 'openupval' list *///当前UpVal从 L->openupval链表移除
-    setobj(L, slot, uv->v);  /* move value to upvalue slot *///把当前的值付给uv->u.value
+    luaF_unlinkupval(uv);  /* remove upvalue from 'openupval' list *///当前UpVal从L->openupval链表移除
+    //值保存到v中 这个时候闭状态了，并不指向虚拟机的openupval中 这里内存就多了一份拷贝了，
+    // 在虚拟机执行过程中，未关闭函数时，都指向同一份内存也就是在openupval中的内存 这里内存就多了一份拷贝了，
+    // 在虚拟机执行过程中，未关闭函数时，都指向同一份内存也就是在openupval中的内存
+    setobj(L, slot, uv->v);  /* move value to upvalue slot *////
     uv->v = slot;  /* now current value lives here *///uv->v指向close值
     if (!iswhite(uv)) {  /* neither white nor dead? *///如果不是白色
       nw2black(uv);  /* closed upvalues cannot be gray *///把它置成黑色
@@ -296,7 +302,7 @@ static void poptbclist (lua_State *L) {
 /// @param yy 
 void luaF_close (lua_State *L, StkId level, int status, int yy) {
   ptrdiff_t levelrel = savestack(L, level);
-  luaF_closeupval(L, level);  /* first, close the upvalues */
+  luaF_closeupval(L, level);  /* first, close the upvalues *///当前UpVal从L->openupval链表移除
   while (L->tbclist >= level) {  /* traverse tbc's down to that level */
     StkId tbc = L->tbclist;  /* get variable index */
     poptbclist(L);  /* remove it from list *///移除tbclist链表

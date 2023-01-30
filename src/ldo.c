@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-29 08:55:12
+ * @LastEditTime: 2023-01-30 22:47:34
 */
 
 /*
@@ -41,7 +41,7 @@
 #include "lzio.h"
 
 
-
+/// 大于LUA_YIELD 都认为是错误状态
 #define errorstatus(s)	((s) > LUA_YIELD)
 
 
@@ -94,7 +94,10 @@ struct lua_longjmp {
   volatile int status;  /* error code */
 };
 
-
+/// @brief 根据errcode的值设置错误对象
+/// @param L 
+/// @param errcode 
+/// @param oldtop 
 void luaD_seterrorobj (lua_State *L, int errcode, StkId oldtop) {
   switch (errcode) {
     case LUA_ERRMEM: {  /* memory error? */

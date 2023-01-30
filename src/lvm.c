@@ -2,7 +2,7 @@
  * @文件作用: 虚拟机。执行字节码（luaV_execute）。还公开了lapi.c使用的一些功能（例如luaV_concat）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-29 08:48:37
+ * @LastEditTime: 2023-01-30 10:12:12
  */
 /*
 ** $Id: lvm.c $
@@ -791,19 +791,26 @@ lua_Integer luaV_shiftl (lua_Integer x, lua_Integer y) {
 ** create a new Lua closure, push it in the stack, and initialize
 ** its upvalues.
 */
+
+/// @brief 创建一个闭包
+/// @param L 
+/// @param p 
+/// @param encup 
+/// @param base 
+/// @param ra 
 static void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
                          StkId ra) {
   int nup = p->sizeupvalues;
   Upvaldesc *uv = p->upvalues;
   int i;
-  LClosure *ncl = luaF_newLclosure(L, nup);
-  ncl->p = p;
-  setclLvalue2s(L, ra, ncl);  /* anchor new closure in stack */
-  for (i = 0; i < nup; i++) {  /* fill in its upvalues */
-    if (uv[i].instack)  /* upvalue refers to local variable? */
-      ncl->upvals[i] = luaF_findupval(L, base + uv[i].idx);
+  LClosure *ncl = luaF_newLclosure(L, nup);//new一个lua闭包
+  ncl->p = p;//填充原型
+  setclLvalue2s(L, ra, ncl);  /* anchor new closure in stack *///将闭包放到数据栈中
+  for (i = 0; i < nup; i++) {  /* fill in its upvalues *///填充upvalues
+    if (uv[i].instack)  /* upvalue refers to local variable? *///如果uv在栈中,说明uv是个局部变量
+      ncl->upvals[i] = luaF_findupval(L, base + uv[i].idx);//通过luaF_findupval找到所需的上值
     else  /* get upvalue from enclosing function */
-      ncl->upvals[i] = encup[uv[i].idx];
+      ncl->upvals[i] = encup[uv[i].idx];//直接从上值列表中查找
     luaC_objbarrier(L, ncl, ncl->upvals[i]);
   }
 }
