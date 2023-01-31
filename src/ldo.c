@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-30 22:47:34
+ * @LastEditTime: 2023-01-31 21:27:52
 */
 
 /*
@@ -148,7 +148,8 @@ l_noret luaD_throw (lua_State *L, int errcode) {
   }
 }
 
-/// @brief 执行 f 函数, 抛出异常后会跳转到 LUAI_TRY 之后继续执行代码, 并返回错误码
+/// @brief 异常保护方法
+// 通过回调Pfunc f，并用setjmp和longjpm方式，实现代码的中断并回到setjmp处
 /// @param L 
 /// @param f 
 /// @param ud 
@@ -829,27 +830,31 @@ static int resume_error (lua_State *L, const char *msg, int narg) {
 ** function), plus erroneous cases: non-suspended coroutine or dead
 ** coroutine.
 */
+
+/// @brief 启动一个协程
+/// @param L 
+/// @param ud 
 static void resume (lua_State *L, void *ud) {
   int n = *(cast(int*, ud));  /* number of arguments */
   StkId firstArg = L->top - n;  /* first argument */
   CallInfo *ci = L->ci;
-  if (L->status == LUA_OK)  /* starting a coroutine? */
+  if (L->status == LUA_OK)  /* starting a coroutine? *///正常启动一个函数调用流程
     ccall(L, firstArg - 1, LUA_MULTRET, 0);  /* just call its body */
-  else {  /* resuming from previous yield */
+  else {  /* resuming from previous yield *///恢复中断的协程调用，并将状态设置为LUA_OK恢复调用
     lua_assert(L->status == LUA_YIELD);
-    L->status = LUA_OK;  /* mark that it is running (again) */
+    L->status = LUA_OK;  /* mark that it is running (again) *///调整协程栈的状态
     if (isLua(ci)) {  /* yielded inside a hook? */
       L->top = firstArg;  /* discard arguments */
-      luaV_execute(L, ci);  /* just continue running Lua code */
+      luaV_execute(L, ci);  /* just continue running Lua code *///继续执行Lua代码 
     }
-    else {  /* 'common' yield */
+    else {  /* 'common' yield *///通用的中断部分处理 
       if (ci->u.c.k != NULL) {  /* does it have a continuation function? */
         lua_unlock(L);
         n = (*ci->u.c.k)(L, LUA_YIELD, ci->u.c.ctx); /* call continuation */
         lua_lock(L);
         api_checknelems(L, n);
       }
-      luaD_poscall(L, ci, n);  /* finish 'luaD_call' */
+      luaD_poscall(L, ci, n);  /* finish 'luaD_call' *///中断处理逻辑
     }
     unroll(L, NULL);  /* run continuation */
   }
@@ -874,7 +879,7 @@ static int precover (lua_State *L, int status) {
   return status;
 }
 
-/// @brief 恢复启动一个协程
+/// @brief 启动一个协程
 /// @param L 要执行的线程
 /// @param from 原始线程栈
 /// @param nargs L栈中的参数
@@ -921,7 +926,7 @@ LUA_API int lua_isyieldable (lua_State *L) {
   return yieldable(L);
 }
 
-/// @brief 协程的让出
+/// @brief 协程 - 挂起操作
 /// @param L 代表协程
 /// @param nresults 表示要返回的结果数
 /// @param ctx 延续函数上下文的类型
@@ -932,15 +937,15 @@ LUA_API int lua_yieldk (lua_State *L, int nresults, lua_KContext ctx,
   CallInfo *ci;
   luai_userstateyield(L, nresults);
   lua_lock(L);
-  ci = L->ci;
+  ci = L->ci;////获取操作栈
   api_checknelems(L, nresults);
-  if (l_unlikely(!yieldable(L))) {
+  if (l_unlikely(!yieldable(L))) {//如果是普通主线程，或者是不支持yield的C编写的线程，就不能切出
     if (L != G(L)->mainthread)
       luaG_runerror(L, "attempt to yield across a C-call boundary");
     else
       luaG_runerror(L, "attempt to yield from outside a coroutine");
   }
-  L->status = LUA_YIELD;
+  L->status = LUA_YIELD;//挂起状态
   ci->u2.nyield = nresults;  /* save number of results */
   if (isLua(ci)) {  /* inside a hook? */
     lua_assert(!isLuacode(ci));
@@ -950,7 +955,7 @@ LUA_API int lua_yieldk (lua_State *L, int nresults, lua_KContext ctx,
   else {
     if ((ci->u.c.k = k) != NULL)  /* is there a continuation? */
       ci->u.c.ctx = ctx;  /* save context */
-    luaD_throw(L, LUA_YIELD);
+    luaD_throw(L, LUA_YIELD);//抛出一个LUA_YIELD
   }
   lua_assert(ci->callstatus & CIST_HOOKED);  /* must be inside a hook */
   lua_unlock(L);

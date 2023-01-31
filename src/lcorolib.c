@@ -2,7 +2,7 @@
  * @文件作用: 协程库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 00:07:43
+ * @LastEditTime: 2023-01-31 21:55:48
  */
 
 /*
@@ -40,41 +40,41 @@ static lua_State *getco (lua_State *L) {
 ** cases or -1 for errors.
 */
 
-/// @brief 启动或恢复一个协程
+/// @brief 启动一个协程
 /// @param L 原始线程
 /// @param co 要启动的线程
 /// @param narg 传入的参数个数
 /// @return 
 static int auxresume (lua_State *L, lua_State *co, int narg) {
   int status, nres;
-  if (l_unlikely(!lua_checkstack(co, narg))) {
-    lua_pushliteral(L, "too many arguments to resume");
-    return -1;  /* error flag */
+  if (l_unlikely(!lua_checkstack(co, narg))) {//检测一下参数是不是合法
+    lua_pushliteral(L, "too many arguments to resume");//参数太多，无法继续
+    return -1;  /* error flag *///错误标签
   }
   lua_xmove(L, co, narg);//把narg个参数从L转移到co
   status = lua_resume(co, L, narg, &nres);//调用lua_resume，根据返回值处理
   if (l_likely(status == LUA_OK || status == LUA_YIELD)) {
     if (l_unlikely(!lua_checkstack(L, nres + 1))) {
-      lua_pop(co, nres);  /* remove results anyway *///表示协程函数返回或中途有yield操作：将co的返回结果移到当前的thread的stack上
+      lua_pop(co, nres);  /* remove results anyway *///
       lua_pushliteral(L, "too many results to resume");
       return -1;  /* error flag */
     }
-    lua_xmove(co, L, nres);  /* move yielded values */
+    lua_xmove(co, L, nres);  /* move yielded values *///表示协程函数返回或中途有yield操作:将co栈中的返回值全部转移到L栈
     return nres;
   }
-  else {
+  else {//如果返回值不是LUA_OK或LUA_YIELD 出错
     lua_xmove(co, L, 1);  /* move error message *///出错：将co栈顶的错误对象转移到L栈顶
     return -1;  /* error flag */
   }
 }
 
-/// @brief coroutinue.resume库函数入口 启动或恢复一个协程
+/// @brief coroutinue.resume库函数入口 启动一个协程
 /// @param L 
 /// @return 
 static int luaB_coresume (lua_State *L) {
-  lua_State *co = getco(L);
+  lua_State *co = getco(L); //获取协程栈
   int r;
-  r = auxresume(L, co, lua_gettop(L) - 1);
+  r = auxresume(L, co, lua_gettop(L) - 1);//启动一个协程
   if (l_unlikely(r < 0)) {//出错了
     lua_pushboolean(L, 0);//错误信息在栈顶，false值插入错误信息下
     lua_insert(L, -2);
@@ -88,11 +88,10 @@ static int luaB_coresume (lua_State *L) {
 }
 
 /// @brief 和resume类型
-//这个函数和resume不同的地方在于：协程出错返回，该函数会继续传播这个错误；如果成功则原样返回协程的结果，不会在最前面加一个布尔值表示成功还是失败。
 /// @param L 
 /// @return 
 static int luaB_auxwrap (lua_State *L) {
-  lua_State *co = lua_tothread(L, lua_upvalueindex(1));//获取线程栈
+  lua_State *co = lua_tothread(L, lua_upvalueindex(1));//获取协程栈
   int r = auxresume(L, co, lua_gettop(L));//唤醒协程
   if (l_unlikely(r < 0)) {  /* error? */
     int stat = lua_status(co);
@@ -112,15 +111,17 @@ static int luaB_auxwrap (lua_State *L) {
   return r;
 }
 
-/// @brief 创建线程
+/// @brief 创建协程 入参为协程回调的函数名
+// 例如 co = coroutine.create(f) 
+// f就是那个回调的函数名
 /// @param L 
 /// @return 
 static int luaB_cocreate (lua_State *L) {
   lua_State *NL;
   luaL_checktype(L, 1, LUA_TFUNCTION);
-  NL = lua_newthread(L);
-  lua_pushvalue(L, 1);  /* move function to top */
-  lua_xmove(L, NL, 1);  /* move function from L to NL */
+  NL = lua_newthread(L);//new一个新协程栈
+  lua_pushvalue(L, 1);  /* move function to top *///将CallInfo操作栈上的协程回调函数，移动到L->top数据栈顶部
+  lua_xmove(L, NL, 1);  /* move function from L to NL *///拷贝回调函数到协程的数据栈上 
   return 1;
 }
 
@@ -128,12 +129,12 @@ static int luaB_cocreate (lua_State *L) {
 /// @param L 
 /// @return 
 static int luaB_cowrap (lua_State *L) {
-  luaB_cocreate(L);
+  luaB_cocreate(L);//创建协程
   lua_pushcclosure(L, luaB_auxwrap, 1);///把线程对象当作luaB_auxwrap的一个upvalue
   return 1;
 }
 
-/// @brief 协程的让出
+/// @brief 协程挂起函数
 //  luaB_yield 调用lua_yield，后面调用lua_yieldk
 /// @param L 
 /// @return 
@@ -231,7 +232,10 @@ static int luaB_close (lua_State *L) {
   }
 }
 
-
+// create和wrap都是用来创建协同程序的，
+// 不同的是create返回的是一个线程号(一个协同程序就是一个线程)，
+// 并且创建的协同程序处于suspend状态，必须用resume唤醒协同程序执行，执行完之后协同程序也就处于dead状态。
+// 而wrap则是返回一个函数，一但调用这个函数就进入coroutine状态。
 static const luaL_Reg co_funcs[] = {
   {"create", luaB_cocreate},
   {"resume", luaB_coresume},

@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 14:57:22
+ * @LastEditTime: 2023-01-31 21:58:38
  */
 /*
 ** $Id: lstate.c $
@@ -290,7 +290,9 @@ static void close_state (lua_State *L) {
   (*g->frealloc)(g->ud, fromstate(L), sizeof(LG), 0);  /* free main block */
 }
 
-/// @brief 新建一个调用栈
+/// @brief 创建一个新的线程栈
+// LUA在main函数中，调用luaL_newstate()方法，创建了主线程（既：lua_State *L）
+// 主要用于实现Lua的协程实现（Lua没有多线程实现）
 /// @param L 
 /// @return 
 LUA_API lua_State *lua_newthread (lua_State *L) {
@@ -307,7 +309,7 @@ LUA_API lua_State *lua_newthread (lua_State *L) {
   L1->next = g->allgc;
   g->allgc = obj2gco(L1);
   /* anchor it on L stack */
-  setthvalue2s(L, L->top, L1);
+  setthvalue2s(L, L->top, L1);//栈顶上 设置一个新的L1对象
   api_incr_top(L);
   preinit_thread(L1, g);
   L1->hookmask = L->hookmask;
