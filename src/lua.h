@@ -2,7 +2,7 @@
  * @文件作用: Lua独立解释器
  * @功能分类: 可执行的解析器，字节码编译器
  * @注释者: frog-game
- * @LastEditTime: 2023-01-23 00:25:42
+ * @LastEditTime: 2023-02-03 10:30:24
  */
 
 /*
@@ -399,6 +399,7 @@ LUA_API int (lua_isyieldable) (lua_State *L);
 
 
 ///协程的让出
+//这个函数等价于调用 lua_yieldk，不同的是不提供延续函数
 #define lua_yield(L,n)		lua_yieldk(L, (n), 0, NULL)
 
 

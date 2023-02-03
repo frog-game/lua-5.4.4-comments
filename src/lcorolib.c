@@ -2,7 +2,7 @@
  * @文件作用: 协程库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-31 21:55:48
+ * @LastEditTime: 2023-02-02 16:49:00
  */
 
 /*
@@ -41,8 +41,8 @@ static lua_State *getco (lua_State *L) {
 */
 
 /// @brief 启动一个协程
-/// @param L 原始线程
-/// @param co 要启动的线程
+/// @param L 原始协程
+/// @param co 要启动的协程
 /// @param narg 传入的参数个数
 /// @return 
 static int auxresume (lua_State *L, lua_State *co, int narg) {
@@ -51,6 +51,7 @@ static int auxresume (lua_State *L, lua_State *co, int narg) {
     lua_pushliteral(L, "too many arguments to resume");//参数太多，无法继续
     return -1;  /* error flag *///错误标签
   }
+  
   lua_xmove(L, co, narg);//把narg个参数从L转移到co
   status = lua_resume(co, L, narg, &nres);//调用lua_resume，根据返回值处理
   if (l_likely(status == LUA_OK || status == LUA_YIELD)) {
@@ -69,6 +70,7 @@ static int auxresume (lua_State *L, lua_State *co, int narg) {
 }
 
 /// @brief coroutinue.resume库函数入口 启动一个协程
+// 例如:coroutine.resume(co, ...)
 /// @param L 
 /// @return 
 static int luaB_coresume (lua_State *L) {
@@ -125,12 +127,13 @@ static int luaB_cocreate (lua_State *L) {
   return 1;
 }
 
-/// @brief 创建一个协程，但返回的是一个闭包，协程对象作为闭包的upvalue
+/// @brief 创建一个封装func的协程，然后返回一个调用该协程的函数
+// 例如: func = coroutine.wrap(f)
 /// @param L 
 /// @return 
 static int luaB_cowrap (lua_State *L) {
   luaB_cocreate(L);//创建协程
-  lua_pushcclosure(L, luaB_auxwrap, 1);///把线程对象当作luaB_auxwrap的一个upvalue
+  lua_pushcclosure(L, luaB_auxwrap, 1);///把协程对象当作luaB_auxwrap的一个upvalue
   return 1;
 }
 
@@ -209,6 +212,7 @@ static int luaB_corunning (lua_State *L) {
 }
 
 /// @brief 只能在挂起或死亡状态下调用，挂起状态下会使用协程进入死亡状态，并且关闭所有的close变量
+//例如:coroutine.close(co)
 /// @param L 
 /// @return 
 static int luaB_close (lua_State *L) {
@@ -233,9 +237,9 @@ static int luaB_close (lua_State *L) {
 }
 
 // create和wrap都是用来创建协同程序的，
-// 不同的是create返回的是一个线程号(一个协同程序就是一个线程)，
+// 不同的是create返回的是一个协程号(一个协同程序就是一个协程)，
 // 并且创建的协同程序处于suspend状态，必须用resume唤醒协同程序执行，执行完之后协同程序也就处于dead状态。
-// 而wrap则是返回一个函数，一但调用这个函数就进入coroutine状态。
+// 而wrap则是返回一个函数，一但调用这个函数就进入coroutine状态。不需要resume唤醒,直接调用返回的函数就行
 static const luaL_Reg co_funcs[] = {
   {"create", luaB_cocreate},
   {"resume", luaB_coresume},

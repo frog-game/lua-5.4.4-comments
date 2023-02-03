@@ -335,7 +335,7 @@ typedef struct global_State {
 struct lua_State {
   CommonHeader;
   lu_byte status;//当前状态机的状态,LUA_YIELD和LUA_OK为lua_State状态机的状态,这两个状态和协程有这对应关系,详见auxstatus函数
-  lu_byte allowhook;//是否允许hook
+  lu_byte allowhook;//是否允许hook，一共有4中状态 LUA_MASKCALL: 被调用时 LUA_MASKRET: 执行结束返回的时候； LUA_MASKLINE: 每一行执行完后；LUA_MASKCOUNT: 每次执行统计运行次数；
   unsigned short nci;  /* number of items in 'ci' list *///ci列表中的条目数，存储一共多少个CallInfo
   StkId top;  /* first free slot in the stack *///指向栈的顶部，压入数据，都通过移动栈顶指针来实现
   global_State *l_G;//全局状态机，维护全局字符串表、内存管理函数、gc等信息

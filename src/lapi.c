@@ -2,7 +2,7 @@
  * @文件作用: Lua API。实现大量的Lua C API（lua_ *函数）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-28 20:22:14
+ * @LastEditTime: 2023-02-03 14:55:45
  */
 
 
@@ -846,10 +846,10 @@ LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
 /// @return 
 LUA_API void lua_pushboolean (lua_State *L, int b) {
   lua_lock(L);
-  if (b)
-    setbtvalue(s2v(L->top));
+  if (b)//如果为那说明是主线程
+    setbtvalue(s2v(L->top));//push true
   else
-    setbfvalue(s2v(L->top));
+    setbfvalue(s2v(L->top));//push false
   api_incr_top(L);
   lua_unlock(L);
 }
@@ -873,10 +873,10 @@ LUA_API void lua_pushlightuserdata (lua_State *L, void *p) {
 /// @return 
 LUA_API int lua_pushthread (lua_State *L) {
   lua_lock(L);
-  setthvalue(L, s2v(L->top), L);
+  setthvalue(L, s2v(L->top), L);//这里把当前运行的协程进了堆栈
   api_incr_top(L);
   lua_unlock(L);
-  return (G(L)->mainthread == L);
+  return (G(L)->mainthread == L);//如果是主协程,那么就等于1
 }
 
 /*
@@ -1457,11 +1457,11 @@ static void f_call (lua_State *L, void *ud) {
 
 /// @brief 和lua_callk类似只是多了个errfunc
 /// @param L 
-/// @param nargs 
-/// @param nresults 
-/// @param errfunc 
-/// @param ctx 
-/// @param k 
+/// @param nargs 目标函数的参数个数
+/// @param nresults 目标函数返回值个数
+/// @param errfunc 错误时候的回调函数
+/// @param ctx 延续函数上下文环境
+/// @param k 延续函数
 /// @return 
 LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
                         lua_KContext ctx, lua_KFunction k) {

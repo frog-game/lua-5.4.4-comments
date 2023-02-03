@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-31 21:27:52
+ * @LastEditTime: 2023-02-03 17:48:31
 */
 
 /*
@@ -129,7 +129,7 @@ void luaD_seterrorobj (lua_State *L, int errcode, StkId oldtop) {
 l_noret luaD_throw (lua_State *L, int errcode) {
   if (L->errorJmp) {  /* thread has an error handler? */
     L->errorJmp->status = errcode;  /* set status */
-    LUAI_THROW(L, L->errorJmp);  /* jump to it */
+    LUAI_THROW(L, L->errorJmp);  /* jump to it *///进行跳转,跳转到luaD_rawrunprotected
   }
   else {  /* thread has no error handler */
     global_State *g = G(L);
@@ -150,17 +150,27 @@ l_noret luaD_throw (lua_State *L, int errcode) {
 
 /// @brief 异常保护方法
 // 通过回调Pfunc f，并用setjmp和longjpm方式，实现代码的中断并回到setjmp处
+//  #define LUAI_THROW(L,c)		longjmp((c)->b, 1)
+//  #define LUAI_TRY(L,c,a)		if (setjmp((c)->b) == 0) { a }
+
+// 整体流程如下
+// 1. 函数最开始定义一个lua_longjmp结构体，用于保存当前执行环境，状态值设置为LUA_OK
+// 2. 然后调用LUAI_TRY函数，该函数实际是一个宏定义，将当前执行环境setjmp，并执行回调函数
+// 3. 如果回调函数执行内部，发生异常情况，则通过luaD_throw将异常抛出
+// 4. 异常抛出函数，会执行 LUAI_THROW函数，该函数是longjmp的宏定义，并且将返回值设置为1
+// 5. 由于执行了longjmp，则C语言内部方法会回到跳转点setjmp
+// 6. LUAI_TRY函数判断setjmp的返回值，之前是0，现在由于longjmp设置了值为1，所以不会继续执行回调函数，回调函数被中断
 /// @param L 
 /// @param f 
 /// @param ud 
 /// @return 
 int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   l_uint32 oldnCcalls = L->nCcalls;
-  struct lua_longjmp lj;
-  lj.status = LUA_OK;
+  struct lua_longjmp lj;//lj用来保存当前执行环境
+  lj.status = LUA_OK;//状态设置成ok
   lj.previous = L->errorJmp;  /* chain new error handler */
   L->errorJmp = &lj;
-  LUAI_TRY(L, &lj,
+  LUAI_TRY(L, &lj,//执行环境setjmp，并执行回调函数，如果回调函数执行内部，发生异常情况，则通过luaD_throw将异常抛出
     (*f)(L, ud);
   );
   L->errorJmp = lj.previous;  /* restore old error handler */
@@ -856,7 +866,7 @@ static void resume (lua_State *L, void *ud) {
       }
       luaD_poscall(L, ci, n);  /* finish 'luaD_call' *///中断处理逻辑
     }
-    unroll(L, NULL);  /* run continuation */
+    unroll(L, NULL);  /* run continuation *///运行延续函数
   }
 }
 
@@ -869,6 +879,11 @@ static void resume (lua_State *L, void *ud) {
 ** (status == LUA_YIELD), or an unprotected error ('findpcall' doesn't
 ** find a recover point).
 */
+
+/// @brief 若调用luaD_rawrunprotected中途代码发生异常，则会通过下一行的precover函数进行恢复。这里表示，我们不需要担心调用一个协程后会因为协程内部的错误导致外部的主程序崩溃
+/// @param L 
+/// @param status 
+/// @return 
 static int precover (lua_State *L, int status) {
   CallInfo *ci;
   while (errorstatus(status) && (ci = findpcall(L)) != NULL) {
@@ -892,20 +907,20 @@ LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs,
   if (L->status == LUA_OK) {  /* may be starting a coroutine */
     if (L->ci != &L->base_ci)  /* not in base level? */
       return resume_error(L, "cannot resume non-suspended coroutine", nargs);
-    else if (L->top - (L->ci->func + 1) == nargs)  /* no function? */
+    else if (L->top - (L->ci->func + 1) == nargs)  /* no function? *///当函数执行完成
       return resume_error(L, "cannot resume dead coroutine", nargs);
   }
-  else if (L->status != LUA_YIELD)  /* ended with errors? */
+  else if (L->status != LUA_YIELD)  /* ended with errors? *///有错误的时候
     return resume_error(L, "cannot resume dead coroutine", nargs);
   L->nCcalls = (from) ? getCcalls(from) : 0;
   if (getCcalls(L) >= LUAI_MAXCCALLS)
     return resume_error(L, "C stack overflow", nargs);
-  L->nCcalls++;
+  L->nCcalls++;//函数调用的嵌套深度+1
   luai_userstateresume(L, nargs);
   api_checknelems(L, (L->status == LUA_OK) ? nargs + 1 : nargs);
   status = luaD_rawrunprotected(L, resume, &nargs);//  在保护模式中回调函数resume,入参L为协程栈
    /* continue running after recoverable errors */
-  status = precover(L, status);
+  status = precover(L, status);//进行函数恢复
   if (l_likely(!errorstatus(status)))
     lua_assert(status == L->status);  /* normal end or yield */
   else {  /* unrecoverable error */
@@ -913,6 +928,9 @@ LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs,
     luaD_seterrorobj(L, status, L->top);  /* push error message */
     L->ci->top = L->top;
   }
+
+  ///如果状态是挂起状态,那么就返回yield的时候塞入的形参个数,这里主要为了返回给resume返回值使用的
+  ///如果是其他状态,说明不在是挂起状态,这个时候就可以返回栈内的形参个数
   *nresults = (status == LUA_YIELD) ? L->ci->u2.nyield
                                     : cast_int(L->top - (L->ci->func + 1));
   lua_unlock(L);
@@ -929,8 +947,8 @@ LUA_API int lua_isyieldable (lua_State *L) {
 /// @brief 协程 - 挂起操作
 /// @param L 代表协程
 /// @param nresults 表示要返回的结果数
-/// @param ctx 延续函数上下文的类型
-/// @param k 延续函数的类型
+/// @param ctx 延续函数的指针,用来传递上下文环境
+/// @param k 延续函数
 /// @return 
 LUA_API int lua_yieldk (lua_State *L, int nresults, lua_KContext ctx,
                         lua_KFunction k) {
@@ -939,23 +957,24 @@ LUA_API int lua_yieldk (lua_State *L, int nresults, lua_KContext ctx,
   lua_lock(L);
   ci = L->ci;////获取操作栈
   api_checknelems(L, nresults);
-  if (l_unlikely(!yieldable(L))) {//如果是普通主线程，或者是不支持yield的C编写的线程，就不能切出
+  if (l_unlikely(!yieldable(L))) {//如果是主栈，或者是不支持yield的C编写的线程，就不能切出
     if (L != G(L)->mainthread)
-      luaG_runerror(L, "attempt to yield across a C-call boundary");
+      luaG_runerror(L, "attempt to yield across a C-call boundary");//如果你从协程中调入到c层，然后又进入lua层，再yield当前协程，就会包这个错 比如这样: coroutine.resume --> cfunc --> luafunction--> coroutine.yield -----> 报错
+
     else
-      luaG_runerror(L, "attempt to yield from outside a coroutine");
+      luaG_runerror(L, "attempt to yield from outside a coroutine");//主栈不能yield
   }
   L->status = LUA_YIELD;//挂起状态
-  ci->u2.nyield = nresults;  /* save number of results */
-  if (isLua(ci)) {  /* inside a hook? */
+  ci->u2.nyield = nresults;  /* save number of results *///保存返回的结果数
+  if (isLua(ci)) {  /* inside a hook? *///如果跑到这这，认为是lua的hook函数
     lua_assert(!isLuacode(ci));
     api_check(L, nresults == 0, "hooks cannot yield values");
     api_check(L, k == NULL, "hooks cannot continue after yielding");
   }
   else {
-    if ((ci->u.c.k = k) != NULL)  /* is there a continuation? */
-      ci->u.c.ctx = ctx;  /* save context */
-    luaD_throw(L, LUA_YIELD);//抛出一个LUA_YIELD
+    if ((ci->u.c.k = k) != NULL)  /* is there a continuation? *///如果有延续函数
+      ci->u.c.ctx = ctx;  /* save context *///保存下延续函数的上下文环境
+    luaD_throw(L, LUA_YIELD);//luaD_throw 检查lua_State::errorJmp，如果有恢复点则调用LUAI_THROW,跳回到的luaD_rawrunprotected那里
   }
   lua_assert(ci->callstatus & CIST_HOOKED);  /* must be inside a hook */
   lua_unlock(L);
