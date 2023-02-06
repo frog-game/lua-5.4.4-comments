@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-29 08:32:15
+ * @LastEditTime: 2023-02-06 10:34:18
  */
 /*
 ** $Id: lstate.h $
@@ -175,7 +175,7 @@ typedef struct stringtable {
 ** Information about a call.
 ** About union 'u':
 ** - field 'l' is used only for Lua functions;
-** - field 'c' is used only for C functions.
+** - field 'c' is used only for C functions.n
 ** About union 'u2':
 ** - field 'funcidx' is used only by C functions while doing a
 ** protected call;

@@ -2,7 +2,7 @@
  * @文件作用: 解析器
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-01-29 17:32:38
+ * @LastEditTime: 2023-02-04 17:12:57
  */
 /*
 ** $Id: lparser.c $
@@ -2076,9 +2076,9 @@ static int getlocalattribute (LexState *ls) {
     const char *attr = getstr(str_checkname(ls));
     checknext(ls, '>');
     if (strcmp(attr, "const") == 0)
-      return RDKCONST;  /* read-only variable */
+      return RDKCONST;  /* read-only variable *////只读变量
     else if (strcmp(attr, "close") == 0)
-      return RDKTOCLOSE;  /* to-be-closed variable */
+      return RDKTOCLOSE;  /* to-be-closed variable *///tbc变量
     else
       luaK_semerror(ls,
         luaO_pushfstring(ls->L, "unknown attribute '%s'", attr));

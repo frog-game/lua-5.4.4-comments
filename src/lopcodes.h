@@ -2,7 +2,7 @@
  * @文件作用: 虚拟机的字节码定义
  * @功能分类: 拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 20:46:18
+ * @LastEditTime: 2023-02-04 22:41:09
  */
 
 /*
@@ -252,7 +252,7 @@ OP_SETUPVAL,/*	A B	UpValue[B] := R[A]				*///写一个寄存器值到上值
 /*赋值加载指令 end*/
 
 /*表操作 begin*/
-OP_GETTABUP,/*	A B C	R[A] := UpValue[B][K[C]:string]			*///从表取值到寄存器,标在upvalue
+OP_GETTABUP,/*	A B C	R[A] := UpValue[B][K[C]:string]			*///从表取值到寄存器,表在upvalue
 OP_GETTABLE,/*	A B C	R[A] := R[B][R[C]]				*///从表取值到寄存器
 OP_GETI,/*	A B C	R[A] := R[B][C]					*///从表取整型字段值给寄存器
 OP_GETFIELD,/*	A B C	R[A] := R[B][K[C]:string]			*///从表取字符串字段值给寄存器

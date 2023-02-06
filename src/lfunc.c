@@ -2,7 +2,7 @@
  * @文件作用: 函数原型及闭包管理
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-30 10:16:49
+ * @LastEditTime: 2023-02-05 20:15:24
  */
 /*
 ** $Id: lfunc.c $
@@ -204,7 +204,10 @@ static void prepcallclosemth (lua_State *L, StkId level, int status, int yy) {
 ** is used.)
 */
 
-//最大增量
+//最大tbc增量
+//(sizeof(L->stack->tbclist.delta) 结果为2
+//(256ul << ((sizeof(L->stack->tbclist.delta) - 1) * 8))  结果为65536
+//((256ul << ((sizeof(L->stack->tbclist.delta) - 1) * 8)) - 1) 结果为65535
 #define MAXDELTA  \
 	((256ul << ((sizeof(L->stack->tbclist.delta) - 1) * 8)) - 1)
 
@@ -217,16 +220,16 @@ static void prepcallclosemth (lua_State *L, StkId level, int status, int yy) {
 /// @param L 
 /// @param level 
 void luaF_newtbcupval (lua_State *L, StkId level) {
-  lua_assert(level > L->tbclist);
+  lua_assert(level > L->tbclist);//这里level必须要大于L->tbclist,如果等于或者小于,那么说明不是插入到当前tbc变量的屁股后面
   if (l_isfalse(s2v(level)))
     return;  /* false doesn't need to be closed */
-  checkclosemth(L, level);  /* value must have a close method */
-  while (cast_uint(level - L->tbclist) > MAXDELTA) {
-    L->tbclist += MAXDELTA;  /* create a dummy node at maximum delta */
+  checkclosemth(L, level);  /* value must have a close method *///检测有tbc变量有没有关联__closed元方法
+  while (cast_uint(level - L->tbclist) > MAXDELTA) {//如果超过了unsigned short最大值
+    L->tbclist += MAXDELTA;  /* create a dummy node at maximum delta *///创建虚拟节点
     L->tbclist->tbclist.delta = 0;
   }
-  level->tbclist.delta = cast(unsigned short, level - L->tbclist);
-  L->tbclist = level;
+  level->tbclist.delta = cast(unsigned short, level - L->tbclist);//算出当前tbc变量和新的tbc变量的距离
+  L->tbclist = level;//指向最新的tbc变量
 }
 
 /// @brief 把当前UpVal从链表移除
@@ -276,15 +279,15 @@ void luaF_closeupval (lua_State *L, StkId level) {
 ** Remove firt element from the tbclist plus its dummy nodes.
 */
 
-/// @brief 从tbclist删除一个元素
+/// @brief 从tbclist及其虚拟节点中删除第一个元素
 /// @param L 
 static void poptbclist (lua_State *L) {
-  StkId tbc = L->tbclist;
-  lua_assert(tbc->tbclist.delta > 0);  /* first element cannot be dummy */
-  tbc -= tbc->tbclist.delta;
-  while (tbc > L->stack && tbc->tbclist.delta == 0)
-    tbc -= MAXDELTA;  /* remove dummy nodes */
-  L->tbclist = tbc;
+  StkId tbc = L->tbclist;//得到tbclist指针
+  lua_assert(tbc->tbclist.delta > 0);  /* first element cannot be dummy *///必须delta字段>0也就是必须有相邻的tbc变量
+  tbc -= tbc->tbclist.delta;//tbclist指针现在指向了下一个相邻的tbc变量
+  while (tbc > L->stack && tbc->tbclist.delta == 0)//大于起始地址,并且delta是0说明是个虚拟节点
+    tbc -= MAXDELTA;  /* remove dummy nodes *///移除掉虚拟节点
+  L->tbclist = tbc;//指向第一个元素向低地址方向的邻居节点,这样第一个元素就给删除了
 }
 
 

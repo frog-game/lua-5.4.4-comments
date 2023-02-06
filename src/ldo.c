@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-03 17:48:31
+ * @LastEditTime: 2023-02-04 16:49:40
 */
 
 /*
@@ -240,7 +240,7 @@ int luaD_reallocstack (lua_State *L, int newsize, int raiseerror) {
     else return 0;  /* do not raise an error */
   }
   /* number of elements to be copied to the new stack */
-  i = ((oldsize <= newsize) ? oldsize : newsize) + EXTRA_STACK;
+  i = ((oldsize <= newsize) ? oldsize : newsize) + EXTRA_STACK;//要复制到新堆栈的元素数
   memcpy(newstack, L->stack, i * sizeof(StackValue));
   for (; i < newsize + EXTRA_STACK; i++)
     setnilvalue(s2v(newstack + i)); /* erase new segment */
