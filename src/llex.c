@@ -2,7 +2,7 @@
  * @文件作用: 词法分析器。由lparser.c使用
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 16:51:01
+ * @LastEditTime: 2023-02-07 16:51:03
  */
 /*
 ** $Id: llex.c $
@@ -169,7 +169,12 @@ static void inclinenumber (LexState *ls) {
     lexerror(ls, "chunk has too many lines", 0);
 }
 
-
+/// @brief 初始化词法状态机的输入流ls
+/// @param L 
+/// @param ls 
+/// @param z 
+/// @param source 
+/// @param firstchar 
 void luaX_setinput (lua_State *L, LexState *ls, ZIO *z, TString *source,
                     int firstchar) {
   ls->t.token = 0;

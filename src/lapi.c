@@ -2,7 +2,7 @@
  * @文件作用: Lua API。实现大量的Lua C API（lua_ *函数）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-03 14:55:45
+ * @LastEditTime: 2023-02-06 22:48:04
  */
 
 
@@ -359,7 +359,7 @@ LUA_API void lua_copy (lua_State *L, int fromidx, int toidx) {
 
 /// @brief 把栈中指定索引的数据拷贝到栈顶
 /// 例子 栈的初始状态为10 20 30 40 50 *（从栈底到栈顶，“*”标识为栈顶）有
-///  lua_pushvalue(L, 3)    --> 10 20 30 40 50 30*
+///  lua_pushvalue(L, 3)    --> 10 20 30 40 50 30 *
 ///  lua_pushvalue(L,3)是取得原来栈中的第三个元素，压到栈顶
 /// @param L 
 /// @param idx 
@@ -812,8 +812,8 @@ LUA_API const char *lua_pushfstring (lua_State *L, const char *fmt, ...) {
 
 /// @brief 将新的 C 闭包推入堆栈。该函数接收一个指向 C 函数的指针，并将一个 Lua 类型的 function 值压入堆栈，该函数在调用时会调用相应的 C 函数。参数 n 告诉这个函数有多少上值
 /// @param L 
-/// @param fn 
-/// @param n 
+/// @param n 上值数
+/// @param fn //c回调函数
 /// @return 
 LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
   lua_lock(L);
@@ -840,7 +840,7 @@ LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
   lua_unlock(L);
 }
 
-/// @brief 将具有值 b 的布尔值压入堆栈。
+/// @brief 将具有值b的布尔值压入堆栈。
 /// @param L 
 /// @param b 
 /// @return 
@@ -1391,7 +1391,7 @@ LUA_API int lua_setiuservalue (lua_State *L, int idx, int n) {
 ** 'load' and 'call' functions (run Lua code)
 */
 
-/// @brief 检测 nargs:压入栈的参数个数 nresults:返回值的个数 合法性
+/// @brief 检测 nargs:压入栈的参数个数 nresults:返回值的个数 检查当前栈空间是否足够容纳目标函数返回的参数个数
 #define checkresults(L,na,nr) \
      api_check(L, (nr) == LUA_MULTRET || (L->ci->top - L->top >= (nr) - (na)), \
 	"results from function overflow current stack size")
@@ -1443,6 +1443,8 @@ LUA_API void lua_callk (lua_State *L, int nargs, int nresults,
 /*
 ** Execute a protected call.
 */
+
+//f_call的数据信息
 struct CallS {  /* data to 'f_call' */
   StkId func;//* 要调用的函数位置 */
   int nresults;//函数返回值个数
@@ -1456,6 +1458,8 @@ static void f_call (lua_State *L, void *ud) {
 
 
 /// @brief 和lua_callk类似只是多了个errfunc
+///CIST_YPCALL状态是保证发生错误的时候能够跳到对应的错误回复点,
+// 恢复点在"status = precover(L, status);"//进行函数恢复`这个地方
 /// @param L 
 /// @param nargs 目标函数的参数个数
 /// @param nresults 目标函数返回值个数
@@ -1467,36 +1471,37 @@ LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
                         lua_KContext ctx, lua_KFunction k) {
   struct CallS c;
   int status;
-  ptrdiff_t func;
+  ptrdiff_t func;//用于指针算术和数组索引
   lua_lock(L);
   api_check(L, k == NULL || !isLua(L->ci),
-    "cannot use continuations inside hooks");
-  api_checknelems(L, nargs+1);
-  api_check(L, L->status == LUA_OK, "cannot do calls on non-normal thread");
-  checkresults(L, nargs, nresults);
+    "cannot use continuations inside hooks");//检测延续函数是否可用
+  api_checknelems(L, nargs+1);//检测目标函数的参数个数
+  api_check(L, L->status == LUA_OK, "cannot do calls on non-normal thread");//无法在非正常线程上执行调用
+  checkresults(L, nargs, nresults);//检查当前栈空间是否足够容纳目标函数返回的参数个数
   if (errfunc == 0)
     func = 0;
   else {
-    StkId o = index2stack(L, errfunc);
-    api_check(L, ttisfunction(s2v(o)), "error handler must be a function");
-    func = savestack(L, o);
+    StkId o = index2stack(L, errfunc);//得到errfunc
+    api_check(L, ttisfunction(s2v(o)), "error handler must be a function");//必须的是一个函数
+    func = savestack(L, o);//恢复下偏移量
   }
-  c.func = L->top - (nargs+1);  /* function to be called */
-  if (k == NULL || !yieldable(L)) {  /* no continuation or no yieldable? */
+  c.func = L->top - (nargs+1);  /* function to be called *///函数指针在这里,另外看的出参数放到了函数指针的上面
+  if (k == NULL || !yieldable(L)) {  /* no continuation or no yieldable? *///没有设置延续函数或者不能yield
     c.nresults = nresults;  /* do a 'conventional' protected call */
-    status = luaD_pcall(L, f_call, &c, savestack(L, c.func), func);
+    status = luaD_pcall(L, f_call, &c, savestack(L, c.func), func);//以保护方式调用函数
   }
-  else {  /* prepare continuation (call is already protected by 'resume') */
+  else {  /* prepare continuation (call is already protected by 'resume') *///准备延续函数的一些数据
     CallInfo *ci = L->ci;
-    ci->u.c.k = k;  /* save continuation */
-    ci->u.c.ctx = ctx;  /* save context */
+    ci->u.c.k = k;  /* save continuation *///保存延续函数
+    ci->u.c.ctx = ctx;  /* save context *///保存上下文
     /* save information for error recovery */
+    //保存信息以进行错误恢复
     ci->u2.funcidx = cast_int(savestack(L, c.func));
     ci->u.c.old_errfunc = L->errfunc;
     L->errfunc = func;
     setoah(ci->callstatus, L->allowhook);  /* save value of 'allowhook' */
-    ci->callstatus |= CIST_YPCALL;  /* function can do error recovery */
-    luaD_call(L, c.func, nresults);  /* do the call */
+    ci->callstatus |= CIST_YPCALL;  /* function can do error recovery *///保证跳转到正确恢复点
+    luaD_call(L, c.func, nresults);  /* do the call *///主要调用luaD_precall()进行预处理，如果是lua函数就调用luaV_execute()执行
     ci->callstatus &= ~CIST_YPCALL;
     L->errfunc = ci->u.c.old_errfunc;
     status = LUA_OK;  /* if it is here, there were no errors */

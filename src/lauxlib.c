@@ -2,7 +2,7 @@
  * @文件作用: c库编写用到的辅助函数库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 17:10:45
+ * @LastEditTime: 2023-02-07 15:52:29
  */
 /*
 ** $Id: lauxlib.c $
@@ -1063,14 +1063,14 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   LoadF lf;
   int status, readstatus;
   int c;
-  int fnameindex = lua_gettop(L) + 1;  /* index of filename on the stack */
-  if (filename == NULL) {
+  int fnameindex = lua_gettop(L) + 1;  /* index of filename on the stack *///读取文件名索引
+  if (filename == NULL) {//文件是空的
     lua_pushliteral(L, "=stdin");
     lf.f = stdin;
   }
   else {
-    lua_pushfstring(L, "@%s", filename);
-    lf.f = fopen(filename, "r");
+    lua_pushfstring(L, "@%s", filename);//把文件名压入堆栈顶
+    lf.f = fopen(filename, "r");//只读方式打开
     if (lf.f == NULL) return errfile(L, "open", fnameindex);
   }
   if (skipcomment(&lf, &c))  /* read initial portion */
@@ -1243,28 +1243,28 @@ LUALIB_API const char *luaL_tolstring (lua_State *L, int idx, size_t *len) {
 ** Returns with only the table at the stack.
 */
 
-/// @brief 将所有 luaL_Reg数组中的函数注册到栈顶的table中.  
+/// @brief 将所有luaL_Reg数组中的函数注册到通过luaL_newlib创建的table中.  
 // 当upvalue个数不为0时,所创建的所有函数共享这些upvalue. -2到-(nup+1)的元素为要注册的upvalue. 
 // (注意:这些upvalue是c中的upvalue,不是lua中的upvalue,可以在注册的c函数中通过 lua_upvalueindex(n)获取其值.) 
 // 调用完成后弹出栈顶的所有upvalue.
 /// @param L 
-/// @param l 
-/// @param nup 
+/// @param l luaL_Reg数组中函数
+/// @param nup 上值数量
 /// @return 
 LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
-  luaL_checkstack(L, nup, "too many upvalues");
-  for (; l->name != NULL; l++) {  /* fill the table with given functions */
-    if (l->func == NULL)  /* place holder? */
-      lua_pushboolean(L, 0);
+  luaL_checkstack(L, nup, "too many upvalues"); //检测上值数量
+  for (; l->name != NULL; l++) {  /* fill the table with given functions *///遍历luaL_Reg数组中的函数
+    if (l->func == NULL)  /* place holder? *///到达了place luaL_Reg数组的{NULL, NULL}占位地方,也就是表示注册函数结束了
+      lua_pushboolean(L, 0);//将布尔值压入堆栈。
     else {
       int i;
-      for (i = 0; i < nup; i++)  /* copy upvalues to the top */
-        lua_pushvalue(L, -nup);
-      lua_pushcclosure(L, l->func, nup);  /* closure with those upvalues */
+      for (i = 0; i < nup; i++)  /* copy upvalues to the top *///遍历上值
+        lua_pushvalue(L, -nup);////将上值都拷贝到栈顶,注意这里传递的是nup,不是i
+      lua_pushcclosure(L, l->func, nup);  /* closure with those upvalues *///塞入一个闭包
     }
-    lua_setfield(L, -(nup + 2), l->name);
+    lua_setfield(L, -(nup + 2), l->name);//将栈顶的回调函数和table关联起来,形如t[l->name] = 栈顶func 这里-(nup + 2)位置的table是通过luaL_newlib创建的
   }
-  lua_pop(L, nup);  /* remove upvalues */
+  lua_pop(L, nup);  /* remove upvalues *///移除掉上值
 }
 
 

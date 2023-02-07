@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 16:38:09
+ * @LastEditTime: 2023-02-06 20:12:55
 */
 
 /*
@@ -47,6 +47,7 @@
 
 
 /* macro to check stack size, preserving 'p' */
+//检测堆栈大小
 #define checkstackGCp(L,n,p)  \
   luaD_checkstackaux(L, n, \
     ptrdiff_t t__ = savestack(L, p);  /* save 'p' */ \

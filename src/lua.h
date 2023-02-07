@@ -2,7 +2,7 @@
  * @文件作用: Lua独立解释器
  * @功能分类: 可执行的解析器，字节码编译器
  * @注释者: frog-game
- * @LastEditTime: 2023-02-03 10:30:24
+ * @LastEditTime: 2023-02-06 20:16:56
  */
 
 /*
@@ -40,7 +40,7 @@
 #define LUA_SIGNATURE	"\x1bLua"
 
 /* option for multiple returns in 'lua_pcall' and 'lua_call' */
-#define LUA_MULTRET	(-1)
+#define LUA_MULTRET	(-1)//实际有多少个返回值，他就返回多少个，不会丢弃
 
 
 /*
@@ -542,10 +542,10 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 /*
 ** Event masks
 */
-#define LUA_MASKCALL	(1 << LUA_HOOKCALL)
-#define LUA_MASKRET	(1 << LUA_HOOKRET)
-#define LUA_MASKLINE	(1 << LUA_HOOKLINE)
-#define LUA_MASKCOUNT	(1 << LUA_HOOKCOUNT)
+#define LUA_MASKCALL	(1 << LUA_HOOKCALL)//调用函数时回调
+#define LUA_MASKRET	(1 << LUA_HOOKRET)//函数返回时回调
+#define LUA_MASKLINE	(1 << LUA_HOOKLINE)//执行一行时代码时回调 vmfetch中每执行一条指令，都会调用luaG_traceexec函数，在其中判断新行并触发事件
+#define LUA_MASKCOUNT	(1 << LUA_HOOKCOUNT)//每执行count条指令时回调，vmfetch中每执行一条指令，都会调用luaG_traceexec函数，在其中判断是否执行了count条件指令并触发事件
 
 typedef struct lua_Debug lua_Debug;  /* activation record */
 

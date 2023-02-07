@@ -2,7 +2,7 @@
  * @文件作用: 解析器
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-02-04 17:12:57
+ * @LastEditTime: 2023-02-07 16:51:24
  */
 /*
 ** $Id: lparser.c $
@@ -2326,33 +2326,33 @@ static void mainfunc (LexState *ls, FuncState *fs) {
 }
 
 
-/// @brief 解析和编译过程的入口函数
+/// @brief 语法树解析
 /// @param L 
 /// @param z 
 /// @param buff 
 /// @param dyd 
 /// @param name 
 /// @param firstchar 
-/// @return 
+/// @return 返回一个LClosure
 LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
                        Dyndata *dyd, const char *name, int firstchar) {
-  LexState lexstate;
-  FuncState funcstate;
-  LClosure *cl = luaF_newLclosure(L, 1);  /* create main closure */
-  setclLvalue2s(L, L->top, cl);  /* anchor it (to avoid being collected) */
-  luaD_inctop(L);
-  lexstate.h = luaH_new(L);  /* create table for scanner */
-  sethvalue2s(L, L->top, lexstate.h);  /* anchor it */
-  luaD_inctop(L);
-  funcstate.f = cl->p = luaF_newproto(L);
+  LexState lexstate;//语法分析
+  FuncState funcstate;//函数状态
+  LClosure *cl = luaF_newLclosure(L, 1);  /* create main closure *///创建main闭包
+  setclLvalue2s(L, L->top, cl);  /* anchor it (to avoid being collected) *///挂到top避免被回收
+  luaD_inctop(L);//自增top
+  lexstate.h = luaH_new(L);  /* create table for scanner *///创建一个扫描表
+  sethvalue2s(L, L->top, lexstate.h);  /* anchor it *///挂到top避免被回收
+  luaD_inctop(L);//自增top
+  funcstate.f = cl->p = luaF_newproto(L);//new一个函数原型
   luaC_objbarrier(L, cl, cl->p);
-  funcstate.f->source = luaS_new(L, name);  /* create and anchor TString */
+  funcstate.f->source = luaS_new(L, name);  /* create and anchor TString *///赋文件名字
   luaC_objbarrier(L, funcstate.f, funcstate.f->source);
   lexstate.buff = buff;
   lexstate.dyd = dyd;
   dyd->actvar.n = dyd->gt.n = dyd->label.n = 0;
-  luaX_setinput(L, &lexstate, z, funcstate.f->source, firstchar);
-  mainfunc(&lexstate, &funcstate);
+  luaX_setinput(L, &lexstate, z, funcstate.f->source, firstchar);//初始化词法状态机的输入流ls
+  mainfunc(&lexstate, &funcstate);//执行主函数
   lua_assert(!funcstate.prev && funcstate.nups == 1 && !lexstate.fs);
   /* all scopes should be correctly finished */
   lua_assert(dyd->actvar.n == 0 && dyd->gt.n == 0 && dyd->label.n == 0);

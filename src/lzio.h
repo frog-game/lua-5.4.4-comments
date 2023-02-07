@@ -2,7 +2,7 @@
  * @文件作用: 通用的缓冲输入流接口
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-21 21:05:11
+ * @LastEditTime: 2023-02-07 14:31:25
  */
 /*
 ** $Id: lzio.h $
@@ -60,11 +60,11 @@ LUAI_FUNC size_t luaZ_read (ZIO* z, void *b, size_t n);	/* read next n bytes */
 /* --------- Private Part ------------------ */
 
 struct Zio {
-  size_t n;			/* bytes still unread */
-  const char *p;		/* current position in buffer */
-  lua_Reader reader;		/* reader function */
-  void *data;			/* additional data */
-  lua_State *L;			/* Lua state (for reader) */
+  size_t n;			/* bytes still unread *///还未读的字节数
+  const char *p;		/* current position in buffer *///缓冲区当前读到的位置
+  lua_Reader reader;		/* reader function *///读写lua代码块的函数
+  void *data;			/* additional data *///附加的数据
+  lua_State *L;			/* Lua state (for reader) *///当前线程栈地址
 };
 
 

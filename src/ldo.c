@@ -2,7 +2,7 @@
  * @文件作用: 函数调用以及栈管理 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-04 16:49:40
+ * @LastEditTime: 2023-02-07 14:39:45
 */
 
 /*
@@ -352,6 +352,13 @@ void luaD_inctop (lua_State *L) {
 ** called. (Both 'L->hook' and 'L->hookmask', which trigger this
 ** function, can be changed asynchronously by signals.)
 */
+
+/// @brief 执行钩子函数
+/// @param L 
+/// @param event 
+/// @param line 
+/// @param ftransfer 
+/// @param ntransfer 
 void luaD_hook (lua_State *L, int event, int line,
                               int ftransfer, int ntransfer) {
   lua_Hook hook = L->hook;
@@ -375,15 +382,15 @@ void luaD_hook (lua_State *L, int event, int line,
     if (ci->top < L->top + LUA_MINSTACK)
       ci->top = L->top + LUA_MINSTACK;
     L->allowhook = 0;  /* cannot call hooks inside a hook */
-    ci->callstatus |= mask;
+    ci->callstatus |= mask;//设置CallInfo的状态
     lua_unlock(L);
     (*hook)(L, &ar);
     lua_lock(L);
     lua_assert(!L->allowhook);
-    L->allowhook = 1;
+    L->allowhook = 1;//恢复允许HOOK
     ci->top = restorestack(L, ci_top);
     L->top = restorestack(L, top);
-    ci->callstatus &= ~mask;
+    ci->callstatus &= ~mask;//恢复CallInfo的状态
   }
 }
 
@@ -520,16 +527,21 @@ l_sinline void moveresults (lua_State *L, StkId res, int nres, int wanted) {
 ** info. If function has to close variables, hook must be called after
 ** that.
 */
+
+/// @brief 调整堆栈，返回上一个调用栈 
+/// @param L 
+/// @param ci 
+/// @param nres 
 void luaD_poscall (lua_State *L, CallInfo *ci, int nres) {
   int wanted = ci->nresults;
   if (l_unlikely(L->hookmask && !hastocloseCfunc(wanted)))
     rethook(L, ci, nres);
   /* move results to proper place */
-  moveresults(L, ci->func, nres, wanted);
+  moveresults(L, ci->func, nres, wanted);//调整返回结果
   /* function cannot be in any of these cases when returning */
   lua_assert(!(ci->callstatus &
         (CIST_HOOKED | CIST_YPCALL | CIST_FIN | CIST_TRAN | CIST_CLSRET)));
-  L->ci = ci->previous;  /* back to caller (after closing variables) */
+  L->ci = ci->previous;  /* back to caller (after closing variables) *///返回上一个调用栈
 }
 
 
@@ -537,13 +549,18 @@ void luaD_poscall (lua_State *L, CallInfo *ci, int nres) {
 #define next_ci(L)  (L->ci->next ? L->ci->next : luaE_extendCI(L))
 
 
+/// @brief // 调用next_ci()从lua_State的CallInfo数组中得到一个新的CallInfo结构体,设置它的func/top指针
+/// @param L 
+/// @param func 
+/// @param nret 
+/// @param mask 
+/// @param top 
+/// @return 
 l_sinline CallInfo *prepCallInfo (lua_State *L, StkId func, int nret,
                                                 int mask, StkId top) {
-  // L->ci是调用的函数的CallInfo，当它存在next时，next_ci并不是“完全”使用该ci，
-  // 只是用它已分配的sizeof(CallInfo)字节内存块，免得再次分配而已。
   CallInfo *ci = L->ci = next_ci(L);  /* new frame */
   ci->func = func;
-  ci->nresults = nret; // next_ci已从内存分配出sizeof(CallInfo)字节的内存块，接下填写此次的调用信息。
+  ci->nresults = nret; 
   ci->callstatus = mask;
   ci->top = top;
   return ci;
@@ -564,13 +581,13 @@ l_sinline int precallC (lua_State *L, StkId func, int nresults,
                                             lua_CFunction f) {
   int n;  /* number of returns */
   CallInfo *ci;
-  checkstackGCp(L, LUA_MINSTACK, func);  /* ensure minimum stack size */
+  checkstackGCp(L, LUA_MINSTACK, func);  /* ensure minimum stack size *///确保最小堆栈大小
   L->ci = ci = prepCallInfo(L, func, nresults, CIST_C,
-                               L->top + LUA_MINSTACK);
+                               L->top + LUA_MINSTACK);//创建一个新的CallInfo栈对象 
   lua_assert(ci->top <= L->stack_last);
-  if (l_unlikely(L->hookmask & LUA_MASKCALL)) {
+  if (l_unlikely(L->hookmask & LUA_MASKCALL)) {//调用函数时回调
     int narg = cast_int(L->top - func) - 1;
-    luaD_hook(L, LUA_HOOKCALL, -1, 1, narg);
+    luaD_hook(L, LUA_HOOKCALL, -1, 1, narg);//触发hook
   }
   lua_unlock(L);
   // 不论C闭包函数，还是轻量C函数，函数原型都是lua_CFunction，执行这个f
@@ -635,7 +652,7 @@ int luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func,
 ** original function position.
 */
 
-/// @brief 对c或者lua函数调用前的预处理
+/// @brief 预处理函数会创建一个调用栈CallInfo，管理函数调用时的信息
 // 只有调用的是lua函数,或者元方法__call里面调用的是lua函数,这个时候才返回ci,其余的都返回NULL
 /// @param L 
 /// @param func 
@@ -678,6 +695,13 @@ CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
 ** number of recursive invocations in the C stack) or nyci (the same
 ** plus increment number of non-yieldable calls).
 */
+
+/// @brief 主要调用luaD_precall()进行预处理，如果是lua函数就调用luaV_execute()执行
+/// @param L 
+/// @param func 
+/// @param nResults 
+/// @param inc 
+/// @return 
 l_sinline void ccall (lua_State *L, StkId func, int nResults, int inc) {
   CallInfo *ci;
   L->nCcalls += inc;
@@ -880,7 +904,8 @@ static void resume (lua_State *L, void *ud) {
 ** find a recover point).
 */
 
-/// @brief 若调用luaD_rawrunprotected中途代码发生异常，则会通过下一行的precover函数进行恢复。这里表示，我们不需要担心调用一个协程后会因为协程内部的错误导致外部的主程序崩溃
+/// @brief 若调用luaD_rawrunprotected中途代码发生异常，则会通过下一行的precover函数进行恢复。
+// 这里表示，我们不需要担心调用一个协程后会因为协程内部的错误导致外部的主程序崩溃
 /// @param L 
 /// @param status 
 /// @return 
@@ -1032,6 +1057,19 @@ int luaD_closeprotected (lua_State *L, ptrdiff_t level, int status) {
 ** thread information ('allowhook', etc.) and in particular
 ** its stack level in case of errors.
 */
+
+/// @brief 
+// 传入函数指针参数， 
+// 以及错误处理函数，此函数首先保存了当前的调用环境，
+// 然后将func,u传给luaD_rawrunpreotected函数， 
+// luaD_rawrunpreotected直接在在内存使用了函数指针调用了传入的函数和参数 func(L,u),
+// 并返回调用结果，如果有错误，则还原调用前的环境，最后向上回传调用结果
+/// @param L 
+/// @param func 
+/// @param u 
+/// @param old_top 
+/// @param ef 
+/// @return 
 int luaD_pcall (lua_State *L, Pfunc func, void *u,
                 ptrdiff_t old_top, ptrdiff_t ef) {
   int status;
@@ -1056,15 +1094,20 @@ int luaD_pcall (lua_State *L, Pfunc func, void *u,
 /*
 ** Execute a protected parser.
 */
+
+/// @brief 解析器结构
 struct SParser {  /* data to 'f_parser' */
-  ZIO *z;
-  Mbuffer buff;  /* dynamic structure used by the scanner */
-  Dyndata dyd;  /* dynamic structures used by the parser */
-  const char *mode;
-  const char *name;
+  ZIO *z;//读写流对象
+  Mbuffer buff;  /* dynamic structure used by the scanner *///缓冲对象,用于扫描
+  Dyndata dyd;  /* dynamic structures used by the parser *///用于解析
+  const char *mode;//读取方式,text还是binary,
+  const char *name;//源代码名字
 };
 
-
+/// @brief 检测mode合法性
+/// @param L 
+/// @param mode 
+/// @param x 
 static void checkmode (lua_State *L, const char *mode, const char *x) {
   if (mode && strchr(mode, x[0]) == NULL) {
     luaO_pushfstring(L,
@@ -1079,8 +1122,8 @@ static void checkmode (lua_State *L, const char *mode, const char *x) {
 static void f_parser (lua_State *L, void *ud) {
   LClosure *cl;
   struct SParser *p = cast(struct SParser *, ud);
-  int c = zgetc(p->z);  /* read first character */
-  if (c == LUA_SIGNATURE[0]) {.//判断是二进制
+  int c = zgetc(p->z);  /* read first character *///获取第一字符的
+  if (c == LUA_SIGNATURE[0]) {.//如果字符等于"\x1bLua"判断是二进制
     checkmode(L, p->mode, "binary");
     cl = luaU_undump(L, p->z, p->name);
   }

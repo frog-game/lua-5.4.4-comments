@@ -26,7 +26,9 @@
 #include "lstate.h"
 #include "lzio.h"
 
-
+/// @brief 读取文件
+/// @param z 
+/// @return 
 int luaZ_fill (ZIO *z) {
   size_t size;
   lua_State *L = z->L;
@@ -41,7 +43,11 @@ int luaZ_fill (ZIO *z) {
   return cast_uchar(*(z->p++));
 }
 
-
+/// @brief ZIO初始化
+/// @param L 
+/// @param z 
+/// @param reader 
+/// @param data 
 void luaZ_init (lua_State *L, ZIO *z, lua_Reader reader, void *data) {
   z->L = L;
   z->reader = reader;
