@@ -1,10 +1,10 @@
 # lua-5.4.4 每行都加注释版本
 
 - 第一章 简介
-  - [源码结构分析](https://frog-game.github.io/posts/read/lua5.4.4.jiegoufenxi/)
+  - [源码结构分析](https://frog-game.github.io/posts/read/lua5.4.4.introduction/)
 - 第二章 类型
-  - [数据类型 ](https://frog-game.github.io/posts/read/lua5.4.4.shujuleixing/)
-  - [字符串](https://frog-game.github.io/posts/read/lua5.4.4.zifuchuan/)
+  - [数据类型 ](https://frog-game.github.io/posts/read/lua5.4.4.type/)
+  - [字符串](https://frog-game.github.io/posts/read/lua5.4.4.string/)
   - [表](https://frog-game.github.io/posts/read/lua5.4.4.table/)
   - [函数](https://frog-game.github.io/posts/read/lua5.4.4.function/)
   - [协程](https://frog-game.github.io/posts/read/lua5.4.4.coroutine/)
