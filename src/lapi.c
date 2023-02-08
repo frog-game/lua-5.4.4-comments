@@ -2,7 +2,7 @@
  * @文件作用: Lua API。实现大量的Lua C API（lua_ *函数）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-06 22:48:04
+ * @LastEditTime: 2023-02-07 17:25:13
  */
 
 
@@ -1525,15 +1525,15 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   int status;
   lua_lock(L);
   if (!chunkname) chunkname = "?";
-  luaZ_init(L, &z, reader, data);
+  luaZ_init(L, &z, reader, data);//ZIO初始化
   status = luaD_protectedparser(L, &z, chunkname, mode);//加载代码块
   if (status == LUA_OK) {  /* no errors? */
     LClosure *f = clLvalue(s2v(L->top - 1));  /* get newly created function *///如果加载成功，栈顶为Lua闭包
-    if (f->nupvalues >= 1) {  /* does it have an upvalue? */
+    if (f->nupvalues >= 1) {  /* does it have an upvalue? *///有上值
       /* get global table from registry */
       const TValue *gt = getGtable(L);
       /* set global table as 1st upvalue of 'f' (may be LUA_ENV) */
-      setobj(L, f->upvals[0]->v, gt);//将第1个uv设置为全局环境
+      setobj(L, f->upvals[0]->v, gt);//将第1个uv设置为全局表
       luaC_barrier(L, f->upvals[0], gt);
     }
   }

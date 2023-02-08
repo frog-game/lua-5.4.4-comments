@@ -2,7 +2,7 @@
  * @文件作用: Lua独立解释器
  * @功能分类: 可执行的解析器，字节码编译器
  * @注释者: frog-game
- * @LastEditTime: 2023-02-06 20:16:56
+ * @LastEditTime: 2023-02-07 17:26:27
  */
 
 /*
@@ -90,7 +90,7 @@ typedef struct lua_State lua_State;
 
 /* predefined values in the registry */
 /// @brief 注册表中的预定义值
-#define LUA_RIDX_MAINTHREAD	1 //指向main thread
+#define LUA_RIDX_MAINTHREAD	1 //指向main thread //状态机的主线程
 #define LUA_RIDX_GLOBALS	2 //指向global table
 #define LUA_RIDX_LAST		LUA_RIDX_GLOBALS //保存了Globals(也就是_G)
 

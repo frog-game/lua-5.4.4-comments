@@ -2,7 +2,7 @@
  * @文件作用: 解析器
  * @功能分类: 源代码解析以及预编译字节码
  * @注释者: frog-game
- * @LastEditTime: 2023-02-07 16:51:24
+ * @LastEditTime: 2023-02-07 22:10:30
  */
 /*
 ** $Id: lparser.c $
@@ -932,7 +932,7 @@ static void codeclosure (LexState *ls, expdesc *v) {
   luaK_exp2nextreg(fs, v);  /* fix it at the last register */
 }
 
-/// @brief 开始编译函数
+/// @brief 设定好parser过程中用到的FuncState和BlockCnt
 /// @param ls 
 /// @param fs 
 /// @param bl 
@@ -1025,8 +1025,8 @@ static int block_follow (LexState *ls, int withuntil) {
 
 /// @brief 如果没有块结束标志，一直执行语句,直到遇到块结束标志,跳出
 /// @param ls 
-static void statlist (LexState *ls) {
   /* statlist -> { stat [';'] } */
+static void statlist (LexState *ls) {
   while (!block_follow(ls, 1)) {
     if (ls->t.token == TK_RETURN) {
       statement(ls);
@@ -1270,8 +1270,8 @@ static void body (LexState *ls, expdesc *e, int ismethod, int line) {
   checknext(ls, ')');
   statlist(ls);
   new_fs.f->lastlinedefined = ls->linenumber;
-  check_match(ls, TK_END, TK_FUNCTION, line);
-  codeclosure(ls, e);
+  check_match(ls, TK_END, TK_FUNCTION, line);//校验函数结束标志符'end'
+  codeclosure(ls, e);//把OP_CLOSURE这条指令添加到父函数的code之中
   close_func(ls);
 }
 
@@ -2312,15 +2312,15 @@ static void mainfunc (LexState *ls, FuncState *fs) {
   BlockCnt bl;
   Upvaldesc *env;
   open_func(ls, fs, &bl);
-  setvararg(fs, 0);  /* main function is always declared vararg */
-  env = allocupvalue(fs);  /* ...set environment upvalue */
+  setvararg(fs, 0);  /* main function is always declared vararg *///main函数永远是变参
+  env = allocupvalue(fs);  /* ...set environment upvalue *///分配upvalue的空间,并设置好上值的环境描述信息
   env->instack = 1;
   env->idx = 0;
   env->kind = VDKREG;
   env->name = ls->envn;
   luaC_objbarrier(ls->L, fs->f, env->name);
-  luaX_next(ls);  /* read first token */
-  statlist(ls);  /* parse main body */
+  luaX_next(ls);  /* read first token *///读下一个token 
+  statlist(ls);  /* parse main body *///一直执行语句,直到遇到块结束标志,等价于执行main主体
   check(ls, TK_EOS);
   close_func(ls);
 }
@@ -2341,7 +2341,7 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
   LClosure *cl = luaF_newLclosure(L, 1);  /* create main closure *///创建main闭包
   setclLvalue2s(L, L->top, cl);  /* anchor it (to avoid being collected) *///挂到top避免被回收
   luaD_inctop(L);//自增top
-  lexstate.h = luaH_new(L);  /* create table for scanner *///创建一个扫描表
+  lexstate.h = luaH_new(L);  /* create table for scanner *///创建一个常量扫描表,用于加快查找效率
   sethvalue2s(L, L->top, lexstate.h);  /* anchor it *///挂到top避免被回收
   luaD_inctop(L);//自增top
   funcstate.f = cl->p = luaF_newproto(L);//new一个函数原型
@@ -2356,7 +2356,7 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
   lua_assert(!funcstate.prev && funcstate.nups == 1 && !lexstate.fs);
   /* all scopes should be correctly finished */
   lua_assert(dyd->actvar.n == 0 && dyd->gt.n == 0 && dyd->label.n == 0);
-  L->top--;  /* remove scanner's table */
-  return cl;  /* closure is on the stack, too */
+  L->top--;  /* remove scanner's table *///移除常量扫描表
+  return cl;  /* closure is on the stack, too *///返回一个LClosure
 }
 

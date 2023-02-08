@@ -2,7 +2,7 @@
  * @文件作用: c库编写用到的辅助函数库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-02-07 15:52:29
+ * @LastEditTime: 2023-02-07 17:23:41
  */
 /*
 ** $Id: lauxlib.c $
@@ -1073,23 +1073,23 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
     lf.f = fopen(filename, "r");//只读方式打开
     if (lf.f == NULL) return errfile(L, "open", fnameindex);
   }
-  if (skipcomment(&lf, &c))  /* read initial portion */
-    lf.buff[lf.n++] = '\n';  /* add line to correct line numbers */
-  if (c == LUA_SIGNATURE[0] && filename) {  /* binary file? */
-    lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
-    if (lf.f == NULL) return errfile(L, "reopen", fnameindex);
-    skipcomment(&lf, &c);  /* re-read initial portion */
+  if (skipcomment(&lf, &c))  /* read initial portion *///跳过一些内容
+    lf.buff[lf.n++] = '\n';  /* add line to correct line numbers *///文件库设置成"\n"
+  if (c == LUA_SIGNATURE[0] && filename) {  /* binary file? *///二进制文件
+    lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode *///二进制方式打开
+    if (lf.f == NULL) return errfile(L, "reopen", fnameindex);//出错了
+    skipcomment(&lf, &c);  /* re-read initial portion *///重新开始读取
   }
-  if (c != EOF)
-    lf.buff[lf.n++] = c;  /* 'c' is the first character of the stream */
-  status = lua_load(L, getF, &lf, lua_tostring(L, -1), mode);
-  readstatus = ferror(lf.f);
-  if (filename) fclose(lf.f);  /* close file (even in case of errors) */
-  if (readstatus) {
+  if (c != EOF)//没有读到文件尾
+    lf.buff[lf.n++] = c;  /* 'c' is the first character of the stream *///真正内容的第一个字符
+  status = lua_load(L, getF, &lf, lua_tostring(L, -1), mode);//加载一段 Lua 代码块
+  readstatus = ferror(lf.f);//检测与流关联的标识符是不是正确的
+  if (filename) fclose(lf.f);  /* close file (even in case of errors) *///关闭文件流
+  if (readstatus) {//检测到发生了错误
     lua_settop(L, fnameindex);  /* ignore results from 'lua_load' */
     return errfile(L, "read", fnameindex);
   }
-  lua_remove(L, fnameindex);
+  lua_remove(L, fnameindex);//移除掉文件名
   return status;
 }
 
