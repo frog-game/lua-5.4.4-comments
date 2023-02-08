@@ -1,13 +1,13 @@
 # lua-5.4.4 每行都加注释版本
 
 - 第一章 简介
-  - [源码结构分析](https://frog-game.github.io/posts/read/lua5.4.4jiegoufenxi/)
+  - [源码结构分析](https://frog-game.github.io/posts/read/lua5.4.4.jiegoufenxi/)
 - 第二章 类型
-  - [数据类型 ](https://frog-game.github.io/posts/read/lua5.4.4shujuleixing/)
-  - [字符串](https://frog-game.github.io/posts/read/lua5.4.4zifuchuan/)
-  - [表](https://frog-game.github.io/posts/read/lua5.4.4table/)
-  - [函数](https://frog-game.github.io/posts/read/lua5.4.4function/)
-  - [协程](https://frog-game.github.io/posts/read/lua5.4.4coroutine/)
+  - [数据类型 ](https://frog-game.github.io/posts/read/lua5.4.4.shujuleixing/)
+  - [字符串](https://frog-game.github.io/posts/read/lua5.4.4.zifuchuan/)
+  - [表](https://frog-game.github.io/posts/read/lua5.4.4.table/)
+  - [函数](https://frog-game.github.io/posts/read/lua5.4.4.function/)
+  - [协程](https://frog-game.github.io/posts/read/lua5.4.4.coroutine/)
 - 第三章 虚拟机
   - [栈](https://frog-game.github.io/posts/read/lua5.4.4.stack/)
 
