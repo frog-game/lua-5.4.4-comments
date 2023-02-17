@@ -2,7 +2,7 @@
  * @文件作用: c库编写用到的辅助函数库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 17:10:49
+ * @LastEditTime: 2023-02-15 19:36:20
  */
 /*
 ** $Id: lauxlib.h $
@@ -30,6 +30,7 @@ typedef struct luaL_Buffer luaL_Buffer;
 
 
 /* extra error code for 'luaL_loadfilex' */
+///luaL_loadfilex函数文件加载错误时候的错误码
 #define LUA_ERRFILE     (LUA_ERRERR+1)
 
 

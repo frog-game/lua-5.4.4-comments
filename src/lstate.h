@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-06 10:34:18
+ * @LastEditTime: 2023-02-16 21:43:24
  */
 /*
 ** $Id: lstate.h $
@@ -265,6 +265,8 @@ CallInfo->callstatus 字段的位标识
 /*
 ** 'global state', shared by all threads of this state
 */
+
+/// @brief 全局状态机
 typedef struct global_State {
   lua_Alloc frealloc;  /* function to reallocate memory *////全局使用的内存分配器, 在 lua_auxilib.c 中提供了一个示例: l_alloc
   void *ud;         /* auxiliary data to 'frealloc' *////frealloc 函数的第一个参数, 用来实现定制内存分配器 
@@ -284,8 +286,8 @@ typedef struct global_State {
   lu_byte genmajormul;  /* control for major generational collections *///分代局部GC
   lu_byte gcstp;  /* control whether GC is running *///GC是否正在运行
   lu_byte gcemergency;  /* true if this is an emergency collection *///为1 进行紧急GC回收
-  lu_byte gcpause;  /* size of pause between successive GCs *///触发GC需要等待的内存增长百分比
-  lu_byte gcstepmul;  /* GC "speed" *////gc增长速度
+  lu_byte gcpause;  /* size of pause between successive GCs *///控制垃圾收集器在一次收集完成后等待多久再开始新的一次收集
+  lu_byte gcstepmul;  /* GC "speed" *////gc每步处理多少数据
   lu_byte gcstepsize;  /* (log2 of) GC granularity *///gc粒度
   GCObject *allgc;  /* list of all collectable objects *///存放待GC对象的链表，所有对象创建之后都会放入该链表中
   GCObject **sweepgc;  /* current position of sweep in list *///待处理的回收数据都存放在rootgc链表中，

@@ -1,4 +1,4 @@
-/*
+./*
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
@@ -160,8 +160,7 @@
 #define LUAI_GCMUL      100 //gc增长速度
 
 /* how much to allocate before next GC step (log2) */
-#define LUAI_GCSTEPSIZE 13      /* 8 KB *///gc的粒度值
-
+#define LUAI_GCSTEPSIZE 13      /* 8 KB *///在下一个GC步骤之前分配多少
 
 /*
 ** Check whether the declared GC mode is generational. While in

@@ -2,7 +2,7 @@
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-27 15:48:09
+ * @LastEditTime: 2023-02-16 21:37:46
  */
 
 /*
@@ -142,17 +142,17 @@ static void entersweep (lua_State *L);//前置声明
 /// @return 
 static GCObject **getgclist (GCObject *o) {
   switch (o->tt) {
-    case LUA_VTABLE: return &gco2t(o)->gclist;
-    case LUA_VLCL: return &gco2lcl(o)->gclist;
-    case LUA_VCCL: return &gco2ccl(o)->gclist;
-    case LUA_VTHREAD: return &gco2th(o)->gclist;
-    case LUA_VPROTO: return &gco2p(o)->gclist;
+    case LUA_VTABLE: return &gco2t(o)->gclist;//返回table的gc列表
+    case LUA_VLCL: return &gco2lcl(o)->gclist;//返回lua闭包的gc列表
+    case LUA_VCCL: return &gco2ccl(o)->gclist;//返回C闭包的gc列表
+    case LUA_VTHREAD: return &gco2th(o)->gclist;//返回线程栈的gc列表
+    case LUA_VPROTO: return &gco2p(o)->gclist;//返回函数原型的gc列表
     case LUA_VUSERDATA: {
       Udata *u = gco2u(o);
       lua_assert(u->nuvalue > 0);
-      return &u->gclist;
+      return &u->gclist;//返回full userdata的gc列表
     }
-    default: lua_assert(0); return 0;
+    default: lua_assert(0); return 0;//其他返回0
   }
 }
 
@@ -290,13 +290,13 @@ void luaC_barrierback_ (lua_State *L, GCObject *o) {
 /// @param L 
 /// @param o 
 void luaC_fix (lua_State *L, GCObject *o) {
-  global_State *g = G(L);
-  lua_assert(g->allgc == o);  /* object must be 1st in 'allgc' list! */
-  set2gray(o);  /* they will be gray forever */
-  setage(o, G_OLD);  /* and old forever */
-  g->allgc = o->next;  /* remove object from 'allgc' list */
-  o->next = g->fixedgc;  /* link it to 'fixedgc' list */
-  g->fixedgc = o;
+  global_State *g = G(L);//获取全局状态机
+  lua_assert(g->allgc == o);  /* object must be 1st in 'allgc' list! *////必须保证要设置的对象在第一位
+  set2gray(o);  /* they will be gray forever *///永远给设置成灰色
+  setage(o, G_OLD);  /* and old forever *///永远作为老年代对象,表示永远不会被回收了
+  g->allgc = o->next;  /* remove object from 'allgc' list *///把要设置永远不回收的对象从allgc移除
+  o->next = g->fixedgc;  /* link it to 'fixedgc' list *///链接到fixedgc链表上面这样就永远不会回收了
+  g->fixedgc = o;//fixedgc前移到头部,等价于这是个头指针
 }
 
 
@@ -311,12 +311,12 @@ void luaC_fix (lua_State *L, GCObject *o) {
 /// @param sz 大小
 /// @return 
 GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
-  global_State *g = G(L);
-  GCObject *o = cast(GCObject *, luaM_newobject(L, novariant(tt), sz));
-  o->marked = luaC_white(g);
-  o->tt = tt;
-  o->next = g->allgc;
-  g->allgc = o;
+  global_State *g = G(L);//获取全局状态机
+  GCObject *o = cast(GCObject *, luaM_newobject(L, novariant(tt), sz));//new出一个object出来
+  o->marked = luaC_white(g);//初始设置成当前白
+  o->tt = tt;//设置好类型
+  o->next = g->allgc;//挂在allgc链表里面
+  g->allgc = o;//allgc前移到头部,等价于这是个头指针
   return o;
 }
 
@@ -387,7 +387,7 @@ static void reallymarkobject (global_State *g, GCObject *o) {
 ** mark metamethods for basic types
 */
 
-//标记基础类型的元表
+//标记元表
 static void markmt (global_State *g) {
   int i;
   for (i=0; i < LUA_NUMTAGS; i++)
@@ -469,11 +469,11 @@ static void cleargraylists (global_State *g) {
 /// @brief 标记根集并重置所有灰名单，以开始新集合
 /// @param g 
 static void restartcollection (global_State *g) {
-  cleargraylists(g);
-  markobject(g, g->mainthread);
-  markvalue(g, &g->l_registry);
-  markmt(g);
-  markbeingfnz(g);  /* mark any finalizing object left from previous cycle */
+  cleargraylists(g);//清除灰色链表
+  markobject(g, g->mainthread);//标记主执行栈
+  markvalue(g, &g->l_registry);//标记全局注册表
+  markmt(g);//标记元表
+  markbeingfnz(g);  /* mark any finalizing object left from previous cycle *///标记所以准备终结的对象
 }
 
 /* }====================================================== */
@@ -792,7 +792,7 @@ static int traversethread (global_State *g, lua_State *th) {
   UpVal *uv;
   StkId o = th->stack;
   if (isold(th) || g->gcstate == GCSpropagate)//如果线程是old,gcstate是GCSpropagate状态
-    linkgclist(th, g->grayagain);  /* insert into 'grayagain' list *///丢到g->grayagain列表
+    linkgclist(th, g->grayagain);  /* insert into 'grayagain' list *///丢到g->grayagain列表 放在atomic中进行处理
   if (o == NULL)
     return 1;  /* stack not completely built yet *///栈没有创建
   lua_assert(g->gcstate == GCSatomic ||
@@ -825,8 +825,8 @@ static int traversethread (global_State *g, lua_State *th) {
 /// @return //返回工作单元数量
 static lu_mem propagatemark (global_State *g) {
   GCObject *o = g->gray;
-  nw2black(o);
-  g->gray = *getgclist(o);  /* remove from 'gray' list *///返回下一个灰色对象,把当前的移除掉
+  nw2black(o);//标记成黑色
+  g->gray = *getgclist(o);  /* remove from 'gray' list *///返回下一个灰色对象,等价于当前被移移除掉了
   switch (o->tt) {
     case LUA_VTABLE: return traversetable(g, gco2t(o));
     case LUA_VUSERDATA: return traverseudata(g, gco2u(o));
@@ -1344,7 +1344,7 @@ static void sweep2old (lua_State *L, GCObject **p) {
 /// @param g 
 /// @param p 
 /// @param limit 
-/// @param pfirstold1 
+/// @param pfirstold1 列表中的第一个 OLD1 对象
 /// @return 
 static GCObject **sweepgen (lua_State *L, global_State *g, GCObject **p,
                             GCObject *limit, GCObject **pfirstold1) {
@@ -1395,7 +1395,7 @@ static GCObject **sweepgen (lua_State *L, global_State *g, GCObject **p,
 static void whitelist (global_State *g, GCObject *p) {
   int white = luaC_white(g);
   for (; p != NULL; p = p->next)
-    p->marked = cast_byte((p->marked & ~maskgcbits) | white);
+    p->marked = cast_byte((p->marked & ~maskgcbits) | white);//标记成当前白
 }
 
 
@@ -1504,11 +1504,11 @@ static void finishgencycle (lua_State *L, global_State *g) {
 ** finish the collection.
 */
 
-/// @brief 一次分代gc
+/// @brief 青年代对象gc回收
 /// @param L 
 /// @param g 
 static void youngcollection (lua_State *L, global_State *g) {
-  GCObject **psurvival;  /* to point to first non-dead survival object *///指向第一个未死亡的生存对象
+  GCObject **psurvival;  /* to point to first non-dead survival object *///指向当前gc生存下来的对象
   GCObject *dummy;  /* dummy out parameter to 'sweepgen' */
   lua_assert(g->gcstate == GCSpropagate);///保证当前状态是GCSpropagate
   if (g->firstold1) {  /* are there regular OLD1 objects? *////是否有常规的 OLD1 对象
@@ -1531,12 +1531,12 @@ static void youngcollection (lua_State *L, global_State *g) {
   // 这样可以确保g->survival能进行正确的删除操作
   psurvival = sweepgen(L, g, &g->allgc, g->survival, &g->firstold1);
   /* sweep 'survival' */
-  sweepgen(L, g, psurvival, g->old1, &g->firstold1);
-  g->reallyold = g->old1;
-  g->old1 = *psurvival;  /* 'survival' survivals are old now */
-  g->survival = g->allgc;  /* all news are survivals */
+  sweepgen(L, g, psurvival, g->old1, &g->firstold1);//扫描当前gc生存下来的对象
+  g->reallyold = g->old1;//
+  g->old1 = *psurvival;  /* 'survival' survivals are old now *///生存的幸存者现在已经老了
+  g->survival = g->allgc;  /* all news are survivals *///当前allgc里面的是新的生成者对象
 
-  /* repeat for 'finobj' lists */
+  /* repeat for 'finobj' lists *///扫描带有_gc元方法的对象
   dummy = NULL;  /* no 'firstold1' optimization for 'finobj' lists */
   psurvival = sweepgen(L, g, &g->finobj, g->finobjsur, &dummy);
   /* sweep 'survival' */
@@ -1561,24 +1561,24 @@ static void youngcollection (lua_State *L, global_State *g) {
 /// @param L 
 /// @param g 
 static void atomic2gen (lua_State *L, global_State *g) {
-  cleargraylists(g);
+  cleargraylists(g);//清除灰色链表
   /* sweep all elements making them old */
-  g->gcstate = GCSswpallgc;
-  sweep2old(L, &g->allgc);
+  g->gcstate = GCSswpallgc;//设置成清扫global_State.allgc 
+  sweep2old(L, &g->allgc);//清扫过期对象,并标记成G_OLD
   /* everything alive now is old */
   g->reallyold = g->old1 = g->survival = g->allgc;
   g->firstold1 = NULL;  /* there are no OLD1 objects anywhere */
 
-  /* repeat for 'finobj' lists */
+  /* repeat for 'finobj' lists *///清除finobj链表
   sweep2old(L, &g->finobj);
   g->finobjrold = g->finobjold1 = g->finobjsur = g->finobj;
 
-  sweep2old(L, &g->tobefnz);
+  sweep2old(L, &g->tobefnz);//清除tobefnz链表
 
-  g->gckind = KGC_GEN;
+  g->gckind = KGC_GEN;//设置成分代gc类型
   g->lastatomic = 0;
-  g->GCestimate = gettotalbytes(g);  /* base for memory control */
-  finishgencycle(L, g);
+  g->GCestimate = gettotalbytes(g);  /* base for memory control *///非垃圾内存的估算,也就是上一轮存活下来的对象内存统计
+  finishgencycle(L, g);//进行分代gc的后续操作
 }
 
 
@@ -1770,15 +1770,10 @@ static void genstep (lua_State *L, global_State *g) {
 ** because Lua cannot even start with less than PAUSEADJ bytes).
 */
 
-/// @brief   
-// 不考虑越界情况,代码这样写
-// l_mem threshold = g->gcpause * g->GCestimate / PAUSEADJ;
-// luaE_setdebt(g, gettotalbytes(g) - threshold);
-// gcpause默认是200,PAUSEADJ默认是100
-// 也就是threshold默认是 2*g->GCestimate
-// 在luaC_fullgc代码中可以确认当GC循环执行到GCScallfin状态以前,g->GCestimate与gettotalbytes(g)必然相等
-// 也就是说设置的g->GCdebt = -g->GCestimate
-// 需要分配g->GCestimate大小的内存后,再启动垃圾回收
+/// @brief 控制垃圾收集器在一次收集完成后等待多久再开始新的一次收集
+// 使用方法：
+// collectgarbage("setpause", 200)，表示当收集器在总使用内存数量达到上次垃圾收集时的两倍时再开启新的收集周期
+// collectgarbage("setpause", 0) 当值为零时表示 Lua语言在上一次垃圾回收结束后立即开始一次新的收集
 /// @param g 
 static void setpause (global_State *g) {
   l_mem threshold, debt;
@@ -1994,7 +1989,7 @@ void luaC_runtilstate (lua_State *L, int statesmask) {
 /// @param L 
 /// @param g 
 static void incstep (lua_State *L, global_State *g) {
-  int stepmul = (getgcparam(g->gcstepmul) | 1);  /* avoid division by 0 */
+  int stepmul = (getgcparam(g->gcstepmul) | 1);  /* avoid division by 0 */// | 1操作是为了避免下面除0操作
   l_mem debt = (g->GCdebt / WORK2MEM) * stepmul;
   l_mem stepsize = (g->gcstepsize <= log2maxs(l_mem))
                  ? ((cast(l_mem, 1) << g->gcstepsize) / WORK2MEM) * stepmul
@@ -2014,14 +2009,17 @@ static void incstep (lua_State *L, global_State *g) {
 /*
 ** performs a basic GC step if collector is running
 */
+
+/// @brief gc函数入口
+/// @param L 
 void luaC_step (lua_State *L) {
   global_State *g = G(L);
   lua_assert(!g->gcemergency);
   if (gcrunning(g)) {  /* running? */
     if(isdecGCmodegen(g))
-      genstep(L, g);
+      genstep(L, g);//分代gc
     else
-      incstep(L, g);
+      incstep(L, g);//增量gc
   }
 }
 
@@ -2068,7 +2066,7 @@ void luaC_fullgc (lua_State *L, int isemergency) {
     fullinc(L, g);//以增量模式执行完整收集
   else
     fullgen(L, g);//在分代模式下执行完整集合
-  g->gcemergency = 0;
+  g->gcemergency = 0;//设置成0代表不紧急回收
 }
 
 /* }====================================================== */
