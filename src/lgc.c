@@ -2,7 +2,7 @@
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-16 21:37:46
+ * @LastEditTime: 2023-02-19 22:37:48
  */
 
 /*
@@ -57,7 +57,7 @@
 ** The equivalent, in bytes, of one unit of "work" (visiting a slot,
 ** sweeping an object, etc.)
 */
-#define WORK2MEM	sizeof(TValue) //通用数据类型大小
+#define WORK2MEM	sizeof(TValue) //没有使用GCObject的大小，而是取了TValue的大小 因为标记清除算法工作的过程主要是以TValue对象为单位
 
 
 /*
@@ -244,7 +244,7 @@ static int iscleared (global_State *g, const GCObject *o) {
 ** whites from deads.)
 */
 
-/// @brief  向前设置barrier，把新建立联系的对象立刻标记 用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
+/// @brief  向前设置barrier，如果一个新创建对象的颜色是白色，而且它被一个黑色对象引用了,比如
 /// @param L 
 /// @param o 黑色 object
 /// @param v 白色 object
@@ -271,7 +271,9 @@ void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
 ** pointing to a white object as gray again.
 */
 
-/// @brief 向后设置barrier 将黑色对象再次标记为灰色。用来保证增量式GC在GC流程中暂停时，对象引用状态的改变不会引起GC流程产生错误的结果
+/// @brief 向后设置barrier 将黑色对象再次标记为灰色,看源代码能看出来主要是针对table进行的,主要因为table是一个1对多的对应关系,如果对table进行的是向前操作
+// 那么每增加一个新的对象,就会把这个对象标记成灰色放入gray中等待扫描,毕竟gray链表不是原子性操作,而且会反复的多次进行多次标记,这样影响效率,增加性能开销,还不如
+// 直接后退一步,也就是黑色对象标记成灰色,然后放入grayagain链表当中,在下一次进入atomic原子操作,一次性操作完,这样就能大大提高性能
 /// @param L 
 /// @param o 
 void luaC_barrierback_ (lua_State *L, GCObject *o) {
@@ -320,7 +322,7 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
   return o;
 }
 
-/* }====================================================== */
+/* }====================================================== */ 
 
 
 
@@ -387,7 +389,7 @@ static void reallymarkobject (global_State *g, GCObject *o) {
 ** mark metamethods for basic types
 */
 
-//标记元表
+//标记全局元表
 static void markmt (global_State *g) {
   int i;
   for (i=0; i < LUA_NUMTAGS; i++)
@@ -457,8 +459,8 @@ static int remarkupvals (global_State *g) {
 /// @brief 清除灰色链表
 /// @param g 
 static void cleargraylists (global_State *g) {
-  g->gray = g->grayagain = NULL;
-  g->weak = g->allweak = g->ephemeron = NULL;
+  g->gray = g->grayagain = NULL;//g->gray是灰色节点链 g->grayagain是需要原子操作标记的灰色节点
+  g->weak = g->allweak = g->ephemeron = NULL;//3个弱表链表
 }
 
 
@@ -466,14 +468,14 @@ static void cleargraylists (global_State *g) {
 ** mark root set and reset all gray lists, to start a new collection
 */
 
-/// @brief 标记根集并重置所有灰名单，以开始新集合
+/// @brief 标记一些设置,重置所有灰名单，以开始新集合
 /// @param g 
 static void restartcollection (global_State *g) {
   cleargraylists(g);//清除灰色链表
   markobject(g, g->mainthread);//标记主执行栈
   markvalue(g, &g->l_registry);//标记全局注册表
-  markmt(g);//标记元表
-  markbeingfnz(g);  /* mark any finalizing object left from previous cycle *///标记所以准备终结的对象
+  markmt(g);//标记全局元表
+  markbeingfnz(g);  /* mark any finalizing object left from previous cycle *///标记上次GC循环中剩余的finalize中的userdata对象
 }
 
 /* }====================================================== */
@@ -787,7 +789,7 @@ static int traverseLclosure (global_State *g, LClosure *cl) {
 /// @brief 标记线程
 /// @param g 
 /// @param th 
-/// @return //返回工作单元数量
+/// @return //返回工作量
 static int traversethread (global_State *g, lua_State *th) {
   UpVal *uv;
   StkId o = th->stack;
@@ -812,7 +814,7 @@ static int traversethread (global_State *g, lua_State *th) {
   }
   else if (!g->gcemergency)//没有紧急回收
     luaD_shrinkstack(th); /* do not change stack in emergency cycle *///栈进行合理收缩
-  return 1 + stacksize(th);//返回工作单元数量
+  return 1 + stacksize(th);//返回工作量
 }
 
 
@@ -822,7 +824,7 @@ static int traversethread (global_State *g, lua_State *th) {
 
 /// @brief 只 traverse 一个 gray object, 将其标记为 black, 并从 gray list 移除
 /// @param g 
-/// @return //返回工作单元数量
+/// @return //返回工作量
 static lu_mem propagatemark (global_State *g) {
   GCObject *o = g->gray;
   nw2black(o);//标记成黑色
@@ -841,12 +843,12 @@ static lu_mem propagatemark (global_State *g) {
 /// @brief 将gray链表的所有对象进行标记
 // 遍历灰色链表的过程中，可能会有新增对象会被扫描过的Table对象引用，这个Table对象将会放在grayagain里，所以需要这个
 /// @param g 
-/// @return //返回工作单元数量
+/// @return //返回工作量
 static lu_mem propagateall (global_State *g) {
   lu_mem tot = 0;
   while (g->gray)//对灰色列表进行标记
     tot += propagatemark(g);
-  return tot;//返回工作单元数量
+  return tot;//返回工作量
 }
 
 
@@ -1730,7 +1732,7 @@ static void genstep (lua_State *L, global_State *g) {
   if (g->lastatomic != 0)  /* last collection was a bad one? */
     stepgenfull(L, g);  /* do a full step */
   else {
-    lu_mem majorbase = g->GCestimate;  /* memory after last major collection */
+    lu_mem majorbase = g->GCestimate;  /* memory after last major collection *///保存基础值，该基础值会在entergen初始化
     lu_mem majorinc = (majorbase / 100) * getgcparam(g->genmajormul);
     if (g->GCdebt > 0 && gettotalbytes(g) > majorbase + majorinc) {
       lu_mem numobjs = fullgen(L, g);  /* do a major collection */
@@ -1745,7 +1747,7 @@ static void genstep (lua_State *L, global_State *g) {
       }
     }
     else {  /* regular case; do a minor collection */
-      youngcollection(L, g);
+      youngcollection(L, g);//执行一次young gc
       setminordebt(g);
       g->GCestimate = majorbase;  /* preserve base value */
     }
@@ -1838,40 +1840,42 @@ void luaC_freeallobjects (lua_State *L) {
   lua_assert(g->strt.nuse == 0);
 }
 
-
+/// @brief 原子执行过程不可被打断
+/// @param L 
+/// @return 
 static lu_mem atomic (lua_State *L) {
   global_State *g = G(L);
   lu_mem work = 0;
   GCObject *origweak, *origall;
-  GCObject *grayagain = g->grayagain;  /* save original list */
+  GCObject *grayagain = g->grayagain;  /* save original list *///保存初始的灰色链表位置
   g->grayagain = NULL;
   lua_assert(g->ephemeron == NULL && g->weak == NULL);
-  lua_assert(!iswhite(g->mainthread));
-  g->gcstate = GCSatomic;
-  markobject(g, L);  /* mark running thread */
+  lua_assert(!iswhite(g->mainthread));//主线程不能是白色
+  g->gcstate = GCSatomic;//进入原子阶段
+  markobject(g, L);  /* mark running thread *///标记运行中的协程栈
   /* registry and global metatables may be changed by API */
-  markvalue(g, &g->l_registry);
-  markmt(g);  /* mark global metatables */
-  work += propagateall(g);  /* empties 'gray' list */
+  markvalue(g, &g->l_registry);//标记注册表
+  markmt(g);  /* mark global metatables *///标记元表
+  work += propagateall(g);  /* empties 'gray' list *///迭代灰色链表节点
   /* remark occasional upvalues of (maybe) dead threads */
-  work += remarkupvals(g);
-  work += propagateall(g);  /* propagate changes */
-  g->gray = grayagain;
-  work += propagateall(g);  /* traverse 'grayagain' list */
-  convergeephemerons(g);
+  work += remarkupvals(g);//标记open状态的上值
+  work += propagateall(g);  /* propagate changes *///迭代灰色链表节点
+  g->gray = grayagain;//恢复一下初始的灰色链表位置
+  work += propagateall(g);  /* traverse 'grayagain' list *///迭代遍历grayagain链表
+  convergeephemerons(g);//不断遍历 weak table 的 ephemerons 链表, 直到一次遍历没有标记任何值为止
   /* at this point, all strongly accessible objects are marked. */
   /* Clear values from weak tables, before checking finalizers */
-  clearbyvalues(g, g->weak, NULL);
-  clearbyvalues(g, g->allweak, NULL);
+  clearbyvalues(g, g->weak, NULL);//清除g->weak中所有未标记的值
+  clearbyvalues(g, g->allweak, NULL);//清除g->allweak中所有未标记的值
   origweak = g->weak; origall = g->allweak;
-  separatetobefnz(g, 0);  /* separate objects to be finalized */
-  work += markbeingfnz(g);  /* mark objects that will be finalized */
+  separatetobefnz(g, 0);  /* separate objects to be finalized *///将带__gc函数的需要回收的(白色)对象放到global_State.tobefnz表中,留待以后清理
+  work += markbeingfnz(g);  /* mark objects that will be finalized *///标记将要完成的对象
   work += propagateall(g);  /* remark, to propagate 'resurrection' */
-  convergeephemerons(g);
+  convergeephemerons(g);//不断遍历 weak table 的 ephemerons 链表
   /* at this point, all resurrected objects are marked. */
   /* remove dead objects from weak tables */
-  clearbykeys(g, g->ephemeron);  /* clear keys from all ephemeron tables */
-  clearbykeys(g, g->allweak);  /* clear keys from all 'allweak' tables */
+  clearbykeys(g, g->ephemeron);  /* clear keys from all ephemeron tables *///清除g->weak中所有未标记的值
+  clearbykeys(g, g->allweak);  /* clear keys from all 'allweak' tables *///清除g->allweak中所有未标记的值
   /* clear values from resurrected weak tables */
   clearbyvalues(g, g->weak, origweak);
   clearbyvalues(g, g->allweak, origall);
@@ -1881,7 +1885,12 @@ static lu_mem atomic (lua_State *L) {
   return work;  /* estimate of slots marked by 'atomic' */
 }
 
-
+/// @brief 扫描阶段
+/// @param L 
+/// @param g 
+/// @param nextstate 
+/// @param nextlist 
+/// @return 
 static int sweepstep (lua_State *L, global_State *g,
                       int nextstate, GCObject **nextlist) {
   if (g->sweepgc) {
@@ -1898,34 +1907,34 @@ static int sweepstep (lua_State *L, global_State *g,
   }
 }
 
-/// @brief 
-// work:工作单元表示业务对象量
+/// @brief gc状态机
+// work:工作量
 /// @param L 
 /// @return 
 static lu_mem singlestep (lua_State *L) {
-  global_State *g = G(L);
+  global_State *g = G(L);//获取全局状态机
   lu_mem work;//工作单元
-  lua_assert(!g->gcstopem);  /* collector is not reentrant */
+  lua_assert(!g->gcstopem);  /* collector is not reentrant *///不能gc状态机处理逻辑中
   g->gcstopem = 1;  /* no emergency collections while collecting */
   switch (g->gcstate) {
-    case GCSpause: {
-      restartcollection(g);
-      g->gcstate = GCSpropagate;
-      work = 1;
+    case GCSpause: {//gc开始阶段
+      restartcollection(g);//标记一些设置,重置所有灰名单，以开始新集合
+      g->gcstate = GCSpropagate;//传播阶段
+      work = 1;//工作量加1
       break;
     }
-    case GCSpropagate: {
-      if (g->gray == NULL) {  /* no more gray objects? */
-        g->gcstate = GCSenteratomic;  /* finish propagate phase */
-        work = 0;
+    case GCSpropagate: {//传播阶段
+      if (g->gray == NULL) {  /* no more gray objects? *///检测一下有没有灰色对象，没有的话
+        g->gcstate = GCSenteratomic;  /* finish propagate phase *///进入GCSatomic的过渡状态
+        work = 0;//工作量为0
       }
       else
-        work = propagatemark(g);  /* traverse one gray object */
+        work = propagatemark(g);  /* traverse one gray object *///遍历一个灰色对象
       break;
     }
-    case GCSenteratomic: {
-      work = atomic(L);  /* work is what was traversed by 'atomic' */
-      entersweep(L);
+    case GCSenteratomic: {//进入GCSatomic的过渡状态
+      work = atomic(L);  /* work is what was traversed by 'atomic' *///进入原子收集标记阶段
+      entersweep(L);//进入扫描
       g->GCestimate = gettotalbytes(g);  /* first estimate */;
       break;
     }
@@ -1989,20 +1998,20 @@ void luaC_runtilstate (lua_State *L, int statesmask) {
 /// @param L 
 /// @param g 
 static void incstep (lua_State *L, global_State *g) {
-  int stepmul = (getgcparam(g->gcstepmul) | 1);  /* avoid division by 0 */// | 1操作是为了避免下面除0操作
-  l_mem debt = (g->GCdebt / WORK2MEM) * stepmul;
+  int stepmul = (getgcparam(g->gcstepmul) | 1);  /* avoid division by 0 */// 步进倍率 "|1 操作是为了避免下面除0操作“
+  l_mem debt = (g->GCdebt / WORK2MEM) * stepmul;//(根据需要回收总量/WORK2MEM) * 步进倍率 得到需要回收的工作量
   l_mem stepsize = (g->gcstepsize <= log2maxs(l_mem))
                  ? ((cast(l_mem, 1) << g->gcstepsize) / WORK2MEM) * stepmul
-                 : MAX_LMEM;  /* overflow; keep maximum value */
+                 : MAX_LMEM;  /* overflow; keep maximum value *///在下一个GC步骤之前这次GC回收的TValue量
   do {  /* repeat until pause or enough "credit" (negative debt) */
-    lu_mem work = singlestep(L);  /* perform one single step */
+    lu_mem work = singlestep(L);  /* perform one single step *///单步执行
     debt -= work;
-  } while (debt > -stepsize && g->gcstate != GCSpause);
+  } while (debt > -stepsize && g->gcstate != GCSpause);//达到回收的TValue量就结束
   if (g->gcstate == GCSpause)
-    setpause(g);  /* pause until next cycle */
+    setpause(g);  /* pause until next cycle *///暂停直到下一个循环
   else {
-    debt = (debt / stepmul) * WORK2MEM;  /* convert 'work units' to bytes */
-    luaE_setdebt(g, debt);
+    debt = (debt / stepmul) * WORK2MEM;  /* convert 'work units' to bytes *///将剩余工作量转换成内存值
+    luaE_setdebt(g, debt);//设置debt值 
   }
 }
 
@@ -2061,7 +2070,7 @@ static void fullinc (lua_State *L, global_State *g) {
 void luaC_fullgc (lua_State *L, int isemergency) {
   global_State *g = G(L);//获取全局状态机
   lua_assert(!g->gcemergency);//不能是紧急回收
-  g->gcemergency = isemergency;  /* set flag *///设置成紧急
+  g->gcemergency = isemergency;  /* set flag *///设置flag
   if (g->gckind == KGC_INC)//如果是增量
     fullinc(L, g);//以增量模式执行完整收集
   else

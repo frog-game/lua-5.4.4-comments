@@ -35,15 +35,15 @@
 ** Possible states of the Garbage Collector
 */
 
-#define GCSpropagate	0 // 传播阶段 分多次执行，直到 gray 链表处理完，进入 GCSatomic
-#define GCSenteratomic	1 // gc 转移到 GCSatomic的辅助状态 , 所有的GC状态必须在GCSpropagate状态或者GCSatomic状态两者之间
+#define GCSpropagate	0 // 传播阶段 用于遍历灰色节点检查对象的引用情况，进入 GCSatomic
+#define GCSenteratomic	1 // gc 转移到 GCSatomic的过渡状态 , 所有的GC状态必须在GCSpropagate状态或者GCSatomic状态两者之间
 #define GCSatomic	2 //一次性的处理所有需要回顾一遍的地方, 保证一致性, 然后进入清理阶段
 #define GCSswpallgc	3//清扫global_State.allgc 可以分多次执行, 清理完后进入 GCSswpfinobj
 #define GCSswpfinobj	4 //对global_State.finobj链表进行清扫 可以分多次执行, 清理完 后进入 GCSswptobefnz
-#define GCSswptobefnz	5//对global_State.tobefnz链表进行清扫  可以分多次执行, 清理完 后进入 GCSswpend
+#define GCSswptobefnz	5//对global_State.tobefnz链表进行清扫 可以分多次执行, 清理完 后进入 GCSswpend
 #define GCSswpend	6//sweep main thread 然后进入 GCScallfin
 #define GCScallfin	7// 执行一些 finalizer (__gc) 然后进入 GCSpause, 完成循环
-#define GCSpause	8 //处于两次完整 GC 流程中间的休息状态
+#define GCSpause	8 //gc开始阶段,或者是完成当前gc阶段,下一次gc操作开始阶段
 
 /// 是不是扫描阶段
 #define issweepphase(g)  \
@@ -84,10 +84,10 @@
 */
 
 //------------------------------------- 位标记索引 begin ---------------------------------//
-#define WHITE0BIT	3  /* object is white (type 0) *///白色0  	bit2mask(3)   1000
-#define WHITE1BIT	4  /* object is white (type 1) *///白色1 	bit2mask(4)  10000
-#define BLACKBIT	5  /* object is black *///黑色				bit2mask(5) 100000
-#define FINALIZEDBIT	6  //用于标记userdata					110
+#define WHITE0BIT	3  /* object is white (type 0) *///白色0  	bitmask(3)    1000
+#define WHITE1BIT	4  /* object is white (type 1) *///白色1 	bitmask(4)   10000
+#define BLACKBIT	5  /* object is black *///黑色				bitmask(5)  100000
+#define FINALIZEDBIT	6  //用于标记userdata					bitmask(6) 1000000
 //  当 userdata 确认不被引用，则设置上这个标记 不同于颜色标记。
 // 主要还是userdata 能设置gc方法，释放内存要延迟到gc方法以后,这个标记可以保证元方法不被反复调用
 
@@ -101,9 +101,9 @@
 
 
 //------------------------------------- 位检测设置 begin ---------------------------------//
-#define iswhite(x)      testbits((x)->marked, WHITEBITS)//是不是白色  其实就是看第4位和第5位是不是1
-#define isblack(x)      testbit((x)->marked, BLACKBIT)//是不是黑色
-#define isgray(x)  /* neither white nor black */  \ 
+#define iswhite(x)      testbits((x)->marked, WHITEBITS)//是不是白色 其实就是看第3位或第4位是不是1
+#define isblack(x)      testbit((x)->marked, BLACKBIT)//是不是黑色 其实就是看第5位是不是1
+#define isgray(x)  /* neither white nor black */  \ //不是白色也不是黑色就认为是灰色
 	(!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))//是不是灰色 意思就是3,4,5位都的是0
 
 #define tofinalize(x)	testbit((x)->marked, FINALIZEDBIT)//是不是标记了userdata 
@@ -112,26 +112,26 @@
 #define isdeadm(ow,m)	((m) & (ow))
 #define isdead(g,v)	isdeadm(otherwhite(g), (v)->marked) //如果是其他白,那么就说明真正死亡了,肯定会被清除掉, 当前白表示新创建的对象，是不一样的东西
 
-#define changewhite(x)	((x)->marked ^= WHITEBITS) //改变白色位 比如如果((x)->marked是111000  111000 ^ 11000 = 100000 比如如果((x)->marked是101000  101000 ^ 11000 = 110000  比如如果((x)->marked是110000  110000 ^ 11000 = 101000  比如如果((x)->marked是100000  100000 ^ 11000 = 111000   注意看第4位和第5位是不是切换位标识了
+#define changewhite(x)	((x)->marked ^= WHITEBITS) //改变当前白色位 比如如果((x)->marked是110000  110000 ^ 11000 = 101000 比如如果((x)->marked是101000  101000 ^ 11000 = 110000  注意看第3位和第4位是不是切换位标识了
 #define nw2black(x)  \
-	check_exp(!iswhite(x), l_setbit((x)->marked, BLACKBIT))//非白色到黑色
+	check_exp(!iswhite(x), l_setbit((x)->marked, BLACKBIT))//当bit 3,4位都是0 然后就可以设成把5号位设置成黑色了
 
-#define luaC_white(g)	cast_byte((g)->currentwhite & WHITEBITS) //得到当前的白色状态 比如如果(g)->currentwhite是1000 1000 & 11000 = 01000， 1000 & 11000还是1000 是能获取当前白色值的状态 如果(g)->currentwhite是10000   10000 & 11000 = 10000， 10000 &11000还是10000
+#define luaC_white(g)	cast_byte((g)->currentwhite & WHITEBITS) //得到当前的要回收的白色类型 比如如果(g)->currentwhite是1000 1000 & 11000 = 01000， 1000 & 11000还是1000 是能获取当前白色值的状态 如果(g)->currentwhite是10000   10000 & 11000 = 10000， 10000 &11000还是10000
 //------------------------------------- 位检测设置 end ---------------------------------//
 
 /* object age in generational mode */
 //------------------------------------- 分代模式下对象年龄标识 begin ---------------------------------//
-#define G_NEW		0	/* created in current cycle *///(0代对象）本次cycle创建的新对象（没有引用任何old对象） 
-#define G_SURVIVAL	1	/* created in previous cycle *///(1代对象）上一轮cycle创建的对象 -- 只活过一轮，下一次如果是白色的话，仍然会被回收
-#define G_OLD0		2	/* marked old by frw. barrier in this cycle *///(1代对象） 当前gc循环被barrier forward的节点，如果被插入的节点为isold()为true的节点,表示本次cycle创建的新对象，但是引用了old对象
+#define G_NEW		0	/* created in current cycle *///本次cycle创建的新对象（没有引用任何old对象） 
+#define G_SURVIVAL	1	/* created in previous cycle *///当前gc存活下来的对象
+#define G_OLD0		2	/* marked old by frw. barrier in this cycle *///当前gc循环被barrier forward的节点，如果被插入的节点为isold()为true的节点
 
 //老年代对象
-#define G_OLD1		3	/* first full cycle as old *///（2代对象）作为老对象第一次存活了整个gc过程 
-#define G_OLD		4	/* really old object (not to be visited) *///（3代对象）作为老对象活过了两次完整的gc，表示真正的old对象，不会被回收 
-#define G_TOUCHED1	5	/* old object touched this cycle *///（3代对象）标记位G_OLD的对象在这次gc barrier_back的状态 新touch的对象，需要进入到grayagain中
-#define G_TOUCHED2	6	/* old object touched in previous cycle *///（3代对象）标记为G_OLD的对象在上一次gc barrier_back的状态前进到touched2  从G_TOUCHED1转成G_TOUCHED2，并设置为黑色，仍然存在于grayagain中
+#define G_OLD1		3	/* first full cycle as old *///活过了一次完整的gc
+#define G_OLD		4	/* really old object (not to be visited) *///活过了两次完整的gc，标记为G_OLD，不再被访问
+#define G_TOUCHED1	5	/* old object touched this cycle *///old节点被插入新节点
+#define G_TOUCHED2	6	/* old object touched in previous cycle *///G_TOUCHED1节点经过一次完整的gc还没有新的节点插入
 
-#define AGEBITS		7  /* all age bits (111) *///age使用的位mask，age只使用了marked的0,1,2字段
+#define AGEBITS		7  /* all age bits (111) *///age使用的位mask，age只使用了marked的0,1,2位置
 
 #define getage(o)	((o)->marked & AGEBITS)//获取年龄
 #define setage(o,a)  ((o)->marked = cast_byte(((o)->marked & (~AGEBITS)) | a))//设置年龄
@@ -160,7 +160,7 @@
 #define LUAI_GCMUL      100 //gc增长速度
 
 /* how much to allocate before next GC step (log2) */
-#define LUAI_GCSTEPSIZE 13      /* 8 KB *///在下一个GC步骤之前分配多少
+#define LUAI_GCSTEPSIZE 13      /* 8 KB *///在下一个GC步骤之前这次GC回收的量
 
 /*
 ** Check whether the declared GC mode is generational. While in
@@ -192,20 +192,23 @@
 	  condchangemem(L,pre,pos); }
 
 /* more often than not, 'pre'/'pos' are empty */
-/// 随着内存的使用增加,通过对g-> GCdebt、g-> totalbytes等参数计算来触发GC
+/// 随着内存的使用增加,通过对g-> GCdebt > 0来触发GC
 #define luaC_checkGC(L)		luaC_condGC(L,(void)0,(void)0)
 
 /// 针对 TValue 标记过程向前走一步 如果新建对象是白色，而它被一个黑色对象引用了，那么将这个新建对象颜色从白色变为灰色 
+// 向前走一步主要是因为,在赋值操作的时候有可能发生黑色对象,指向白色对象的可能性,出现这种情况是不合法的
+// 毕竟如果你一个黑色对象指向了白色对象,比如 lua_load 函数当中的  luaC_barrier(L, f->upvals[0], gt);执行语句如果不把gt从白色变成灰色,那么
+// 在lua GC状态机持续运转中到达回收状态中会把他当白色对象给回收了,那这样就会导致函数的上值表第一个位置存的元素消失,这样肯定是不合理的
 #define luaC_barrier(L,p,v) (  \
 	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ?  \
 	luaC_barrier_(L,obj2gco(p),gcvalue(v)) : cast_void(0))
 
-/// 标记过程向后走一步 此时将引用的它的黑色对象的颜色从黑色变为灰色，使得其重新被扫描一次
+/// 标记过程向后走一步 此时将引用的它的黑色对象的颜色从黑色变为灰色,然后放入grayagain链表当中,在下一次进入atomic原子操作,一次性操作完,节省性能开销
 #define luaC_barrierback(L,p,v) (  \
 	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ? \
 	luaC_barrierback_(L,p) : cast_void(0))
 
-/// 针对 GCObject 标记过程向前走一步 如果新建对象是白色，而它被一个黑色对象引用了，那么将这个新建对象颜色从白色变为灰色 
+/// 针对 GCObject 标记过程向前走一步 如果新建对象是白色，而它被一个黑色对象引用了，那么将这个新建对象颜色从黑色色变为灰色 
 #define luaC_objbarrier(L,p,o) (  \
 	(isblack(p) && iswhite(o)) ? \
 	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))

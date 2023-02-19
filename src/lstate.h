@@ -2,7 +2,7 @@
  * @文件作用: 状态机 管理全局信息,和状态机相关的逻辑
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-16 21:43:24
+ * @LastEditTime: 2023-02-19 22:30:54
  */
 /*
 ** $Id: lstate.h $
@@ -270,9 +270,9 @@ CallInfo->callstatus 字段的位标识
 typedef struct global_State {
   lua_Alloc frealloc;  /* function to reallocate memory *////全局使用的内存分配器, 在 lua_auxilib.c 中提供了一个示例: l_alloc
   void *ud;         /* auxiliary data to 'frealloc' *////frealloc 函数的第一个参数, 用来实现定制内存分配器 
-  l_mem totalbytes;  /* number of bytes currently allocated - GCdebt *///初始为 LG 结构大小
+  l_mem totalbytes;  /* number of bytes currently allocated - GCdebt *///初始为 LG 结构大小 由内存分配器分配的实际内存
   l_mem GCdebt;  /* bytes allocated not yet compensated by the collector *///需要回收的内存数量
-  lu_mem GCestimate;  /* an estimate of the non-garbage memory in use *///上一轮完整GC 所存活下来的对象总数量
+  lu_mem GCestimate;  /* an estimate of the non-garbage memory in use *///上一轮完整GC 所存活下来的对象总数量内存值,小于 totalbytes
   lu_mem lastatomic;  /* see function 'genstep' in file 'lgc.c' *///上次回收的不良gc计数
   stringtable strt;  /* hash table for strings *///全局的字符串哈希表，即保存那些短字符串，使得整个虚拟机中短字符串只有一份实例
   TValue l_registry;// //保存全局的注册表，注册表就是一个全局的table（即整个虚拟机中只有一个注册表），它只能被C代码访问，通常，它用来保存那些需要在几个模块中共享的数据。比如通过luaL_newmetatable创建的元表就是放在全局的注册表中
@@ -281,18 +281,17 @@ typedef struct global_State {
   lu_byte currentwhite;//存放当前GC的白色种类
   lu_byte gcstate;  /* state of garbage collector *///存放GC状态
   lu_byte gckind; /* kind of GC running */            // gc 运行的种类 KGC_INC:增量GC KGC_GEN:分代GC
-  lu_byte gcstopem; /* stops emergency collections */ // 为1 停止紧急回收
+  lu_byte gcstopem; /* stops emergency collections */ // 为1 gc状态机处理逻辑中 设置成1主要是组织在分配内存失败的时候,gc处于正在收集清理清空,而你却调用luaC_fullgc释放一些空间来满足你内存需求
   lu_byte genminormul;  /* control for minor generational collections *///分代完整GC
   lu_byte genmajormul;  /* control for major generational collections *///分代局部GC
   lu_byte gcstp;  /* control whether GC is running *///GC是否正在运行
   lu_byte gcemergency;  /* true if this is an emergency collection *///为1 进行紧急GC回收
-  lu_byte gcpause;  /* size of pause between successive GCs *///控制垃圾收集器在一次收集完成后等待多久再开始新的一次收集
-  lu_byte gcstepmul;  /* GC "speed" *////gc每步处理多少数据
-  lu_byte gcstepsize;  /* (log2 of) GC granularity *///gc粒度
+  lu_byte gcpause;  /* size of pause between successive GCs */// 用于控制下一轮GC开始的时机 控制垃圾收集器在一次收集完成后等待多久再开始新的一次收集
+  lu_byte gcstepmul;  /* GC "speed" *////gc每步处理多少数据  控制GC的回收速度
+  lu_byte gcstepsize;  /* (log2 of) GC granularity *///在下一个GC步骤之前这次GC回收的量
   GCObject *allgc;  /* list of all collectable objects *///存放待GC对象的链表，所有对象创建之后都会放入该链表中
-  GCObject **sweepgc;  /* current position of sweep in list *///待处理的回收数据都存放在rootgc链表中，
-                                                                // 由于回收阶段不是一次性全部回收这个链表的所有数据，
-                                                                // 所以使用这个变量来保存当前回收的位置，下一次从这个位置开始继续回收操作
+  GCObject **sweepgc;  /* current position of sweep in list */// 由于回收阶段不是一次性全部回收这个链表的所有数据，
+                                                              // 所以使用这个变量来保存当前回收的位置，下一次从这个位置开始继续回收操作
 
   GCObject *finobj;  /* list of collectable objects with finalizers *///存放所有带有析构函数(__gc)的GC obj链表
   GCObject *gray;  /* list of gray objects *///存放灰色节点的链表
@@ -304,7 +303,7 @@ typedef struct global_State {
                                                                 //  弱表（weak table）：键或（和）值是弱引用 
 
   GCObject *allweak;  /* list of all-weak tables *///具有要清除的弱键或弱值 或者弱键弱值同时存在的表
-  GCObject *tobefnz;  /* list of userdata to be GC *///所有准备终结的对象
+  GCObject *tobefnz;  /* list of userdata to be GC *///所有准备终结的userdata对象
   GCObject *fixedgc;  /* list of objects not to be collected */// 永远不回收的对象链表, 如保留关键字的字符串, 对象必须在创建之后马上
                                                               //  从 allgc 链表移入该链表中, 用的是 lgc.c 中的 luaC_fix 函数 
 
@@ -424,7 +423,7 @@ union GCUnion {
 
 
 /* actual number of total bytes allocated */
-///分配的实际总字节数
+///lua当前分配的实际内存值
 #define gettotalbytes(g)	cast(lu_mem, (g)->totalbytes + (g)->GCdebt)
 
 LUAI_FUNC void luaE_setdebt (global_State *g, l_mem debt);
