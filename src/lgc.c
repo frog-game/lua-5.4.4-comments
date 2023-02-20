@@ -2,7 +2,7 @@
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-19 22:37:48
+ * @LastEditTime: 2023-02-20 00:11:43
  */
 
 /*
@@ -804,7 +804,7 @@ static int traversethread (global_State *g, lua_State *th) {
   for (uv = th->openupval; uv != NULL; uv = uv->u.open.next)///标记openupval
     markobject(g, uv);  /* open upvalues cannot be collected */
   if (g->gcstate == GCSatomic) {  /* final traversal? */
-    for (; o < th->stack_last + EXTRA_STACK; o++)//将栈上 free slot 置为 nil
+    for (; o < th->stack_last + EXTRA_STACK; o++)//清除已经不在使用的栈空间,并把它们置成nil
       setnilvalue(s2v(o));  /* clear dead stack slice */
     /* 'remarkupvals' may have removed thread from 'twups' list */
     if (!isintwups(th) && th->openupval != NULL) {// 若 thread 上有 openupval, 则将其重新加入到 g->twups list 中
@@ -1003,6 +1003,40 @@ static void freeobj (lua_State *L, GCObject *o) {
 
 
 /*
+** Enter first sweep phase.
+** The call to 'sweeptolive' makes the pointer point to an object
+** inside the list (instead of to the header), so that the real sweep do
+** not need to skip objects created between "now" and the start of the
+** real sweep.
+*/
+
+/// @brief // 设置gcstate为GCSswpallgc
+// 尝试设置sweepgc为allgc中下一项
+/// @param L 
+static void entersweep (lua_State *L) {
+  global_State *g = G(L);
+  g->gcstate = GCSswpallgc;
+  lua_assert(g->sweepgc == NULL);
+  g->sweepgc = sweeptolive(L, &g->allgc);
+}
+
+/*
+** sweep a list until a live object (or end of list)
+*/
+
+/// @brief  调用 sweeplist, sweep 过程中把非 dead 对象标记为 currentwhite 
+/// @param L 
+/// @param p 
+/// @return 
+static GCObject **sweeptolive (lua_State *L, GCObject **p) {
+  GCObject **old = p;
+  do {
+    p = sweeplist(L, p, 1, NULL);
+  } while (p == old);
+  return p;
+}
+
+/*
 ** sweep at most 'countin' elements from a list of GCObjects erasing dead
 ** objects, where a dead object is one marked with the old (non current)
 ** white; change all non-dead objects back to white, preparing for next
@@ -1039,22 +1073,6 @@ static GCObject **sweeplist (lua_State *L, GCObject **p, int countin,
   return (*p == NULL) ? NULL : p;//如果list遍历已经完成那就返回Null
 }
 
-
-/*
-** sweep a list until a live object (or end of list)
-*/
-
-/// @brief  调用 sweeplist, sweep 过程中把非 dead 对象标记为 currentwhite 
-/// @param L 
-/// @param p 
-/// @return 
-static GCObject **sweeptolive (lua_State *L, GCObject **p) {
-  GCObject **old = p;
-  do {
-    p = sweeplist(L, p, 1, NULL);
-  } while (p == old);
-  return p;
-}
 
 /* }====================================================== */
 
@@ -1790,26 +1808,6 @@ static void setpause (global_State *g) {
   luaE_setdebt(g, debt);
 }
 
-
-/*
-** Enter first sweep phase.
-** The call to 'sweeptolive' makes the pointer point to an object
-** inside the list (instead of to the header), so that the real sweep do
-** not need to skip objects created between "now" and the start of the
-** real sweep.
-*/
-
-/// @brief // 设置gcstate为GCSswpallgc
-// 尝试设置sweepgc为allgc中下一项
-/// @param L 
-static void entersweep (lua_State *L) {
-  global_State *g = G(L);
-  g->gcstate = GCSswpallgc;
-  lua_assert(g->sweepgc == NULL);
-  g->sweepgc = sweeptolive(L, &g->allgc);
-}
-
-
 /*
 ** Delete all objects in list 'p' until (but not including) object
 ** 'limit'.
@@ -1847,21 +1845,21 @@ static lu_mem atomic (lua_State *L) {
   global_State *g = G(L);
   lu_mem work = 0;
   GCObject *origweak, *origall;
-  GCObject *grayagain = g->grayagain;  /* save original list *///保存初始的灰色链表位置
+  GCObject *grayagain = g->grayagain;  /* save original list *///grayagain链表
   g->grayagain = NULL;
   lua_assert(g->ephemeron == NULL && g->weak == NULL);
   lua_assert(!iswhite(g->mainthread));//主线程不能是白色
   g->gcstate = GCSatomic;//进入原子阶段
   markobject(g, L);  /* mark running thread *///标记运行中的协程栈
   /* registry and global metatables may be changed by API */
-  markvalue(g, &g->l_registry);//标记注册表
-  markmt(g);  /* mark global metatables *///标记元表
-  work += propagateall(g);  /* empties 'gray' list *///迭代灰色链表节点
+  markvalue(g, &g->l_registry);//标记全局注册表
+  markmt(g);  /* mark global metatables *///标记全局元表
+  work += propagateall(g);  /* empties 'gray' list *////gray链表可能有会有新的对象重新标记灰色链表节点
   /* remark occasional upvalues of (maybe) dead threads */
   work += remarkupvals(g);//标记open状态的上值
-  work += propagateall(g);  /* propagate changes *///迭代灰色链表节点
-  g->gray = grayagain;//恢复一下初始的灰色链表位置
-  work += propagateall(g);  /* traverse 'grayagain' list *///迭代遍历grayagain链表
+  work += propagateall(g);  /* propagate changes *///gray链表可能有会有新的对象重新标记灰色链表节点
+  g->gray = grayagain;//修改gray链表指针指向grayagain指针
+  work += propagateall(g);  /* traverse 'grayagain' list *///gray链表可能有会有新的对象重新标记灰色链表节点
   convergeephemerons(g);//不断遍历 weak table 的 ephemerons 链表, 直到一次遍历没有标记任何值为止
   /* at this point, all strongly accessible objects are marked. */
   /* Clear values from weak tables, before checking finalizers */
@@ -1869,18 +1867,19 @@ static lu_mem atomic (lua_State *L) {
   clearbyvalues(g, g->allweak, NULL);//清除g->allweak中所有未标记的值
   origweak = g->weak; origall = g->allweak;
   separatetobefnz(g, 0);  /* separate objects to be finalized *///将带__gc函数的需要回收的(白色)对象放到global_State.tobefnz表中,留待以后清理
-  work += markbeingfnz(g);  /* mark objects that will be finalized *///标记将要完成的对象
-  work += propagateall(g);  /* remark, to propagate 'resurrection' */
+  work += markbeingfnz(g);  /* mark objects that will be finalized *///遍历g->tobefnz链表中所有元素并标记（上一循环剩下的object）
+  work += propagateall(g);  /* remark, to propagate 'resurrection' *///gray链表可能有会有新的对象重新标记灰色链表节点
   convergeephemerons(g);//不断遍历 weak table 的 ephemerons 链表
   /* at this point, all resurrected objects are marked. */
   /* remove dead objects from weak tables */
-  clearbykeys(g, g->ephemeron);  /* clear keys from all ephemeron tables *///清除g->weak中所有未标记的值
+  clearbykeys(g, g->ephemeron);  /* clear keys from all ephemeron tables *///清除g->ephemeron中所有未标记的值
   clearbykeys(g, g->allweak);  /* clear keys from all 'allweak' tables *///清除g->allweak中所有未标记的值
   /* clear values from resurrected weak tables */
+  //从复活的弱表中清除值
   clearbyvalues(g, g->weak, origweak);
   clearbyvalues(g, g->allweak, origall);
-  luaS_clearcache(g);
-  g->currentwhite = cast_byte(otherwhite(g));  /* flip current white */
+  luaS_clearcache(g);//清除字符串缓冲区中将被GC的字符串
+  g->currentwhite = cast_byte(otherwhite(g));  /* flip current white *///将当前白色类型切换到了下一次GC操作的白色类型 
   lua_assert(g->gray == NULL);
   return work;  /* estimate of slots marked by 'atomic' */
 }
