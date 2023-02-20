@@ -10,6 +10,7 @@
   - [协程](https://frog-game.github.io/posts/read/lua5.4.4.coroutine/)
 - 第三章 虚拟机
   - [栈](https://frog-game.github.io/posts/read/lua5.4.4.stack/)
+  - [GC](https://frog-game.github.io/posts/read/lua5.4.4.gc/)
 
 > 如果发现错误请联系我,qq:505384662
 >
