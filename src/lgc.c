@@ -2,7 +2,7 @@
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-20 00:11:43
+ * @LastEditTime: 2023-02-21 23:29:21
  */
 
 /*
@@ -1322,8 +1322,8 @@ static void setpause (global_State *g);//c语言前置声明
 /// @brief  清除过期的对象，同时把所有对象存活的对象标记为G_OLD
 /// @param L 
 /// @param p 
-static void sweep2old (lua_State *L, GCObject **p) {
   GCObject *curr;
+static void sweep2old (lua_State *L, GCObject **p) {
   global_State *g = G(L);//获取全局状态机
   while ((curr = *p) != NULL) {//进行遍历
     if (iswhite(curr)) {  /* is 'curr' dead? *///如果是白色的
@@ -1540,7 +1540,7 @@ static void youngcollection (lua_State *L, global_State *g) {
   markold(g, g->finobj, g->finobjrold);
   markold(g, g->tobefnz, NULL);
 
-  ///标记节点
+  ///原子标记节点
   atomic(L);
 
   /* sweep nursery and get a pointer to its last live element */
@@ -1583,7 +1583,7 @@ static void youngcollection (lua_State *L, global_State *g) {
 static void atomic2gen (lua_State *L, global_State *g) {
   cleargraylists(g);//清除灰色链表
   /* sweep all elements making them old */
-  g->gcstate = GCSswpallgc;//设置成清扫global_State.allgc 
+  g->gcstate = GCSswpallgc;//设置成清扫阶段
   sweep2old(L, &g->allgc);//清扫过期对象,并标记成G_OLD
   /* everything alive now is old */
   g->reallyold = g->old1 = g->survival = g->allgc;
@@ -1614,10 +1614,14 @@ static void atomic2gen (lua_State *L, global_State *g) {
 /// @param g 
 /// @return 
 static lu_mem entergen (lua_State *L, global_State *g) {
+
+  ///首先进行增量gc的标记 + 原子标记 但是这块不会把对象标记成G_OLD状态
   lu_mem numobjs;
   luaC_runtilstate(L, bitmask(GCSpause));  /* prepare to start a new cycle */
   luaC_runtilstate(L, bitmask(GCSpropagate));  /* start new cycle */
   numobjs = atomic(L);  /* propagates all and then do the atomic stuff */
+
+  //然后切换到分代方式调用sweep2old进行清除标记成G_OLD
   atomic2gen(L, g);
   return numobjs;
 }
@@ -1629,7 +1633,7 @@ static lu_mem entergen (lua_State *L, global_State *g) {
 ** and go to the pause state.
 */
 
-/// @brief 进入到增量模式
+/// @brief 对gc相关变量进行初始化并进入到增量模式
 /// @param g 
 static void enterinc (global_State *g) {
   whitelist(g, g->allgc);
@@ -1662,13 +1666,13 @@ void luaC_changemode (lua_State *L, int newmode) {
 ** Does a full collection in generational mode.
 */
 
-/// @brief 在分代模式下执行完整集合
+/// @brief 在分代模式下执行完整收集
 /// @param L 
 /// @param g 
 /// @return 
 static lu_mem fullgen (lua_State *L, global_State *g) {
-  enterinc(g);
-  return entergen(L, g);
+  enterinc(g);//对gc相关变量进行初始化并进入到增量模式
+  return entergen(L, g);//进入分代模式
 }
 
 
@@ -1676,8 +1680,11 @@ static lu_mem fullgen (lua_State *L, global_State *g) {
 ** Set debt for the next minor collection, which will happen when
 ** memory grows 'genminormul'%.
 */
+
+/// @brief 设置下一次minor gc的时机
+/// @param g 
 static void setminordebt (global_State *g) {
-  luaE_setdebt(g, -(cast(l_mem, (gettotalbytes(g) / 100)) * g->genminormul));
+  luaE_setdebt(g, -(cast(l_mem, (gettotalbytes(g) / 100)) * g->genminormul)); // (gettotalbytes(g) / 100)) * g->genminormul) 如果是默认情况下等价于说当前内存总量的20%新增的时候触发minor gc
 }
 
 
@@ -1702,22 +1709,27 @@ static void setminordebt (global_State *g) {
 ** field 'g->lastatomic' keeps this count from the last collection.
 ** ('g->lastatomic != 0' also means that the last collection was bad.)
 */
+
+/// @brief 当有垃圾量时候进行的操作
+/// @param L 
+/// @param g 
 static void stepgenfull (lua_State *L, global_State *g) {
-  lu_mem newatomic;  /* count of traversed objects */
-  lu_mem lastatomic = g->lastatomic;  /* count from last collection */
-  if (g->gckind == KGC_GEN)  /* still in generational mode? */
-    enterinc(g);  /* enter incremental mode */
-  luaC_runtilstate(L, bitmask(GCSpropagate));  /* start new cycle */
-  newatomic = atomic(L);  /* mark everybody */
-  if (newatomic < lastatomic + (lastatomic >> 3)) {  /* good collection? */
-    atomic2gen(L, g);  /* return to generational mode */
-    setminordebt(g);
+  lu_mem newatomic;  /* count of traversed objects *///新的原子方式下统计的垃圾量
+  lu_mem lastatomic = g->lastatomic;  /* count from last collection *///上一次统计的原子方式下统计的垃圾量
+  if (g->gckind == KGC_GEN)  /* still in generational mode? *///分代gc模式
+    enterinc(g);  /* enter incremental mode */// 对gc相关变量进行初始化并进入到增量模式
+  luaC_runtilstate(L, bitmask(GCSpropagate));  /* start new cycle */// 每次调用singlestep，实现单步回收，直到GCSpropagate状态停止
+  newatomic = atomic(L);  /* mark everybody *///进行原子标记操作
+  if (newatomic < lastatomic + (lastatomic >> 3))
+  { /* good collection? */ // 当前扫描到的垃圾量 - 老的垃圾量 = 当前的内存垃圾增量; 当前内存垃圾增量 < (lastatomic >> 3); 当前内存垃圾增量 < lastatomic / 8 意思就是当前内存垃圾增量< 老的扫描回收量的8分之一时
+    atomic2gen(L, g);  /* return to generational mode *///原子方式切换到分代模式
+    setminordebt(g);//设置下一次minor gc的时机
   }
   else {  /* another bad collection; stay in incremental mode */
-    g->GCestimate = gettotalbytes(g);  /* first estimate */;
-    entersweep(L);
-    luaC_runtilstate(L, bitmask(GCSpause));  /* finish collection */
-    setpause(g);
+    g->GCestimate = gettotalbytes(g);  /* first estimate */;//估算存活下来的数量
+    entersweep(L);//进入扫描,清理死亡,复活非死亡对象阶段
+    luaC_runtilstate(L, bitmask(GCSpause));  /* finish collection *///每次调用singlestep，实现单步回收，直到GCSpause状态停止
+    setpause(g);//设置下回收期间隔时间,等待下一次major gc方式回收
     g->lastatomic = newatomic;
   }
 }
@@ -1747,27 +1759,27 @@ static void stepgenfull (lua_State *L, global_State *g) {
 /// @param L 
 /// @param g 
 static void genstep (lua_State *L, global_State *g) {
-  if (g->lastatomic != 0)  /* last collection was a bad one? */
+  if (g->lastatomic != 0)  /* last collection was a bad one? *///有原子扫描方式下的统计的垃圾量
     stepgenfull(L, g);  /* do a full step */
   else {
-    lu_mem majorbase = g->GCestimate;  /* memory after last major collection *///保存基础值，该基础值会在entergen初始化
-    lu_mem majorinc = (majorbase / 100) * getgcparam(g->genmajormul);
-    if (g->GCdebt > 0 && gettotalbytes(g) > majorbase + majorinc) {
-      lu_mem numobjs = fullgen(L, g);  /* do a major collection */
-      if (gettotalbytes(g) < majorbase + (majorinc / 2)) {
+    lu_mem majorbase = g->GCestimate;  /* memory after last major collection *///上一轮完整GC所存活下来的对象总数量内存值
+    lu_mem majorinc = (majorbase / 100) * getgcparam(g->genmajormul);//检测比例值,从getgcparam(p) setgcparam(p,v)在代码中设置和调用可以看出,如果g->genmajormul使用的是默认值100的话,那么majorinc = majorbase
+    if (g->GCdebt > 0 && gettotalbytes(g) > majorbase + majorinc) {//假设是默认配置,则认为如果现在内存涨了一倍
+      lu_mem numobjs = fullgen(L, g);  /* do a major collection *///major gc方式回收
+      if (gettotalbytes(g) < majorbase + (majorinc / 2)) {//进行完 major gc方式回收以后发现回收了至少一半的内存,设置下一次minor gc的时机
         /* collected at least half of memory growth since last major
            collection; keep doing minor collections */
-        setminordebt(g);
+        setminordebt(g);//设置下一次minor gc的时机
       }
-      else {  /* bad collection */
-        g->lastatomic = numobjs;  /* signal that last collection was bad */
-        setpause(g);  /* do a long wait for next (major) collection */
+      else {  /* bad collection *///认为这次是糟糕的回收状态
+        g->lastatomic = numobjs;  /* signal that last collection was bad *///记录垃圾量
+        setpause(g);  /* do a long wait for next (major) collection *///等待下一次major gc方式回收
       }
     }
     else {  /* regular case; do a minor collection */
       youngcollection(L, g);//执行一次young gc
-      setminordebt(g);
-      g->GCestimate = majorbase;  /* preserve base value */
+      setminordebt(g);//设置下一次minor gc的时机
+      g->GCestimate = majorbase;  /* preserve base value *///统计存活量
     }
   }
   lua_assert(isdecGCmodegen(g));
@@ -1794,18 +1806,19 @@ static void genstep (lua_State *L, global_State *g) {
 // 使用方法：
 // collectgarbage("setpause", 200)，表示当收集器在总使用内存数量达到上次垃圾收集时的两倍时再开启新的收集周期
 // collectgarbage("setpause", 0) 当值为零时表示 Lua语言在上一次垃圾回收结束后立即开始一次新的收集
+///默认情况下是当内存达到上一个周期结束时的两倍的时候,再进入下一个周期
 /// @param g 
 static void setpause (global_State *g) {
-  l_mem threshold, debt;
+  l_mem threshold, debt;  //threshold:内存阈值
   int pause = getgcparam(g->gcpause);
-  l_mem estimate = g->GCestimate / PAUSEADJ;  /* adjust 'estimate' */
+  l_mem estimate = g->GCestimate / PAUSEADJ;  /* adjust 'estimate' *///estimate:前预估lua内存占有量
   lua_assert(estimate > 0);
-  threshold = (pause < MAX_LMEM / estimate)  /* overflow? */
-            ? estimate * pause  /* no overflow */
+  threshold = (pause < MAX_LMEM / estimate)  /* overflow? *//// [MAX_LMEM / estimate]:本机最大内存量和当前实际使用量的比值
+            ? estimate * pause  /* no overflow *///[estimate * pause]:得到的是阈值,pause就是倍数,如果是100就是一倍,200就是2倍
             : MAX_LMEM;  /* overflow; truncate to maximum */
-  debt = gettotalbytes(g) - threshold;
-  if (debt > 0) debt = 0;
-  luaE_setdebt(g, debt);
+  debt = gettotalbytes(g) - threshold;//一般来说设定的值都会 threshold > gettotalbytes(g) 所以debt会是负数
+  if (debt > 0) debt = 0;//大于0归位一下
+  luaE_setdebt(g, debt);//如果设置的是负数,那么就会等待g->GCestimate缓慢增长到大于0就开始下一轮GC
 }
 
 /*
@@ -1825,6 +1838,9 @@ static void deletelist (lua_State *L, GCObject *p, GCObject *limit) {
 ** Call all finalizers of the objects in the given Lua state, and
 ** then free all objects, except for the main thread.
 */
+
+/// @brief lua释放除主线程以外所有对象的地方
+/// @param L 
 void luaC_freeallobjects (lua_State *L) {
   global_State *g = G(L);
   g->gcstp = GCSTPCLS;  /* no extra finalizers after here */
@@ -1977,13 +1993,15 @@ static lu_mem singlestep (lua_State *L) {
 ** advances the garbage collector until it reaches a state allowed
 ** by 'statemask'
 */
+
+/// @brief 每次调用singlestep，实现单步回收，直到出现某个状态时停止回收
+/// @param L 
+/// @param statesmask 
 void luaC_runtilstate (lua_State *L, int statesmask) {
   global_State *g = G(L);
   while (!testbit(statesmask, g->gcstate))
     singlestep(L);
 }
-
-
 
 /*
 ** Performs a basic incremental step. The debt and step size are
