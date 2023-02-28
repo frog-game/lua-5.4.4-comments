@@ -2,7 +2,7 @@
  * @文件作用: 虚拟机。执行字节码（luaV_execute）。还公开了lapi.c使用的一些功能（例如luaV_concat）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-30 10:12:12
+ * @LastEditTime: 2023-02-27 16:10:52
  */
 /*
 ** $Id: lvm.c $
@@ -1526,7 +1526,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         op_bitwise(L, luaV_shiftl);
         vmbreak;
       }
-      vmcase(OP_MMBIN) {//对上一条失败的算术运算尝试元方法
+      vmcase(OP_MMBIN) {//前面算术和位运算失败尝试调用C层元方法
         Instruction pi = *(pc - 2);  /* original arith. expression */
         TValue *rb = vRB(i);
         TMS tm = (TMS)GETARG_C(i);
@@ -1535,7 +1535,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         Protect(luaT_trybinTM(L, s2v(ra), rb, result, tm));
         vmbreak;
       }
-      vmcase(OP_MMBINI) {//对上一条失败的算术运算尝试元方法
+      vmcase(OP_MMBINI) {//前面算术和位运算失败尝试调用C层元方法
         Instruction pi = *(pc - 2);  /* original arith. expression */
         int imm = GETARG_sB(i);
         TMS tm = (TMS)GETARG_C(i);
@@ -1544,7 +1544,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         Protect(luaT_trybiniTM(L, s2v(ra), imm, flip, result, tm));
         vmbreak;
       }
-      vmcase(OP_MMBINK) {//对上一条失败的算术运算尝试元方法
+      vmcase(OP_MMBINK) {//前面算术和位运算失败尝试调用C层元方法
         Instruction pi = *(pc - 2);  /* original arith. expression */
         TValue *imm = KB(i);
         TMS tm = (TMS)GETARG_C(i);

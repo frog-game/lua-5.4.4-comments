@@ -2,7 +2,7 @@
  * @文件作用: 虚拟机的字节码定义
  * @功能分类: 拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-04 22:41:09
+ * @LastEditTime: 2023-02-28 10:12:56
  */
 
 /*
@@ -43,7 +43,8 @@ isJ                           sJ(25)                     |   Op(7)     |
 // s:signed 符号 该参数应该被解释为有符号整数否则为无符号整数
 // sJ:表示跳转的PC偏移量
 // sBx和bx的区别是bx是一个无符号整数，而sbx表示的是一个有符号的数，也就是sbx可以是负数
-enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组合的类型
+// Ax 做参数扩展使用,只能和别的指令搭配使用,比如LOADKX指令
+enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///参数编码模式
 
 
 /*
@@ -67,7 +68,7 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 #define POS_A		(POS_OP + SIZE_OP)//A参数起始位置7位
 #define POS_k		(POS_A + SIZE_A)//k参数起始位置15位
 #define POS_B		(POS_k + 1)//B参数起始位置16位
-#define POS_C		(POS_B + SIZE_B)//C参数起始位置7位
+#define POS_C		(POS_B + SIZE_B)//C参数起始位置24位
 
 #define POS_Bx		POS_k//Bx参数起始位置15位
 
@@ -219,9 +220,9 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 
 
 /*
-** R(x) - register                                  一定是寄存器索引 一定要访问Lua栈
-** Kst(x) - constant (in constant table)            一定是常量 在常量表中
-** RK(x) == if ISK(x) then Kst(INDEXK(x)) else R(x) 可能是常量也可能在Lua栈中
+** R(x) - register                                  一定是寄存器索引 一定会访问Lua栈
+** Kst(x) - constant (in constant table)            一定是常量索引 一定会访问常量表
+** RK(x) == if ISK(x) then Kst(INDEXK(x)) else R(x) 可能是常量索引也可能是寄存器索引
 */
 
 /*
@@ -232,7 +233,7 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats *///组
 /// @brief Lua虚拟机采用定长指令，每条指令占4个字节
 // 在Lua 5.3里，操作码占指令低6位，因此总共能够容纳64条指令，定义了47条指令。
 // Lua 5.4将操作码扩展到了7位，因此总共能够容纳128条指令，定义了83条
-//立即数就是写在指令里的常数。用mov操作举例子，mov 12, %rax，那么这个 12 就在操作语句里。那么 12 相当于指令里的立即数。
+//立即数就是写在指令里的常数。用mov操作举例子，mov 12, %rax，那么这个 12 就在操作语句里。那么 12 相当于指令里的立即数。lua中的指令也类似,直接从指令参数中加载的整数和浮点数就是立即数
 typedef enum {
 /*----------------------------------------------------------------------
   name		args	description
@@ -286,8 +287,8 @@ OP_BANDK,/*	A B C	R[A] := R[B] & K[C]:integer			*///常量与
 OP_BORK,/*	A B C	R[A] := R[B] | K[C]:integer			*///常量或
 OP_BXORK,/*	A B C	R[A] := R[B] ~ K[C]:integer			*///常量异或
 
-OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*///立即数左移
-OP_SHLI,/*	A B sC	R[A] := sC << R[B]				*///立即数右移
+OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*///立即数右移
+OP_SHLI,/*	A B sC	R[A] := sC << R[B]				*///立即数左移
 
 OP_ADD,/*	A B C	R[A] := R[B] + R[C]				*///加
 OP_SUB,/*	A B C	R[A] := R[B] - R[C]				*///减
@@ -303,29 +304,32 @@ OP_BXOR,/*	A B C	R[A] := R[B] ~ R[C]				*///位异或
 OP_SHL,/*	A B C	R[A] := R[B] << R[C]				*///左移
 OP_SHR,/*	A B C	R[A] := R[B] >> R[C]				*///右移
 
-/*---------------对上一条失败的算术运算尝试元方法 begin*/
+/*---------------前面算术和位运算失败调用C层元方法 begin*/
 OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]	(*)	*/
 OP_MMBINI,/*	A sB C k	call C metamethod over R[A] and sB	*/
 OP_MMBINK,/*	A B C k		call C metamethod over R[A] and K[B]	*/
-/*---------------对上一条失败的算术运算尝试元方法 end*/
+/*---------------前面算术和位运算失败调用C层元方法 end*/
 
 OP_UNM,/*	A B	R[A] := -R[B]					*///一元减
 OP_BNOT,/*	A B	R[A] := ~R[B]					*///位非
 /*算术和位操作 end*/
 
+/*---------------逻辑运算 begin*/
 OP_NOT,/*	A B	R[A] := not R[B]				*///逻辑取反
+/*---------------逻辑运算 end*/
 
-/*其他操作 begin*/
+/*周边操作 begin*/
 OP_LEN,/*	A B	R[A] := #R[B] (length operator)			*///取长度
 OP_CONCAT,/*	A B	R[A] := R[A].. ... ..R[A + B - 1]		*///拼接对象
-/*其他操作 end*/
+/*周边操作 end*/
+
+OP_CLOSE,/*	A	close all upvalues >= R[A]			*///关闭上值
 
 /*to-be-close变量 begin*/
-OP_CLOSE,/*	A	close all upvalues >= R[A]			*///关闭tbc
 OP_TBC,/*	A	mark variable A "to be closed"			*///标记寄存器为tbc
 /*to-be-close变量 end*/
 
-/*逻辑判断和跳转 begin*/
+/*分支与跳转 begin*/
 OP_JMP,/*	sJ	pc += sJ					*///无条件跳转
 OP_EQ,/*	A B k	if ((R[A] == R[B]) ~= k) then pc++		*///相等测试,条件跳转
 OP_LT,/*	A B k	if ((R[A] <  R[B]) ~= k) then pc++		*///小于测试,条件跳转
@@ -340,7 +344,7 @@ OP_GEI,/*	A sB k	if ((R[A] >= sB) ~= k) then pc++		*///立即数大于等于测�
 
 OP_TEST,/*	A k	if (not R[A] == k) then pc++			*///bool测试,条件跳转
 OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) *///bool测试,条件跳转和赋值
-/*逻辑判断和跳转 end*/
+/*分支与跳转 end*/
 
 /*函数调用 begin*/
 OP_CALL,/*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) *///函数调用 
@@ -369,12 +373,12 @@ OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*///根据函数原型新建一
 
 OP_VARARG,/*	A C	R[A], R[A+1], ..., R[A+C-2] = vararg		*///将函数的可变参数拷贝给寄存器
 
-OP_VARARGPREP,/*A	(adjust vararg parameters)			*///跳转可变函数的调用信息
+OP_VARARGPREP,/*A	(adjust vararg parameters)			*/// 查看可变参数方式下固定参数个数
 /*函数调用 end*/ 
 
-/*附件参数 begin*/
+/*额外参数 begin*/
 OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*///为上一条指令提供额外参数
-/*附件参数 end*/
+/*额外参数 end*/
 } OpCode;
 
 
@@ -448,35 +452,35 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*///为上一条指
 // ** 指令属性的掩码
 // ** 位0-2：指令的类型 也就是这些 {iABC, iABx, iAsBx, iAx, isJ}
 // ** 位3：指令是否修改了寄存器A 
-// ** 位4：指令是否是测试指令下一条指令一定是jump指令 
-// ** 位5：使用前一条指令设置的L->top的值（当 B == 0 时） 
-// ** 位6：设置L->Top用于下一条指令（当C == 0时） 
+// ** 位4：判断当前指令是否涉及一次条件跳转 增加这个标记可以用来检测分支指令这一个打的类别，这样简化了指令集，当遇到跳转指令的时候，可以回到前一条指令来看看那是否是条件跳转
+// ** 位5：使用前一条指令设置的栈顶值（当 B == 0 时） 
+// ** 位6：将值放到栈顶,供后面的指令使用（当C == 0时） 
 // ** 位7：指令是MM指令（调用元方法）
 
 LUAI_DDEC(const lu_byte luaP_opmodes[NUM_OPCODES];)
 
 #define getOpMode(m)	(cast(enum OpMode, luaP_opmodes[m] & 7))//获取指令的类型
 #define testAMode(m)	(luaP_opmodes[m] & (1 << 3))//检查指令是否修改A寄存器
-#define testTMode(m)	(luaP_opmodes[m] & (1 << 4))//检查指令是否是测试指令
-#define testITMode(m)	(luaP_opmodes[m] & (1 << 5))//检查指令是否可以使用前一条指令设置的L->top的值
-#define testOTMode(m)	(luaP_opmodes[m] & (1 << 6))//检查指令是否可以设置L->Top 用于下一条指令
+#define testTMode(m)	(luaP_opmodes[m] & (1 << 4))//判断当前指令是否涉及一次条件跳转 
+#define testITMode(m)	(luaP_opmodes[m] & (1 << 5))//检查指令是否可以使用前一条指令设置的L->top的值（当B == 0时） 
+#define testOTMode(m)	(luaP_opmodes[m] & (1 << 6))//检查指令是否可以将值放到栈顶,供后面的指令使用（当C == 0时） 
 #define testMMMode(m)	(luaP_opmodes[m] & (1 << 7))//检查指令是否元方法指令
 
 /* "out top" (set top for next instruction) */
-//设置L->Top用于下一条指令
+//将值放到栈顶,供后面的指令使用（当C == 0时） 
 #define isOT(i)  \
 	((testOTMode(GET_OPCODE(i)) && GETARG_C(i) == 0) || \
           GET_OPCODE(i) == OP_TAILCALL)
 
 /* "in top" (uses top from previous instruction) */
-//使用前一条指令设置的L->top的值
+//使用前一条指令设置的栈顶值（当B == 0时） 
 #define isIT(i)		(testITMode(GET_OPCODE(i)) && GETARG_B(i) == 0)
 
 //// opmode对应相应操作模式的一个映射表
 // mm:元方法
-// ot:设置L->Top用于下一条指令
-// it:使用前一条指令设置的L->top的值
-// t:是否是测试指令
+// ot:将值放到栈顶,供后面的指令使用
+// it:使用前一条指令设置的栈顶值（当B == 0时） 
+// t:是否是条件跳转指令
 // a:是否修改A寄存器
 // m:指令的类型
 #define opmode(mm,ot,it,t,a,m)  \

@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-01 21:41:26
+ * @LastEditTime: 2023-02-25 16:33:29
  */
 
 /*
@@ -593,19 +593,9 @@ typedef struct Udata0 {
 */
 
 /// @brief 函数原型的上值描述信息
-// instack指明这个upvalue会存在哪里，有两种情况要考虑：
-// uv如果是上一层函数的局部变量，且这个上层函数还在活动中，那么该局部变量一定还在上层函数的栈中。此时，instack为1，表明它在栈中，idx指定在栈中的索引相对于上层函数的栈基址。
-// uv如果是上一层函数之外的局部变量，就像下面代码这样：
-// local x = 1
-// local function func()
-//     local function innerfunc()
-//         return x + 1
-//     end
-// end
-// x在上两层函数之外声明，Lua是这样解决这个问题的：首先func会把x当成upvalue记录下来，然后innerfunc再从func的upvalue数组寻找。所以这种情况下，instack为0，则idx表示上层函数uv列表的索引。
 typedef struct Upvaldesc {
   TString *name;  /* upvalue name (for debug information) *///上值的名字
-  lu_byte instack;  /* whether it is in stack (register) *///指明这个上值存在哪里
+  lu_byte instack;  /* whether it is in stack (register) *///指明这个上值存在哪里,1:表示在栈中创建存在上层函数的局部变量表中   0:表述不在栈中在上层函数的upvalues列表中
   lu_byte idx;  /* index of upvalue (in stack or in outer function's list) *///根据上面的instack表示是什么类型的索引
   lu_byte kind;  /* kind of corresponding variable *///变量类型 VDKREG,VDKREG,RDKCONST,RDKTOCLOSE,RDKCTC这几个类型
 } Upvaldesc;
