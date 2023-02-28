@@ -1,4 +1,4 @@
-./*
+/*
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
@@ -100,11 +100,11 @@
 //------------------------------------- 位标记索引 end ---------------------------------//
 
 
-//------------------------------------- 位检测设置 begin ---------------------------------//
-#define iswhite(x)      testbits((x)->marked, WHITEBITS)//是不是白色 其实就是看第3位或第4位是不是1
-#define isblack(x)      testbit((x)->marked, BLACKBIT)//是不是黑色 其实就是看第5位是不是1
-#define isgray(x)  /* neither white nor black */  \ //不是白色也不是黑色就认为是灰色
-	(!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))//是不是灰色 意思就是3,4,5位都的是0
+/*------------------------------------ - 位检测设置 begin-------------------------------- - */
+#define iswhite(x)      testbits((x)->marked, WHITEBITS)/*是不是白色 其实就是看第3位或第4位是不是1*/
+#define isblack(x)      testbit((x)->marked, BLACKBIT)/*是不是黑色 其实就是看第5位是不是1*/
+#define isgray(x)  /* neither white nor black 不是白色也不是黑色就认为是灰色*/   \
+	(!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))/*是不是灰色 意思就是3,4,5位都的是0*/
 
 #define tofinalize(x)	testbit((x)->marked, FINALIZEDBIT)//是不是标记了userdata 
 
@@ -117,7 +117,7 @@
 	check_exp(!iswhite(x), l_setbit((x)->marked, BLACKBIT))//当bit 3,4位都是0 然后就可以设成把5号位设置成黑色了
 
 #define luaC_white(g)	cast_byte((g)->currentwhite & WHITEBITS) //得到当前的要回收的白色类型 比如如果(g)->currentwhite是1000 1000 & 11000 = 01000， 1000 & 11000还是1000 是能获取当前白色值的状态 如果(g)->currentwhite是10000   10000 & 11000 = 10000， 10000 &11000还是10000
-//------------------------------------- 位检测设置 end ---------------------------------//
+/*------------------------------------- 位检测设置 end ---------------------------------*/
 
 /* object age in generational mode */
 //------------------------------------- 分代模式下对象年龄标识 begin ---------------------------------//
@@ -137,7 +137,8 @@
 #define setage(o,a)  ((o)->marked = cast_byte(((o)->marked & (~AGEBITS)) | a))//设置年龄
 #define isold(o)	(getage(o) > G_SURVIVAL)//是不是旧对象
 
-#define changeage(o,f,t)  \ //改变年龄 从f变到t 前提是o的年龄要等于f 举个例子changeage(curr, G_TOUCHED1, G_TOUCHED2); 如果getage(o) == (f) 那么marked的最地3位是101 101^=（101^110） 101^=011 o->marked=110
+//改变年龄 从f变到t 前提是o的年龄要等于f 举个例子changeage(curr, G_TOUCHED1, G_TOUCHED2); 如果getage(o) == (f) 那么marked的最地3位是101 101^=（101^110） 101^=011 o->marked=110
+#define changeage(o,f,t)  \
 	check_exp(getage(o) == (f), (o)->marked ^= ((f)^(t)))//这个公式是lua作者利用对同一个值进行两次异或等于本身原理
 //------------------------------------- 分代模式下对象年龄标识 end ---------------------------------//
 

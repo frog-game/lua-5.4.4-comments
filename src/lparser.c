@@ -1496,7 +1496,7 @@ static BinOpr getbinopr (int op) {
     case '%': return OPR_MOD;// 模
     case '^': return OPR_POW;// 幂
     case '/': return OPR_DIV;// 除
-    case +: return OPR_IDIV;//  整除
+    case TK_IDIV: return OPR_IDIV;//  整除
     case '&': return OPR_BAND;// 位与
     case '|': return OPR_BOR;//  位或
     case '~': return OPR_BXOR;// 位非 

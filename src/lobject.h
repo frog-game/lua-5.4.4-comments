@@ -603,7 +603,7 @@ typedef struct Upvaldesc {
 /// @brief 局部变量
 typedef struct LocVar {
   TString *varname;//变量名字
-  /*局部变量的作用域信息*/
+  //局部变量的作用域信息
   int startpc;  /* first point where variable is active *///该局部变量存活的第一个指令序号
   int endpc;    /* first point where variable is dead *///该局部变量不存活的第一个指令序号
 } LocVar;
@@ -685,7 +685,7 @@ typedef struct Proto {
 
 #define isLfunction(o)	ttisLclosure(o)//检测是不是lua闭包,并且是回收属性
 
-#define clvalue(o)	c heck_exp(ttisclosure(o), gco2cl(val_(o).gc))//GCobject转换成函数
+#define clvalue(o)	check_exp(ttisclosure(o), gco2cl(val_(o).gc))//GCobject转换成函数
 #define clLvalue(o)	check_exp(ttisLclosure(o), gco2lcl(val_(o).gc))//GCobject转换成lua闭包
 #define fvalue(o)	check_exp(ttislcf(o), val_(o).f)//获取轻量C函数
 #define clCvalue(o)	check_exp(ttisCclosure(o), gco2ccl(val_(o).gc))//GCobject转换成c闭包

@@ -268,7 +268,7 @@ CallInfo->callstatus 字段的位标识
 
 /// @brief 全局状态机
 typedef struct global_State {
-  lua_Alloc frealloc;  /* function to reallocate memory *////全局使用的内存分配器, 在 lua_auxilib.c 中提供了一个示例: l_alloc
+  lua_Alloc frealloc;  /* function to reallocate memory *///全局使用的内存分配器, 在 lua_auxilib.c 中提供了一个示例: l_alloc
   void *ud;         /* auxiliary data to 'frealloc' *////frealloc 函数的第一个参数, 用来实现定制内存分配器 
   l_mem totalbytes;  /* number of bytes currently allocated - GCdebt *///初始为 LG 结构大小 由内存分配器分配的实际内存
   l_mem GCdebt;  /* bytes allocated not yet compensated by the collector *///需要回收的内存数量

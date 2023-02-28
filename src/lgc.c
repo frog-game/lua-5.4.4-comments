@@ -507,7 +507,7 @@ static void genlink (global_State *g, GCObject *o) {
     linkobjgclist(o, g->grayagain);  /* link it back in 'grayagain' *///把object放到灰色链表
   }  /* everything else do not need to be linked back */
   else if (getage(o) == G_TOUCHED2)// touched2状态
-    changeage(o, G_TOUCHED2, G_OLD);  /* advance age *///改变年龄从G_TOUCHED2到G_OLD
+    changeage(o, G_TOUCHED2, G_OLD);/* advance age *///改变年龄从G_TOUCHED2到G_OLD
 }
 
 
@@ -1010,14 +1010,33 @@ static void freeobj (lua_State *L, GCObject *o) {
 ** real sweep.
 */
 
-/// @brief // 设置gcstate为GCSswpallgc
-// 尝试设置sweepgc为allgc中下一项
+/// @brief 释放dead对象, 将非 dead 对象标记为 currentwhite 
 /// @param L 
-static void entersweep (lua_State *L) {
-  global_State *g = G(L);
-  g->gcstate = GCSswpallgc;
-  lua_assert(g->sweepgc == NULL);
-  g->sweepgc = sweeptolive(L, &g->allgc);
+/// @param p 
+/// @param countin 每步扫描最大数量
+/// @param countout 遍历的元素数
+/// @return 
+static GCObject** sweeplist(lua_State* L, GCObject** p, int countin,
+    int* countout) {
+    global_State* g = G(L);//获取全局状态机
+    int ow = otherwhite(g);//非当前白
+    int i;
+    int white = luaC_white(g);  /* current white *///得到当前白
+    for (i = 0; *p != NULL && i < countin; i++) {//循环遍历
+        GCObject* curr = *p;//得到当前的GCObject
+        int marked = curr->marked;
+        if (isdeadm(ow, marked)) {  /* is 'curr' dead? *///如果是死亡状态
+            *p = curr->next;  /* remove 'curr' from list *///移除当前列表
+            freeobj(L, curr);  /* erase 'curr' *///进行释放
+        }
+        else {  /* change mark to 'white' */
+            curr->marked = cast_byte((marked & ~maskgcbits) | white);//如果不是dead状态，就给标记处当前白
+            p = &curr->next;  /* go to next element *///移动到下一个元素
+        }
+    }
+    if (countout)
+        *countout = i;  /* number of elements traversed *///遍历了多少个
+    return (*p == NULL) ? NULL : p;//如果list遍历已经完成那就返回Null
 }
 
 /*
@@ -1036,6 +1055,16 @@ static GCObject **sweeptolive (lua_State *L, GCObject **p) {
   return p;
 }
 
+/// @brief // 设置gcstate为GCSswpallgc
+// 尝试设置sweepgc为allgc中下一项
+/// @param L 
+static void entersweep(lua_State* L) {
+    global_State* g = G(L);
+    g->gcstate = GCSswpallgc;
+    lua_assert(g->sweepgc == NULL);
+    g->sweepgc = sweeptolive(L, &g->allgc);
+}
+
 /*
 ** sweep at most 'countin' elements from a list of GCObjects erasing dead
 ** objects, where a dead object is one marked with the old (non current)
@@ -1043,36 +1072,6 @@ static GCObject **sweeptolive (lua_State *L, GCObject **p) {
 ** collection cycle. Return where to continue the traversal or NULL if
 ** list is finished. ('*countout' gets the number of elements traversed.)
 */
-
-/// @brief 释放dead对象, 将非 dead 对象标记为 currentwhite 
-/// @param L 
-/// @param p 
-/// @param countin 每步扫描最大数量
-/// @param countout 遍历的元素数
-/// @return 
-static GCObject **sweeplist (lua_State *L, GCObject **p, int countin,
-                             int *countout) {
-  global_State *g = G(L);//获取全局状态机
-  int ow = otherwhite(g);//非当前白
-  int i;
-  int white = luaC_white(g);  /* current white *///得到当前白
-  for (i = 0; *p != NULL && i < countin; i++) {//循环遍历
-    GCObject *curr = *p;//得到当前的GCObject
-    int marked = curr->marked;
-    if (isdeadm(ow, marked)) {  /* is 'curr' dead? *///如果是死亡状态
-      *p = curr->next;  /* remove 'curr' from list *///移除当前列表
-      freeobj(L, curr);  /* erase 'curr' *///进行释放
-    }
-    else {  /* change mark to 'white' */
-      curr->marked = cast_byte((marked & ~maskgcbits) | white);//如果不是dead状态，就给标记处当前白
-      p = &curr->next;  /* go to next element *///移动到下一个元素
-    }
-  }
-  if (countout)
-    *countout = i;  /* number of elements traversed *///遍历了多少个
-  return (*p == NULL) ? NULL : p;//如果list遍历已经完成那就返回Null
-}
-
 
 /* }====================================================== */
 
@@ -1278,16 +1277,16 @@ static void correctpointers (global_State *g, GCObject *o) {
 /// @param mt 
 void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt) {
   global_State *g = G(L);//获取全局状态机
-  if (tofinalize(o) ||                 /* obj. is already marked... *///已经进行了标记
-      gfasttm(g, mt, TM_GC) == NULL ||    /* or has no finalizer... *///当不含gc元方法或者是关闭步骤的时候
-      (g->gcstp & GCSTPCLS))                   /* or closing state? */
+  if (tofinalize(o) ||/* obj. is already marked... *///已经进行了标记
+      gfasttm(g, mt, TM_GC) == NULL ||/* or has no finalizer... *///当不含gc元方法或者是关闭步骤的时候
+      (g->gcstp & GCSTPCLS))/* or closing state? */
     return;  /* nothing to be done *///啥也不做
   else {  /* move 'o' to 'finobj' list *///把o从g->finobj进行移除
     GCObject **p;
     if (issweepphase(g)) {//是不是扫描阶段
       makewhite(g, o);  /* "sweep" object 'o' *///擦除所有的颜色位,保留当前的白色位
-      if (g->sweepgc == &o->next)  /* should not remove 'sweepgc' object *///不应删除扫描对象
-        g->sweepgc = sweeptolive(L, g->sweepgc);  /* change 'sweepgc' *///标记为当前白
+      if (g->sweepgc == &o->next)  /* should not remove 'sweepgc' object 不应删除扫描对象*/
+        g->sweepgc = sweeptolive(L, g->sweepgc);  /* change 'sweepgc' 标记为当前白*/
     }
     else
       correctpointers(g, o);

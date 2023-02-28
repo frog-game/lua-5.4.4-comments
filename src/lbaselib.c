@@ -632,7 +632,7 @@ static int luaB_assert (lua_State *L) {
 }
 
 /// @brief 
-/ select (index, ···)
+// select (index, ···)
 // print(select('#',100,1))    --2
 // 如果 index 是个数字， 那么返回参数中第 index 个之后的部分； 
 // 负的数字会从后向前索引（-1 指最后一个参数）。 否则，index 必须是字符串 "#"， 此时 select 返回参数的个数。

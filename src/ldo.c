@@ -1123,7 +1123,7 @@ static void f_parser (lua_State *L, void *ud) {
   LClosure *cl;
   struct SParser *p = cast(struct SParser *, ud);
   int c = zgetc(p->z);  /* read first character *///获取第一字符的
-  if (c == LUA_SIGNATURE[0]) {.//如果字符等于"\x1bLua"判断是二进制
+  if (c == LUA_SIGNATURE[0]) {//如果字符等于"\x1bLua"判断是二进制
     checkmode(L, p->mode, "binary");
     cl = luaU_undump(L, p->z, p->name);
   }

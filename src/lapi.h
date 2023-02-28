@@ -38,8 +38,10 @@
     { if ((nres) <= LUA_MULTRET && L->ci->top < L->top) L->ci->top = L->top; }
 
 
-/* Ensure the stack has at least 'n' elements */
-/// @brief 检测栈中元素数量是否足够满足要求, 当前函数调用栈中至少要有 n 个元素
+/* Ensure the stack has at least 'n' elements  
+检测栈中元素数量是否足够满足要求, 当前函数调用栈中至少要有 n 个元素
+*/
+
 #define api_checknelems(L,n)	api_check(L, (n) < (L->top - L->ci->func), \
 				  "not enough elements in the stack")
 

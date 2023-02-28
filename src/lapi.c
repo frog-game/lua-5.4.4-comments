@@ -1239,7 +1239,7 @@ LUA_API void lua_setfield (lua_State *L, int idx, const char *k) {
 LUA_API void lua_seti (lua_State *L, int idx, lua_Integer n) {
   TValue *t;
   const TValue *slot;
-  lua_lock(L);      mnbvc
+  lua_lock(L);    
   api_checknelems(L, 1);
   t = index2value(L, idx);
   if (luaV_fastgeti(L, t, n, slot)) {
