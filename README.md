@@ -12,6 +12,9 @@
   - [栈](https://frog-game.github.io/posts/read/lua5.4.4.stack/)
   - [GC](https://frog-game.github.io/posts/read/lua5.4.4.gc/)
   - [指令集](https://frog-game.github.io/posts/read/lua5.4.4.code/)
+- 第四章 周边
+  - [元表](https://frog-game.github.io/posts/read/lua5.4.4.metatable/)
+
 
 > 如果发现错误请联系我,qq:505384662
 >

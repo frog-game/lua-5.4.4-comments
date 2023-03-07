@@ -2,7 +2,7 @@
  * @文件作用: lua基础库
  * @功能分类: 内嵌库
  * @注释者: frog-game
- * @LastEditTime: 2023-01-22 19:52:35
+ * @LastEditTime: 2023-03-04 21:57:07
  */
 /*
 ** $Id: lbaselib.c $
@@ -185,7 +185,7 @@ static int luaB_getmetatable (lua_State *L) {
 // setmetatable(a,{__metatable = "hello"})
 // setmetatable(a,{__metatable = "world"})
 // 这种情况就会报错
-// 也就是说 __metatable这个是保护元表,不可读写
+// 也就是说 __metatable这个是保护元表,不可重写
 static int luaB_setmetatable (lua_State *L) {
   int t = lua_type(L, 2);
   luaL_checktype(L, 1, LUA_TTABLE);

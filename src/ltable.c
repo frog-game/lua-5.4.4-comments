@@ -2,7 +2,7 @@
  * @文件作用: 表类型的相关操作。Lua表（哈希） 
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-01-26 23:57:26
+ * @LastEditTime: 2023-03-07 14:40:35
  */
 /*
 ** $Id: ltable.c $
@@ -1201,9 +1201,9 @@ lua_Unsigned luaH_getn (Table *t) {
       return limit - 1;//否则直接返回 这块其实是利用setnorealasize(t)属性设置的特性,也就是其实只要进入编号[1]一次就行了
     }
     else {  /* must search for a boundary in [0, limit] */
-      unsigned int boundary = binsearch(t->array, 0, limit);//如果table数组部分的最后一个元素为nil，那么将在数组部分进行查找
+      unsigned int boundary = binsearch(t->array, 0, limit);//在数组部分进行二分查找
       /* can this boundary represent the real size of the array? */
-      if (ispow2realasize(t) && boundary > luaH_realasize(t) / 2) {
+      if (ispow2realasize(t) && boundary > luaH_realasize(t) / 2) {//查看下这个边界能不能代表数组的实际大小
         t->alimit = boundary;  /* use it as the new limit */
         setnorealasize(t);
       }
@@ -1230,7 +1230,7 @@ lua_Unsigned luaH_getn (Table *t) {
   /* (3) 'limit' is the last element and either is zero or present in table *///最后一种情况是数组部分中没有元素 或如果table数组部分的最后一个元素为nil，那么将在hash部分进行二分查找
   lua_assert(limit == luaH_realasize(t) &&
              (limit == 0 || !isempty(&t->array[limit - 1])));
-  if (isdummy(t) || isempty(luaH_getint(t, cast(lua_Integer, limit + 1))))//如果hash是空的
+  if (isdummy(t) || isempty(luaH_getint(t, cast(lua_Integer, limit + 1))))//如果hash表不连贯返回了absentkey
     return limit;  /* 'limit + 1' is absent */
   else  /* 'limit + 1' is also present */
     return hash_search(t, limit);//hash查找

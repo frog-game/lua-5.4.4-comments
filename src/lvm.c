@@ -2,7 +2,7 @@
  * @文件作用: 虚拟机。执行字节码（luaV_execute）。还公开了lapi.c使用的一些功能（例如luaV_concat）
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-27 16:10:52
+ * @LastEditTime: 2023-03-07 10:31:30
  */
 /*
 ** $Id: lvm.c $
@@ -51,7 +51,7 @@
 
 
 
-/* limit for table tag-method chains (to avoid infinite loops) */
+/* limit for table tag-method chains (to avoid infinite loops) loop次数避免死循环用的*/
 #define MAXTAGLOOP	2000
 
 
@@ -290,32 +290,39 @@ static int floatforloop (StkId ra) {
 ** if 'slot' is NULL, 't' is not a table; otherwise, 'slot' points to
 ** t[k] entry (which must be empty).
 */
+
+/// @brief table根据某个键查询值最后要调用的函数
+/// @param L 
+/// @param t 
+/// @param key 
+/// @param val 
+/// @param slot 如果slot是null,那么说明t不是表,否则就是t[k]的值
 void luaV_finishget (lua_State *L, const TValue *t, TValue *key, StkId val,
                       const TValue *slot) {
-  int loop;  /* counter to avoid infinite loops */
-  const TValue *tm;  /* metamethod */
+  int loop;  /* counter to avoid infinite loops 弄一个计数器避免进入死循环*/
+  const TValue *tm;  /* metamethod 元方法*/
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
-    if (slot == NULL) {  /* 't' is not a table? */
+    if (slot == NULL) {  /* 't' is not a table? t不是table*/
       lua_assert(!ttistable(t));
-      tm = luaT_gettmbyobj(L, t, TM_INDEX);
-      if (l_unlikely(notm(tm)))
-        luaG_typeerror(L, t, "index");  /* no metamethod */
+      tm = luaT_gettmbyobj(L, t, TM_INDEX);//获取元方法
+      if (l_unlikely(notm(tm)))//没有设置index元方法
+        luaG_typeerror(L, t, "index");  /* no metamethod 报错*/
       /* else will try the metamethod */
     }
-    else {  /* 't' is a table */
-      lua_assert(isempty(slot));
-      tm = fasttm(L, hvalue(t)->metatable, TM_INDEX);  /* table's metamethod */
-      if (tm == NULL) {  /* no metamethod? */
-        setnilvalue(s2v(val));  /* result is nil */
+    else {  /* 't' is a table *///t是个table
+      lua_assert(isempty(slot));//是个null值
+      tm = fasttm(L, hvalue(t)->metatable, TM_INDEX);  /* table's metamethod *///找到元方法
+      if (tm == NULL) {  /* no metamethod? *///没找到
+        setnilvalue(s2v(val));  /* result is nil *///返回nil
         return;
       }
       /* else will try the metamethod */
     }
-    if (ttisfunction(tm)) {  /* is metamethod a function? */
-      luaT_callTMres(L, tm, t, key, val);  /* call it */
+    if (ttisfunction(tm)) {  /* is metamethod a function? *///如果是个函数
+      luaT_callTMres(L, tm, t, key, val);  /* call it *///调用函数
       return;
     }
-    t = tm;  /* else try to access 'tm[key]' */
+    t = tm;  /* else try to access 'tm[key]' *///否则访问tm[key]
     if (luaV_fastget(L, t, key, slot, luaH_get)) {  /* fast track? */
       setobj2s(L, val, slot);  /* done */
       return;
@@ -333,17 +340,24 @@ void luaV_finishget (lua_State *L, const TValue *t, TValue *key, StkId val,
 ** is no such entry.  (The value at 'slot' must be empty, otherwise
 ** 'luaV_fastget' would have done the job.)
 */
+
+/// @brief table根据某个键设置值最后要调用的函数
+/// @param L 
+/// @param t 
+/// @param key 
+/// @param val 
+/// @param slot 如果slot是null,那么说明t不是表,否则就是设置t[k]的值
 void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
                      TValue *val, const TValue *slot) {
-  int loop;  /* counter to avoid infinite loops */
+  int loop;  /* counter to avoid infinite loops 弄一个计数器避免进入死循环*/
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
     const TValue *tm;  /* '__newindex' metamethod */
-    if (slot != NULL) {  /* is 't' a table? */
-      Table *h = hvalue(t);  /* save 't' table */
+    if (slot != NULL) {  /* is 't' a table? 元方法*/
+      Table *h = hvalue(t);  /* save 't' table t是个table*/
       lua_assert(isempty(slot));  /* slot must be empty */
-      tm = fasttm(L, h->metatable, TM_NEWINDEX);  /* get metamethod */
-      if (tm == NULL) {  /* no metamethod? */
-        luaH_finishset(L, h, key, slot, val);  /* set new value */
+      tm = fasttm(L, h->metatable, TM_NEWINDEX);  /* get metamethod 获取元方法*/
+      if (tm == NULL) {  /* no metamethod? 没有元方法*/
+        luaH_finishset(L, h, key, slot, val);  /* set new value 直接设置值*/
         invalidateTMcache(h);
         luaC_barrierback(L, obj2gco(h), val);
         return;
@@ -351,17 +365,17 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
       /* else will try the metamethod */
     }
     else {  /* not a table; check metamethod */
-      tm = luaT_gettmbyobj(L, t, TM_NEWINDEX);
+      tm = luaT_gettmbyobj(L, t, TM_NEWINDEX);//查找元方法
       if (l_unlikely(notm(tm)))
         luaG_typeerror(L, t, "index");
     }
     /* try the metamethod */
-    if (ttisfunction(tm)) {
-      luaT_callTM(L, tm, t, key, val);
+    if (ttisfunction(tm)) {//是个函数
+      luaT_callTM(L, tm, t, key, val);//进行设置
       return;
     }
     t = tm;  /* else repeat assignment over 'tm' */
-    if (luaV_fastget(L, t, key, slot, luaH_get)) {
+    if (luaV_fastget(L, t, key, slot, luaH_get)) {//访问table直接进行设置
       luaV_finishfastset(L, t, slot, val);
       return;  /* done */
     }
@@ -686,32 +700,37 @@ void luaV_concat (lua_State *L, int total) {
 /*
 ** Main operation 'ra = #rb'.
 */
+
+/// @brief 获取对象的长度
+/// @param L 
+/// @param ra 
+/// @param rb 
 void luaV_objlen (lua_State *L, StkId ra, const TValue *rb) {
   const TValue *tm;
   switch (ttypetag(rb)) {
-    case LUA_VTABLE: {
+    case LUA_VTABLE: {//是表
       Table *h = hvalue(rb);
       tm = fasttm(L, h->metatable, TM_LEN);
-      if (tm) break;  /* metamethod? break switch to call it */
-      setivalue(s2v(ra), luaH_getn(h));  /* else primitive len */
+      if (tm) break;  /* metamethod? break switch to call it 有元方法,直接调用table设置的__len元方法*/
+      setivalue(s2v(ra), luaH_getn(h));  /* else primitive len 直接获取table长度*/
       return;
     }
-    case LUA_VSHRSTR: {
-      setivalue(s2v(ra), tsvalue(rb)->shrlen);
+    case LUA_VSHRSTR: {//短字符串
+      setivalue(s2v(ra), tsvalue(rb)->shrlen);//直接返回长度
       return;
     }
-    case LUA_VLNGSTR: {
-      setivalue(s2v(ra), tsvalue(rb)->u.lnglen);
+    case LUA_VLNGSTR: {//长字符串
+      setivalue(s2v(ra), tsvalue(rb)->u.lnglen);//直接返回长度
       return;
     }
     default: {  /* try metamethod */
-      tm = luaT_gettmbyobj(L, rb, TM_LEN);
-      if (l_unlikely(notm(tm)))  /* no metamethod? */
+      tm = luaT_gettmbyobj(L, rb, TM_LEN);//获取元表
+      if (l_unlikely(notm(tm)))  /* no metamethod? *///没有元表就报错
         luaG_typeerror(L, rb, "get length of");
       break;
     }
   }
-  luaT_callTMres(L, tm, rb, rb, ra);
+  luaT_callTMres(L, tm, rb, rb, ra);//直接调用元方法
 }
 
 

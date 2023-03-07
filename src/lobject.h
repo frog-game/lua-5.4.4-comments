@@ -2,7 +2,7 @@
  * @文件作用: 对象操作的一些函数。包括数据类型<->字符串转换
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-25 16:33:29
+ * @LastEditTime: 2023-03-07 14:47:00
  */
 
 /*
@@ -852,7 +852,7 @@ typedef union Node {
 ** smallest power of two not smaller than 'alimit' (or zero iff 'alimit'
 ** is zero); 'alimit' is then used as a hint for #t.
 */
-
+//第8位为0代表alimit是数组实际大小标识,否则如果为1代表不是数组实际大小标识
 #define BITRAS		(1 << 7)//第8位为1
 #define isrealasize(t)		(!((t)->flags & BITRAS))//根据flags的第8位判断alimit是否为数组部分的实际大小
 #define setrealasize(t)		((t)->flags &= cast_byte(~BITRAS))//设置flags的第8为0 

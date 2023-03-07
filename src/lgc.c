@@ -2,7 +2,7 @@
  * @文件作用: 垃圾回收
  * @功能分类: 虚拟机运转的核心功能
  * @注释者: frog-game
- * @LastEditTime: 2023-02-21 23:29:21
+ * @LastEditTime: 2023-03-06 21:53:57
  */
 
 /*
@@ -686,7 +686,7 @@ static void traversestrongtable (global_State *g, Table *h) {
 /// @return 返回工作单元数量
 static lu_mem traversetable (global_State *g, Table *h) {
   const char *weakkey, *weakvalue;
-  const TValue *mode = gfasttm(g, h->metatable, TM_MODE);//从元方法中获取弱表信息
+  const TValue *mode = gfasttm(g, h->metatable, TM_MODE);//从元表中获取弱表信息
   markobjectN(g, h->metatable);//对object标记
   if (mode && ttisstring(mode) &&  /* is there a weak mode? *///是weak mode
       (cast_void(weakkey = strchr(svalue(mode), 'k')),//得到key
