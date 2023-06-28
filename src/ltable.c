@@ -169,9 +169,14 @@ static Node *hashint (const Table *t, lua_Integer i) {
 */
 #if !defined(l_hashfloat)
 /// @brief 浮点型数据的哈希算法
-// 在一个两个组合的表示中，INT_MAX没有一个精确的浮点数表示。但是INT_MAX有
-// 因为frexp的绝对值是一个比一小的数字（除非n是无穷大或无效数字）
-// 'frexp * -INT_MIN'的绝对值小于或等于INT_MAX。通过使用unsigned int可以避免加i时溢出，通过使用~u可以避免INT_MIN的问题
+//这是一个关于浮点数哈希计算的注释。主要计算过程应该是：
+//n = frexp(n, &i); return (n * INT_MAX) + i  
+//但是存在一些数值上的微妙之处。以下是注释的解释：
+//1.在二进制补码表示中，INT_MAX（整数的最大值）不能被精确表示为浮点数，但是 INT_MIN（整数的最小值）可以。
+//2.由于 frexp 函数的绝对值小于1（除非 n 是无穷大或 NaN），所以 frexp 乘以 -INT_MIN 的绝对值小于或等于 INT_MAX。
+//3.使用 unsigned int 类型可以避免在加上 i 时发生溢出。
+//4.使用 ~u（而不是 -u）可以避免处理 INT_MIN 时出现的问题。
+//这段注释解释了在计算浮点数哈希值时需要注意的一些细节。其中，frexp 是一个将浮点数 n 分解为尾数和指数的函数。
 
 // l_mathop:将返回值强转为lua_Number
 // rexp()用来把一个数分解为尾数和指数，其原型为：
